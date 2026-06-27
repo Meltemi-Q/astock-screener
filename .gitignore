@@ -1,0 +1,8 @@
+__pycache__/
+cache/*.json
+results/deep_dives/*.html
+results/deep_dives/index.html
+results/*.csv
+results/*.html
+*.pyc
+.DS_Store
