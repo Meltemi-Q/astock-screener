@@ -8,7 +8,7 @@
   - 资产负债表关键指标（负债率/流动比率/ROA）
   - 现金流量表（经营/投资/筹资现金流）
   - 同行业估值对比
-  - DeepSeek V4 Pro 定性分析：生意模式、护城河、管理层、成长性、行业地位、风险
+  - DeepSeek AI 定性分析：生意模式、护城河、管理层、成长性、行业地位、风险
 
 输出：一个共享 report.html 页面壳 + 每只股票一个 JSON 数据文件（可点开看完整分析）。
 
@@ -20,7 +20,7 @@
 """
 
 import os, sys, json, time, csv, ssl, argparse, re
-from urllib import request, parse
+from urllib import request, parse, error
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
@@ -29,6 +29,9 @@ CACHE_DIR = os.path.join(WORKDIR, "cache")
 OUT_DIR = os.path.join(WORKDIR, "results", "deep_dives")
 TEMPLATE_DIR = os.path.join(WORKDIR, "templates", "deep_dive")
 DATA_DIR_NAME = "data"
+PREFETCH_THRESHOLD = int(os.environ.get("DEEP_PREFETCH_THRESHOLD", "50"))
+DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash")
+DEEPSEEK_RETRIES = int(os.environ.get("DEEPSEEK_RETRIES", "3"))
 SSL_CTX = ssl.create_default_context()
 SSL_CTX.check_hostname = False
 SSL_CTX.verify_mode = ssl.CERT_NONE
@@ -131,6 +134,17 @@ def prefetch_all_financials(codes=None):
           f"{len(_FINANCIAL_CACHE['cashflow'])} 只现金流")
     print(f"  用时 {time.time()-t0:.1f}s · 后续每只股票从内存读取")
     return _FINANCIAL_CACHE
+
+
+def should_prefetch_financials(mode, stock_count, is_single_code):
+    """判断是否在主流程中预取财务三表。"""
+    if mode == "always":
+        return True
+    if mode == "never":
+        return False
+    return (not is_single_code) and stock_count >= PREFETCH_THRESHOLD
+
+
 def http_get(url, retries=5):
     """带重试的 HTTP GET，自适应退避。"""
     last = None
@@ -185,7 +199,7 @@ def fnum(x):
 # ============================================================
 # 二、单只股票全面数据收集
 # ============================================================
-def fetch_stock_full(code, name=None, industry=None, csv_rows=None, no_kline=False):
+def fetch_stock_full(code, name=None, industry=None, csv_rows=None, no_kline=False, spot_cache=None):
     """
     抓取一只股票的全部深度数据。
     name/industry 优先从 CSV 传入（准确），回退到 API。
@@ -226,13 +240,16 @@ def fetch_stock_full(code, name=None, industry=None, csv_rows=None, no_kline=Fal
 
     # 5) 行情数据：批量抓取全市场行情（clist f12 过滤有 bug 不可靠），
     #    利用 astock_screener.fetch_spot_parallel() + 缓存，秒级取到正确数据。
-    spot = {}
-    try:
-        from astock_screener import fetch_spot_parallel
-        all_spot = fetch_spot_parallel()
-        spot = all_spot.get(code, {})
-    except Exception:
-        pass
+    if spot_cache is not None:
+        spot = spot_cache.get(code, {})
+    else:
+        spot = {}
+        try:
+            from astock_screener import fetch_spot_parallel
+            all_spot = fetch_spot_parallel()
+            spot = all_spot.get(code, {})
+        except Exception:
+            pass
     # 回退：从 CSV 取上次筛选时的行情
     if not spot and csv_rows:
         my = next((r for r in csv_rows if r["code"] == code), {})
@@ -428,7 +445,7 @@ def compute_financials(stock):
 # 四、DeepSeek 定性分析
 # ============================================================
 def deepseek_analyze(stock, financials):
-    """调用 DeepSeek V4 Pro API 生成定性分析。"""
+    """调用 DeepSeek API 生成定性分析。"""
     if not DEEPSEEK_KEY:
         return None
 
@@ -472,37 +489,64 @@ def deepseek_analyze(stock, financials):
 请严格按以下 JSON 格式输出（不要 Markdown，不要代码块标记）：
 {{"business_model":"...","moat":"...","moat_score":8,"growth":"...","industry_position":"...","management":"...","risks":"...","thesis":"...","value_trap_risk":"低/中/高","confidence":"高/中/低","qual_score":85}}"""
 
+    req_payload = {
+        "model": DEEPSEEK_MODEL,
+        "messages": [
+            {"role": "system", "content": "你是资深价值投资者，擅长用第一性原理分析企业基本面。回答用中文，简洁深刻，不做铺垫。"},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.4,
+        "max_tokens": 1500,
+        "user_id": "economy_deep_dive",
+    }
+    if DEEPSEEK_MODEL.startswith("deepseek-v4-"):
+        req_payload["thinking"] = {"type": "disabled"}
+
+    last_err = None
+    retries = max(1, DEEPSEEK_RETRIES)
+    for attempt in range(retries):
+        try:
+            req_body = json.dumps(req_payload).encode("utf-8")
+            api_req = request.Request(
+                "https://api.deepseek.com/v1/chat/completions",
+                data=req_body,
+                headers={
+                    "Authorization": f"Bearer {DEEPSEEK_KEY}",
+                    "Content-Type": "application/json",
+                }
+            )
+            resp = json.loads(request.urlopen(api_req, timeout=60, context=SSL_CTX).read())
+            content = resp["choices"][0]["message"]["content"]
+
+            # 尝试解析 JSON
+            content_clean = content.strip()
+            if content_clean.startswith("```"):
+                content_clean = re.sub(r"^```\w*\n?", "", content_clean)
+                content_clean = re.sub(r"\n?```$", "", content_clean)
+            return json.loads(content_clean)
+        except error.HTTPError as e:
+            last_err = f"HTTP {e.code}"
+            if e.code not in (429, 500, 502, 503, 504) or attempt == retries - 1:
+                break
+            time.sleep(1.5 * (attempt + 1))
+        except Exception as e:
+            last_err = str(e)
+            if attempt == retries - 1:
+                break
+            time.sleep(1.0 * (attempt + 1))
+    print(f"    DeepSeek API 错误: {last_err}")
+    return None
+
+
+def run_deepseek_with_limiter(stock, financials, ai_limiter=None):
+    """可选地通过 semaphore 限制 DeepSeek 并发。"""
+    if ai_limiter is None:
+        return deepseek_analyze(stock, financials)
+    ai_limiter.acquire()
     try:
-        req_body = json.dumps({
-            "model": "deepseek-chat",
-            "messages": [
-                {"role": "system", "content": "你是资深价值投资者，擅长用第一性原理分析企业基本面。回答用中文，简洁深刻，不做铺垫。"},
-                {"role": "user", "content": prompt}
-            ],
-            "temperature": 0.4,
-            "max_tokens": 1500,
-        }).encode("utf-8")
-
-        api_req = request.Request(
-            "https://api.deepseek.com/v1/chat/completions",
-            data=req_body,
-            headers={
-                "Authorization": f"Bearer {DEEPSEEK_KEY}",
-                "Content-Type": "application/json",
-            }
-        )
-        resp = json.loads(request.urlopen(api_req, timeout=60, context=SSL_CTX).read())
-        content = resp["choices"][0]["message"]["content"]
-
-        # 尝试解析 JSON
-        content_clean = content.strip()
-        if content_clean.startswith("```"):
-            content_clean = re.sub(r"^```\w*\n?", "", content_clean)
-            content_clean = re.sub(r"\n?```$", "", content_clean)
-        return json.loads(content_clean)
-    except Exception as e:
-        print(f"    DeepSeek API 错误: {e}")
-        return None
+        return deepseek_analyze(stock, financials)
+    finally:
+        ai_limiter.release()
 
 
 # ============================================================
@@ -605,7 +649,7 @@ def _generate_html_legacy(stock, financials, analysis, output_path, screen_ts=No
 
         ai_html = f"""
     <div class="section">
-        <h2>🤖 AI 定性分析 (DeepSeek V4 Pro)</h2>
+        <h2>🤖 AI 定性分析 (DeepSeek)</h2>
         <div class="ai-meta">
             <span>护城河评分: <b style="color:{moat_color}">{analysis.get('moat_score', '?')}/10</b></span>
             <span>综合定性分: <b style="color:#3a86ff">{analysis.get('qual_score', '?')}/100</b></span>
@@ -649,7 +693,7 @@ def _generate_html_legacy(stock, financials, analysis, output_path, screen_ts=No
         <h2>🤖 AI 定性分析</h2>
         <div id="aiPlaceholder" style="background:#131820;border:1px dashed #2a3140;border-radius:10px;padding:20px;text-align:center;color:#6b7380">
             <p style="font-size:15px;margin:0 0 8px">AI 定性分析未运行</p>
-            <p style="font-size:12px;margin:0 0 12px">DeepSeek V4 Pro 将对生意模式、护城河、管理层、成长性、行业地位、风险做深度分析（约 5-10 秒）</p>
+            <p style="font-size:12px;margin:0 0 12px">DeepSeek 将对生意模式、护城河、管理层、成长性、行业地位、风险做深度分析（约 5-10 秒）</p>
             <button id="aiAnalyzeBtn" style="background:#1d2033;border:1px solid #3a86ff;color:#7fb3ff;padding:8px 20px;border-radius:7px;cursor:pointer;font-size:14px"
                     onclick="runAiAnalysis('{code}')">🤖 开始 AI 分析</button>
             <div id="aiProgress" style="margin-top:10px;display:none;color:#7fb3ff;font-size:12px">⏳ 分析中…</div>
@@ -816,7 +860,7 @@ footer{{margin-top:40px;padding:16px 0;border-top:1px solid #232936;color:#5a627
 {ai_html}
 
 <footer>
-    数据来源：东方财富公开接口 · AI分析由 DeepSeek V4 Pro 生成，仅供参考不构成投资建议 · 生成于 {time.strftime('%Y-%m-%d %H:%M')}
+    数据来源：东方财富公开接口 · AI分析由 DeepSeek 生成，仅供参考不构成投资建议 · 生成于 {time.strftime('%Y-%m-%d %H:%M')}
 </footer>
 </div>
 
@@ -1213,6 +1257,48 @@ def build_deep_dive_payload(stock, financials, analysis, screen_ts=None):
     }
 
 
+def _payload_path_for_code(code, base_dir=None):
+    return os.path.join(base_dir or OUT_DIR, DATA_DIR_NAME, f"{code}.json")
+
+
+def _stock_from_payload(payload):
+    meta = payload.get("meta") or {}
+    quote = payload.get("quote") or {}
+    return {
+        "code": meta.get("code") or "",
+        "name": meta.get("name") or "",
+        "industry": meta.get("industry") or "",
+        "price": quote.get("price"),
+        "pe_ttm": quote.get("pe_ttm"),
+        "pe_dyn": quote.get("pe_dyn"),
+        "pb": quote.get("pb"),
+        "mktcap": quote.get("mktcap"),
+        "peers": payload.get("peers") or [],
+        "kline": payload.get("kline") or {"day": [], "week": [], "month": []},
+    }
+
+
+def run_ai_only_for_existing_report(code, ai_limiter=None):
+    """只对已有 JSON 研报补 DeepSeek 分析，不重新抓财务/行情/K线。"""
+    data_path = _payload_path_for_code(code)
+    if not os.path.exists(data_path):
+        print(f"    [{code}] 无已有 JSON 研报，跳过 AI-only")
+        return False
+    with open(data_path, encoding="utf-8") as f:
+        payload = json.load(f)
+    stock = _stock_from_payload(payload)
+    financials = payload.get("financials") or []
+    analysis = run_deepseek_with_limiter(stock, financials, ai_limiter)
+    if not analysis:
+        return False
+    payload["analysis"] = analysis
+    payload.setdefault("meta", {})["generated_at"] = time.strftime("%Y-%m-%d %H:%M")
+    with open(data_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
+    ensure_deep_dive_app(OUT_DIR)
+    return True
+
+
 def generate_html(stock, financials, analysis, output_path, screen_ts=None):
     """生成 JSON-backed 个股研报：共享 report.html + data/XXXXXX.json。"""
     base_dir = _base_dir_from_output_path(output_path)
@@ -1295,7 +1381,7 @@ footer{{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #23293
 </tr></thead>
 <tbody>{rows_html}</tbody>
 </table></div>
-<footer>数据来源：东方财富公开接口 · AI分析由 DeepSeek V4 Pro 生成 · 仅供参考不构成投资建议 · <a href="../astock_screen_{screen_ts}.html">← 回到选股总表</a></footer>
+<footer>数据来源：东方财富公开接口 · AI分析由 DeepSeek 生成 · 仅供参考不构成投资建议 · <a href="../astock_screen_{screen_ts}.html">← 回到选股总表</a></footer>
 </div>
 </body></html>"""
     idx_path = os.path.join(base_dir, "index.html")
@@ -1304,20 +1390,41 @@ footer{{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #23293
     return idx_path
 
 
-def _process_one(idx, s, total, csv_rows, screen_ts, no_llm, deepseek_key, no_kline, stocks_done, lock):
+def _process_one(idx, s, total, csv_rows, screen_ts, no_llm, deepseek_key, no_kline,
+                 stocks_done, lock, spot_cache=None, ai_limiter=None, ai_only=False):
     """单只股票的分析+生成（线程安全）。"""
     code = s["code"]
     with lock:
         print(f"[{idx+1}/{total}] {code} {s['name']}")
 
-    stock = fetch_stock_full(code, name=s["name"], industry=s.get("industry"), csv_rows=csv_rows, no_kline=no_kline)
+    if ai_only:
+        ok = False
+        if not no_llm and deepseek_key:
+            with lock:
+                print(f"    [{code}] 🤖 AI-only 分析中...", end=" ", flush=True)
+            ok = run_ai_only_for_existing_report(code, ai_limiter)
+            with lock:
+                print("OK" if ok else "失败")
+        s["has_llm"] = ok or _report_has_analysis(OUT_DIR, code)
+        with lock:
+            stocks_done.append(s)
+        return
+
+    stock = fetch_stock_full(
+        code,
+        name=s["name"],
+        industry=s.get("industry"),
+        csv_rows=csv_rows,
+        no_kline=no_kline,
+        spot_cache=spot_cache,
+    )
     financials = compute_financials(stock)
 
     analysis = None
     if not no_llm and deepseek_key:
         with lock:
             print(f"    [{code}] 🤖 DeepSeek 分析中...", end=" ", flush=True)
-        analysis = deepseek_analyze(stock, financials)
+        analysis = run_deepseek_with_limiter(stock, financials, ai_limiter)
         with lock:
             print("OK" if analysis else "失败")
 
@@ -1339,9 +1446,19 @@ def main():
     ap.add_argument("--tier", type=str, choices=["A", "B", "C"], help="仅分析指定评级的股票")
     ap.add_argument("--no-llm", action="store_true", help="跳过 DeepSeek AI 分析")
     ap.add_argument("--parallel", type=int, default=20, help="并行生成研报的线程数（默认20）")
+    ap.add_argument("--ai-concurrency", type=int, default=int(os.environ.get("DEEPSEEK_CONCURRENCY", "20")),
+                    help="DeepSeek API 并发数（默认20，可独立于研报线程数调低）")
+    ap.add_argument("--ai-only", action="store_true", help="只对已有 JSON 研报补 AI，不重抓财务/行情/K线")
+    ap.add_argument("--prefetch-financials", choices=["auto", "always", "never"], default="auto",
+                    help="批量预取财务三表：auto>=50只启用，always强制，never禁用")
     ap.add_argument("--no-parallel", action="store_true", help="禁用并行，逐只生成")
     ap.add_argument("--no-kline", action="store_true", help="跳过 K 线图（提速 ~40%%，适合批量跑）")
     args = ap.parse_args()
+
+    if args.parallel < 1:
+        ap.error("--parallel 必须 >= 1")
+    if args.ai_concurrency < 1:
+        ap.error("--ai-concurrency 必须 >= 1")
 
     os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -1392,34 +1509,46 @@ def main():
         sys.exit(1)
 
     print(f"\n{'='*60}")
-    print(f"个股深度研报生成 | {len(stocks)} 只 | {'含 AI 定性分析' if not args.no_llm and DEEPSEEK_KEY else '仅量化数据'}")
+    mode_label = "AI-only" if args.ai_only else ("含 AI 定性分析" if not args.no_llm and DEEPSEEK_KEY else "仅量化数据")
+    print(f"个股深度研报生成 | {len(stocks)} 只 | {mode_label}")
     if not args.no_parallel and len(stocks) > 1:
         print(f"并行模式：{args.parallel} 线程")
+    if not args.no_llm and DEEPSEEK_KEY:
+        print(f"AI并发：{args.ai_concurrency} | 模型：{DEEPSEEK_MODEL}")
     print(f"{'='*60}\n")
 
     # 从 CSV 文件名提取日期，用于动态返回链接
     screen_ts = csv_path[0].replace("astock_screen_", "").replace(".csv", "")
 
-    # 预热：先跑一次 spot 抓取，让后续所有调用全部走缓存
-    try:
-        from astock_screener import fetch_spot_parallel
-        fetch_spot_parallel()
-    except Exception:
-        pass
+    codes = [s["code"] for s in stocks]
+    if not args.ai_only and should_prefetch_financials(args.prefetch_financials, len(stocks), bool(args.code)):
+        prefetch_all_financials(codes)
+
+    spot_cache = None
+    if not args.ai_only:
+        # 只抓一次全市场行情，线程间共享，避免每只股票重复创建行情线程池。
+        try:
+            from astock_screener import fetch_spot_parallel
+            spot_cache = fetch_spot_parallel()
+        except Exception:
+            spot_cache = None
 
     stocks_done = []
     thread_lock = threading.Lock()
+    ai_limiter = threading.BoundedSemaphore(args.ai_concurrency) if (not args.no_llm and DEEPSEEK_KEY) else None
 
     if args.no_parallel or len(stocks) <= 1:
         for i, s in enumerate(stocks):
             _process_one(i, s, len(stocks), csv_rows, screen_ts,
-                        args.no_llm, DEEPSEEK_KEY, args.no_kline, stocks_done, thread_lock)
+                        args.no_llm, DEEPSEEK_KEY, args.no_kline, stocks_done, thread_lock,
+                        spot_cache=spot_cache, ai_limiter=ai_limiter, ai_only=args.ai_only)
     else:
         with ThreadPoolExecutor(max_workers=args.parallel) as ex:
             futures = {}
             for i, s in enumerate(stocks):
                 fut = ex.submit(_process_one, i, s, len(stocks), csv_rows,
-                               screen_ts, args.no_llm, DEEPSEEK_KEY, args.no_kline, stocks_done, thread_lock)
+                               screen_ts, args.no_llm, DEEPSEEK_KEY, args.no_kline, stocks_done, thread_lock,
+                               spot_cache, ai_limiter, args.ai_only)
                 futures[fut] = s
             for fut in as_completed(futures):
                 try:

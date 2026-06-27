@@ -5,6 +5,7 @@
 #   ./run.sh --fresh         强制刷新行情
 #   ./run.sh --deep          选股后自动生成个股深度研报（含 AI 定性）
 #   ./run.sh --deep --no-llm 深度研报但不调用 AI（仅量化数据）
+#   ./run.sh --deep --ai-only 只对已有研报补 AI
 #   ./run.sh --code 600519   单独生成某只股票的深度研报
 #   ./run.sh --serve-only    仅启动服务（不跑选股）
 #   ./run.sh --year 2024     使用 2024 年报
@@ -18,6 +19,8 @@ usage() {
   ./run.sh --fresh         强制刷新行情
   ./run.sh --deep          选股后自动生成个股深度研报（含 AI 定性）
   ./run.sh --deep --no-llm 深度研报但不调用 AI（仅量化数据）
+  ./run.sh --deep --ai-only 只对已有研报补 AI，不重抓财务/K线
+  ./run.sh --deep --parallel=20 --ai-concurrency=20
   ./run.sh --code 600519   单独生成某只股票的深度研报
   ./run.sh --serve-only    仅启动服务（不跑选股）
   ./run.sh --serve=8900    指定 HTTP 服务端口
@@ -54,6 +57,11 @@ for arg in "$@"; do
     --fresh)     SCREENER_ARGS+=("$arg") ;;
     --deep)      DO_DEEP=true ;;
     --no-llm)    DEEP_ARGS+=("$arg") ;;
+    --ai-only)   DEEP_ARGS+=("$arg"); DO_DEEP=true; DO_SCREENER=false ;;
+    --no-kline)  DEEP_ARGS+=("$arg") ;;
+    --parallel=*) DEEP_ARGS+=("--parallel" "${arg#*=}") ;;
+    --ai-concurrency=*) DEEP_ARGS+=("--ai-concurrency" "${arg#*=}") ;;
+    --prefetch-financials=*) DEEP_ARGS+=("--prefetch-financials" "${arg#*=}") ;;
     --code)      EXPECT_CODE="1" ;;
     --year)      EXPECT_YEAR="1"; SCREENER_ARGS+=("$arg") ;;
     --serve-only) DO_SCREENER=false; DO_SERVE=true ;;

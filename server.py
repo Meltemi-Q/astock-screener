@@ -32,20 +32,33 @@ def _count_existing():
 
 def _count_tier_stocks(tier):
     """读取最新 CSV，统计指定 tier 的股票数。"""
+    return len(_tier_stock_codes(tier))
+
+
+def _tier_stock_codes(tier):
+    """读取最新 CSV，返回指定 tier 的股票代码。"""
     csvs = sorted([f for f in os.listdir(RESULTS_DIR)
                    if f.startswith("astock_screen_") and f.endswith(".csv")],
                   reverse=True)
     if not csvs:
-        return 0
+        return []
     tier_map = {"A": "A_可买入", "B": "B_优质待跌", "C": "C_接近合格", "all": None}
     target = tier_map.get(tier)
-    count = 0
+    codes = []
     with open(os.path.join(RESULTS_DIR, csvs[0]), encoding="utf-8-sig") as f:
         import csv
         for r in csv.DictReader(f):
             if target is None or r.get("tier", "") == target:
-                count += 1
-    return count
+                codes.append(r.get("code", ""))
+    return [c for c in codes if len(c) == 6 and c.isdigit()]
+
+
+def _deep_json_exists(code):
+    return os.path.exists(os.path.join(DEEP_DIR, "data", f"{code}.json"))
+
+
+def _all_deep_json_exist(codes):
+    return bool(codes) and all(_deep_json_exists(code) for code in codes)
 
 
 class ScreenerHandler(SimpleHTTPRequestHandler):
@@ -120,6 +133,8 @@ class ScreenerHandler(SimpleHTTPRequestHandler):
             self.send_json({"error": "无效代码"}, status=400)
             return
         args = [sys.executable, os.path.join(WORKDIR, "stock_deep_dive.py"), "--code", code]
+        if _deep_json_exists(code):
+            args.append("--ai-only")
         try:
             result = subprocess.run(args, capture_output=True, text=True,
                                     timeout=120, cwd=WORKDIR)
@@ -139,7 +154,8 @@ class ScreenerHandler(SimpleHTTPRequestHandler):
         tier = tier.upper()
         if tier not in ("A", "B", "C"):
             tier = "A"
-        total = _count_tier_stocks(tier)
+        tier_codes = _tier_stock_codes(tier)
+        total = len(tier_codes)
         before = _count_existing()
 
         with _job_lock:
@@ -150,9 +166,12 @@ class ScreenerHandler(SimpleHTTPRequestHandler):
             global _job
             exit_code = 0
             try:
+                args = [sys.executable, os.path.join(WORKDIR, "stock_deep_dive.py"),
+                        "--tier", tier, "--parallel", "20", "--ai-concurrency", "20"]
+                if _all_deep_json_exist(tier_codes):
+                    args.append("--ai-only")
                 result = subprocess.run(
-                    [sys.executable, os.path.join(WORKDIR, "stock_deep_dive.py"),
-                     "--tier", tier, "--parallel", "20"],
+                    args,
                     capture_output=True, text=True, timeout=600, cwd=WORKDIR)
                 exit_code = result.returncode
             except Exception:

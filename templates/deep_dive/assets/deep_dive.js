@@ -71,7 +71,7 @@ function renderReport(data){
   renderFinancialRows(financials);
   renderPeers(data);
   renderAnalysis(data);
-  $("footer").textContent="数据来源：东方财富公开接口 · AI分析由 DeepSeek V4 Pro 生成，仅供参考不构成投资建议 · 生成于 "+(meta.generated_at||"");
+  $("footer").textContent="数据来源：东方财富公开接口 · AI分析由 DeepSeek 生成，仅供参考不构成投资建议 · 生成于 "+(meta.generated_at||"");
   bindKlineButtons();
   drawKline();
   setupKlineInteraction();
@@ -161,7 +161,7 @@ function renderAnalysis(data){
   if(!analysis){
     $("analysisBlock").innerHTML='<div class="section"><h2>AI 定性分析</h2>'
       +'<div class="ai-placeholder"><p style="font-size:15px">AI 定性分析未运行</p>'
-      +'<p style="font-size:12px">DeepSeek V4 Pro 将对生意模式、护城河、管理层、成长性、行业地位、风险做深度分析。</p>'
+      +'<p style="font-size:12px">DeepSeek 将对生意模式、护城河、管理层、成长性、行业地位、风险做深度分析。</p>'
       +'<button id="aiAnalyzeBtn">开始 AI 分析</button><div class="ai-progress" id="aiProgress">分析中…</div></div></div>';
     $("aiAnalyzeBtn").addEventListener("click",function(){runAiAnalysis(code)});
     return;
@@ -177,7 +177,7 @@ function renderAnalysis(data){
     ["管理层与治理",analysis.management],
     ["风险点",analysis.risks,"risk"]
   ];
-  $("analysisBlock").innerHTML='<div class="section"><h2>AI 定性分析 (DeepSeek V4 Pro)</h2>'
+  $("analysisBlock").innerHTML='<div class="section"><h2>AI 定性分析 (DeepSeek)</h2>'
     +'<div class="ai-meta"><span>护城河评分: <b style="color:'+moatColor+'">'+esc(analysis.moat_score||"?")+'/10</b></span>'
     +'<span>综合定性分: <b style="color:#3a86ff">'+esc(analysis.qual_score||"?")+'/100</b></span>'
     +'<span>价值陷阱风险: <b style="color:'+trapColor+'">'+esc(analysis.value_trap_risk||"?")+'</b></span>'

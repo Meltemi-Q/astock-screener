@@ -4,6 +4,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -198,6 +200,117 @@ class RegressionTests(unittest.TestCase):
                 self.assertIn('"deepCount": 1', html)
         finally:
             astock_screener.OUT_DIR = old_out_dir
+
+    def test_fetch_stock_full_uses_shared_spot_cache_without_refetching_market_data(self):
+        import stock_deep_dive
+
+        old_cache = stock_deep_dive._FINANCIAL_CACHE
+        try:
+            stock_deep_dive._FINANCIAL_CACHE = {
+                "income": {"000001": []},
+                "balance": {"000001": []},
+                "cashflow": {"000001": []},
+            }
+            with patch.object(stock_deep_dive, "_existing_report_codes", return_value=set()):
+                stock = stock_deep_dive.fetch_stock_full(
+                    "000001",
+                    name="平安银行",
+                    industry="银行",
+                    csv_rows=[],
+                    no_kline=True,
+                    spot_cache={
+                        "000001": {
+                            "f2": 10.5,
+                            "f9": 5.0,
+                            "f23": 0.6,
+                            "f20": 200000000000,
+                            "f115": 5.2,
+                        }
+                    },
+                )
+
+            self.assertEqual(stock["price"], 10.5)
+            self.assertEqual(stock["pe_ttm"], 5.2)
+        finally:
+            stock_deep_dive._FINANCIAL_CACHE = old_cache
+
+    def test_auto_prefetch_financials_only_for_batch_runs(self):
+        import stock_deep_dive
+
+        self.assertFalse(stock_deep_dive.should_prefetch_financials("auto", 1, True))
+        self.assertFalse(stock_deep_dive.should_prefetch_financials("auto", 20, False))
+        self.assertTrue(stock_deep_dive.should_prefetch_financials("auto", 80, False))
+        self.assertTrue(stock_deep_dive.should_prefetch_financials("always", 1, True))
+        self.assertFalse(stock_deep_dive.should_prefetch_financials("never", 200, False))
+
+    def test_deepseek_limiter_caps_concurrent_ai_calls(self):
+        import stock_deep_dive
+
+        active = 0
+        peak = 0
+        guard = threading.Lock()
+
+        def fake_deepseek(stock, financials):
+            nonlocal active, peak
+            with guard:
+                active += 1
+                peak = max(peak, active)
+            time.sleep(0.03)
+            with guard:
+                active -= 1
+            return {"thesis": stock["code"]}
+
+        limiter = threading.BoundedSemaphore(2)
+        with patch.object(stock_deep_dive, "deepseek_analyze", side_effect=fake_deepseek):
+            threads = [
+                threading.Thread(
+                    target=stock_deep_dive.run_deepseek_with_limiter,
+                    args=({"code": str(i).zfill(6)}, [], limiter),
+                )
+                for i in range(6)
+            ]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+        self.assertLessEqual(peak, 2)
+
+    def test_ai_only_updates_existing_json_without_refetching_stock_data(self):
+        import stock_deep_dive
+
+        old_out_dir = stock_deep_dive.OUT_DIR
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                deep_dir = Path(td) / "deep_dives"
+                data_dir = deep_dir / "data"
+                data_dir.mkdir(parents=True)
+                payload = {
+                    "meta": {
+                        "code": "000001",
+                        "name": "平安银行",
+                        "industry": "银行",
+                        "screen_ts": "20260627",
+                        "generated_at": "2026-06-27 12:00",
+                    },
+                    "quote": {"price": 10.5, "pe_ttm": 5.2, "pb": 0.6, "mktcap": 200000000000},
+                    "financials": [{"year": "2025", "roe": 10.0, "gm": 30.0, "netp": 100}],
+                    "peers": [],
+                    "kline": {"day": [], "week": [], "month": []},
+                    "analysis": None,
+                }
+                (data_dir / "000001.json").write_text(json.dumps(payload), encoding="utf-8")
+                stock_deep_dive.OUT_DIR = str(deep_dir)
+
+                with patch.object(stock_deep_dive, "fetch_stock_full", side_effect=AssertionError("should not refetch")):
+                    with patch.object(stock_deep_dive, "deepseek_analyze", return_value={"thesis": "测试逻辑"}):
+                        updated = stock_deep_dive.run_ai_only_for_existing_report("000001")
+
+                saved = json.loads((data_dir / "000001.json").read_text(encoding="utf-8"))
+                self.assertTrue(updated)
+                self.assertEqual(saved["analysis"]["thesis"], "测试逻辑")
+        finally:
+            stock_deep_dive.OUT_DIR = old_out_dir
 
     def test_layer4_report_handles_missing_codes_json(self):
         with tempfile.TemporaryDirectory() as td:

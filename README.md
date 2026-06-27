@@ -9,6 +9,8 @@
 cd /Users/meltemi/Documents/yulong/economy
 ./run.sh            # 普通运行（6小时缓存，秒级出结果）
 ./run.sh --fresh    # 强制抓最新数据
+./run.sh --deep --no-llm                    # 批量生成量化研报，不调用 AI
+./run.sh --deep --ai-only --ai-concurrency=20 # 只给已有研报补 DeepSeek 分析
 ```
 
 或直接：
@@ -20,6 +22,14 @@ python3 astock_screener.py --year 2024 --top 60
 ```
 
 **零第三方依赖**——只用 Python 标准库，数据来自东方财富公开接口，不需要装 akshare/tushare，也不需要 token。
+
+## 性能与 AI 开关
+
+- 全市场筛选：财报/资产负债/商誉/历史净利使用 6 路并行，行情按 5 个板块并行抓取，并带 6 小时本地 cache。
+- 个股研报：默认 `--parallel 20` 按股票并发；全市场行情只抓一次并在线程间共享，避免每只股票重复开行情线程池。
+- DeepSeek：默认 `DEEPSEEK_MODEL=deepseek-v4-flash`，可改为 `deepseek-v4-pro`；`--ai-concurrency` 单独控制 AI 并发，默认 20。
+- 快速补 AI：已有 `results/deep_dives/data/XXXXXX.json` 时可用 `--ai-only`，只调用 DeepSeek，不重抓财务、行情、K 线。
+- 跳过 AI：`--no-llm` 只生成量化数据；批量只看基本面时优先用这个。
 
 ## 输出
 
