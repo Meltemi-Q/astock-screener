@@ -6,7 +6,12 @@ results/*
 !results/astock_layer4_final_20260627.html
 !results/deep_dives/
 results/deep_dives/*
-!results/deep_dives/*.html
+!results/deep_dives/index.html
+!results/deep_dives/report.html
+!results/deep_dives/assets/
+!results/deep_dives/assets/**
+!results/deep_dives/data/
+!results/deep_dives/data/*.json
 *.pyc
 .DS_Store
 .factory/

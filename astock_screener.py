@@ -838,12 +838,12 @@ function rowHTML(r){
  var cells=COLS.map(function(c){var k=c[0],v=r[k];
   if(k==="tier")return '<td>'+tierBadge(v)+'</td>';
   if(k==="code"){
-   var dv = r.deep ? '<a href="deep_dives/'+v+'.html" class="code" title="查看深度研报">'+v+'</a>' : '<span class="code">'+v+'</span>';
+   var dv = r.deep ? '<a href="deep_dives/report.html?code='+v+'" class="code" title="查看深度研报">'+v+'</a>' : '<span class="code">'+v+'</span>';
    return '<td class="l">'+dv+'</td>';
   }
   if(k==="name"){
    var nm = (r.warn?"⚠":"")+v;
-   var dv2 = r.deep ? '<a href="deep_dives/'+r.code+'.html" style="color:inherit;text-decoration:none" title="查看深度研报">'+nm+'</a>' : nm;
+   var dv2 = r.deep ? '<a href="deep_dives/report.html?code='+r.code+'" style="color:inherit;text-decoration:none" title="查看深度研报">'+nm+'</a>' : nm;
    return '<td class="l">'+dv2+'</td>';
   }
   if(k==="ind")return '<td class="l">'+fmt(v)+'</td>';
@@ -888,11 +888,16 @@ def write_html(records, path, year, total_eval, tierN):
     data = []
     # 检查哪些股票已有深度研报
     deep_dir = os.path.join(OUT_DIR, "deep_dives")
+    deep_data_dir = os.path.join(deep_dir, "data")
     existing_deep = set()
+    if os.path.isdir(deep_data_dir):
+        for f in os.listdir(deep_data_dir):
+            if len(f) == 11 and f.endswith(".json") and f[:6].isdigit():
+                existing_deep.add(f[:6])
     if os.path.isdir(deep_dir):
         for f in os.listdir(deep_dir):
-            if f.endswith(".html") and f != "index.html":
-                existing_deep.add(f.replace(".html", ""))
+            if len(f) == 11 and f.endswith(".html") and f[:6].isdigit():
+                existing_deep.add(f[:6])
     for i, r in enumerate(records, 1):
         data.append({
             "rk": i, "code": r["code"], "name": r["name"],

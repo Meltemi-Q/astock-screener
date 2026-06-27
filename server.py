@@ -22,8 +22,12 @@ def _count_existing():
     """统计各 tier 已有研报数。"""
     if not os.path.isdir(DEEP_DIR):
         return 0
+    data_dir = os.path.join(DEEP_DIR, "data")
+    if os.path.isdir(data_dir):
+        return len([f for f in os.listdir(data_dir)
+                    if len(f) == 11 and f.endswith(".json") and f[:6].isdigit()])
     return len([f for f in os.listdir(DEEP_DIR)
-                if f.endswith(".html") and f != "index.html"])
+                if len(f) == 11 and f.endswith(".html") and f[:6].isdigit()])
 
 
 def _count_tier_stocks(tier):
@@ -51,6 +55,8 @@ class ScreenerHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith("/api/"):
             self._handle_api()
+        elif self._redirect_legacy_deep_link():
+            return
         else:
             super().do_GET()
 
@@ -78,6 +84,19 @@ class ScreenerHandler(SimpleHTTPRequestHandler):
                 self.send_json({"error": "unknown endpoint"})
         except Exception as e:
             self.send_json({"error": str(e)}, status=500)
+
+    def _redirect_legacy_deep_link(self):
+        path = self.path.split("?")[0]
+        prefix = "/deep_dives/"
+        if not path.startswith(prefix) or not path.endswith(".html"):
+            return False
+        code = path[len(prefix):-5]
+        if len(code) != 6 or not code.isdigit():
+            return False
+        self.send_response(302)
+        self.send_header("Location", f"/deep_dives/report.html?code={code}")
+        self.end_headers()
+        return True
 
     def _api_refresh(self, fresh):
         global _last_run

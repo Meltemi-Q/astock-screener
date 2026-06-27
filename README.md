@@ -24,6 +24,7 @@ python3 astock_screener.py --year 2024 --top 60
 ## 输出
 
 - `results/astock_screen_YYYYMMDD.html` —— **交互式网页（首选）**：全部 5500 只都在，可搜索代码/名称、按 A/B/C 档筛选、选行业、点表头排序，含**现价**。`run.sh` 会自动用浏览器打开。
+- `results/deep_dives/report.html?code=XXXXXX` —— 个股深度研报共享页面壳；每只股票的数据存放在 `results/deep_dives/data/XXXXXX.json`，避免重复提交大量同构 HTML。
 - `results/astock_shortlist_YYYYMMDD.md` —— 榜单，Tier A/B/C 三档表格，按评分排序，可直接看
 - `results/astock_screen_YYYYMMDD.csv` —— 全量 5500 只，含每只的所有指标 + **现价** + **落选原因** + **风险备注**（用 Excel 打开可任意筛选/排序）
 
@@ -77,5 +78,11 @@ economy/
 ├── run.sh               一键运行
 ├── README.md            本文件
 ├── cache/               接口数据缓存（财报静态，重复跑秒级）
-└── results/             输出榜单 + CSV
+├── templates/deep_dive/  个股研报共享页面模板
+└── results/             输出榜单 + CSV + HTML/JSON 报告
+    └── deep_dives/
+        ├── index.html
+        ├── report.html
+        ├── assets/
+        └── data/         每只股票一个 XXXXXX.json
 ```

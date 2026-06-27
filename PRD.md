@@ -134,7 +134,10 @@ economy/
     ├── astock_shortlist_YYYYMMDD.md  Markdown 榜单
     └── deep_dives/
         ├── index.html               研报索引页
-        └── XXXXXX.html              个股研报
+        ├── report.html              个股研报共享页面壳
+        ├── assets/                  共享 CSS/JS
+        └── data/
+            └── XXXXXX.json          个股研报数据
 ```
 
 ### 4.2 数据流
@@ -148,7 +151,7 @@ economy/
                                            ↓
                               五层流水线判定 + 评分
                                            ↓
-                          HTML / CSV / MD 三格式输出
+                          HTML / CSV / MD + JSON 研报数据输出
                                            ↓
                           server.py HTTP 服务 → 浏览器按钮
 ```
@@ -213,15 +216,14 @@ economy/
 | 14 | 🟢 中 | `layer4_report.py` tolerant_load 未定义 `raw` 变量 | JSON 解析失败后正则兜底路径引用未定义变量 | 修复 raw 定义 + with 语句 |
 | 15 | 🟢 中 | K 线解析一根坏数据丢弃整段 | 外层 try/except 捕获了单行异常 | 改为行内 try/except 只跳过坏行 |
 | 16 | 🟢 中 | server.py 全局变量无锁 | 后台线程写 `_job`，HTTP handler 读 `_job` | 添加 threading.Lock |
-| 17 | 🟢 中 | HTML JS 硬编码端口 8899 | 4 处 fetch() 写死 localhost:8899 | 记录为已知限制 |
+| 17 | 🟢 中 | HTML JS 硬编码端口 8899 | 4 处 fetch() 写死 localhost:8899 | 改为 HTTP 时使用 location.origin，file:// 时回退 8899 |
 
 ---
 
 ## 八、已知限制
 
-1. **硬编码端口**：前端 JS 和生成 HTML 中 API 地址写死为 `localhost:8899`。如果服务端口变更需同步修改 `astock_screener.py` 中的 `API` 常量
+1. **本地 file:// 限制**：`report.html` 通过 `fetch()` 读取 `data/XXXXXX.json`，本地直接双击打开可能被浏览器 CORS 拦截；推荐通过 `./run.sh` 的 HTTP 服务访问
 2. **财年假设**：筛选器和研报均假设所有 A 股财年为 12 月 31 日，少数非标财年公司（如 3 月或 6 月年结）可能缺失最新年报数据
 3. **CAGR 连续性**：3 年 CAGR 假设 4 个年报数据连续，不验证年份间隔
 4. **嵌套线程池**：`fetch_stock_full` 内部调用 `fetch_spot_parallel()` 会再创建线程池，与外部 20 线程叠加可达 100 线程，实际对 I/O 等网络无影响但占内存
 5. **服务器异常泄露**：500 错误直接返回 Python 异常消息到客户端（仅本地使用，低风险）
-6. **`event` 全局对象**：K 线切换 JS 使用非标准 `window.event`，Firefox 中可能不可用

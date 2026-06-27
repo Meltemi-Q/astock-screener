@@ -10,7 +10,7 @@
   - 同行业估值对比
   - DeepSeek V4 Pro 定性分析：生意模式、护城河、管理层、成长性、行业地位、风险
 
-输出：每只股票一个独立 HTML 研报页面（可点开看完整分析）。
+输出：一个共享 report.html 页面壳 + 每只股票一个 JSON 数据文件（可点开看完整分析）。
 
 用法：
   python3 stock_deep_dive.py                    # 分析 Tier A+B 全部 ~108 只
@@ -27,6 +27,8 @@ import threading
 WORKDIR = os.path.dirname(os.path.abspath(__file__))
 CACHE_DIR = os.path.join(WORKDIR, "cache")
 OUT_DIR = os.path.join(WORKDIR, "results", "deep_dives")
+TEMPLATE_DIR = os.path.join(WORKDIR, "templates", "deep_dive")
+DATA_DIR_NAME = "data"
 SSL_CTX = ssl.create_default_context()
 SSL_CTX.check_hostname = False
 SSL_CTX.verify_mode = ssl.CERT_NONE
@@ -42,7 +44,8 @@ DEEPSEEK_KEY = None
 try:
     kf = os.path.expanduser("~/.config/deepseek/api_key")
     if os.path.exists(kf):
-        DEEPSEEK_KEY = open(kf).read().strip()
+        with open(kf, encoding="utf-8") as f:
+            DEEPSEEK_KEY = f.read().strip()
 except Exception:
     pass
 
@@ -309,12 +312,7 @@ def fetch_stock_full(code, name=None, industry=None, csv_rows=None, no_kline=Fal
                             break
 
     # 7) 同行公司 & 已有研报索引
-    existing_deep = set()
-    deep_dir = os.path.join(OUT_DIR)
-    if os.path.isdir(deep_dir):
-        for f in os.listdir(deep_dir):
-            if f.endswith(".html") and f != "index.html":
-                existing_deep.add(f.replace(".html", ""))
+    existing_deep = _existing_report_codes(OUT_DIR, include_legacy=True)
 
     peers = []
     if csv_rows and industry:
@@ -510,8 +508,8 @@ def deepseek_analyze(stock, financials):
 # ============================================================
 # 五、HTML 生成
 # ============================================================
-def generate_html(stock, financials, analysis, output_path, screen_ts=None):
-    """生成单只股票的深度研报 HTML 页面。screen_ts 用于动态返回链接。"""
+def _generate_html_legacy(stock, financials, analysis, output_path, screen_ts=None):
+    """旧版自包含 HTML renderer。保留作对照，不再由主流程调用。"""
     name = stock["name"]
     code = stock["code"]
     ind = stock["industry"]
@@ -1122,11 +1120,126 @@ for(var i = 0; i < n; i++){{
     return html
 
 
+def _base_dir_from_output_path(output_path):
+    """兼容旧调用签名：传入 XXXXXX.html 或 data/XXXXXX.json 都归一到 deep_dives 目录。"""
+    base_dir = os.path.dirname(os.path.abspath(output_path))
+    if os.path.basename(base_dir) == DATA_DIR_NAME:
+        base_dir = os.path.dirname(base_dir)
+    return base_dir
+
+
+def _write_text_if_changed(path, content):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            if f.read() == content:
+                return
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)
+
+
+def ensure_deep_dive_app(base_dir):
+    """把共享 report shell 和静态 assets 写入 deep_dives 目录。"""
+    os.makedirs(os.path.join(base_dir, DATA_DIR_NAME), exist_ok=True)
+    os.makedirs(os.path.join(base_dir, "assets"), exist_ok=True)
+    files = {
+        "report.html": os.path.join(TEMPLATE_DIR, "report.html"),
+        os.path.join("assets", "deep_dive.css"): os.path.join(TEMPLATE_DIR, "assets", "deep_dive.css"),
+        os.path.join("assets", "deep_dive.js"): os.path.join(TEMPLATE_DIR, "assets", "deep_dive.js"),
+    }
+    for rel, src in files.items():
+        with open(src, encoding="utf-8") as f:
+            _write_text_if_changed(os.path.join(base_dir, rel), f.read())
+
+
+def _existing_report_codes(base_dir, include_legacy=False):
+    codes = set()
+    data_dir = os.path.join(base_dir, DATA_DIR_NAME)
+    if os.path.isdir(data_dir):
+        for f in os.listdir(data_dir):
+            if len(f) == 11 and f.endswith(".json") and f[:6].isdigit():
+                codes.add(f[:6])
+    if include_legacy and os.path.isdir(base_dir):
+        for f in os.listdir(base_dir):
+            if len(f) == 11 and f.endswith(".html") and f[:6].isdigit():
+                codes.add(f[:6])
+    return codes
+
+
+def _report_has_analysis(base_dir, code):
+    path = os.path.join(base_dir, DATA_DIR_NAME, f"{code}.json")
+    if not os.path.exists(path):
+        return False
+    try:
+        with open(path, encoding="utf-8") as f:
+            payload = json.load(f)
+        return bool(payload.get("analysis"))
+    except (OSError, json.JSONDecodeError):
+        return False
+
+
+def build_deep_dive_payload(stock, financials, analysis, screen_ts=None):
+    """构建前端 report shell 使用的纯数据 payload。"""
+    code = stock["code"]
+    if not screen_ts:
+        screen_ts = sorted([f for f in os.listdir(os.path.join(WORKDIR, "results"))
+                           if f.startswith("astock_screen_") and f.endswith(".html")],
+                          reverse=True)
+        screen_ts = screen_ts[0].replace("astock_screen_", "").replace(".html", "") if screen_ts else time.strftime("%Y%m%d")
+
+    price = stock.get("price") or 0
+    mktcap = stock.get("mktcap") or 0
+    return {
+        "meta": {
+            "code": code,
+            "name": stock.get("name") or "",
+            "industry": stock.get("industry") or "",
+            "screen_ts": screen_ts,
+            "generated_at": time.strftime("%Y-%m-%d %H:%M"),
+        },
+        "quote": {
+            "price": stock.get("price"),
+            "min_buy": int(price * 100),
+            "pe_ttm": stock.get("pe_ttm"),
+            "pe_dyn": stock.get("pe_dyn"),
+            "pb": stock.get("pb"),
+            "mktcap": mktcap,
+            "mktcap_yi": mktcap / 1e8 if mktcap else None,
+        },
+        "financials": financials,
+        "peers": stock.get("peers", []),
+        "kline": stock.get("kline", {"day": [], "week": [], "month": []}),
+        "analysis": analysis,
+    }
+
+
+def generate_html(stock, financials, analysis, output_path, screen_ts=None):
+    """生成 JSON-backed 个股研报：共享 report.html + data/XXXXXX.json。"""
+    base_dir = _base_dir_from_output_path(output_path)
+    ensure_deep_dive_app(base_dir)
+
+    payload = build_deep_dive_payload(stock, financials, analysis, screen_ts)
+    data_path = os.path.join(base_dir, DATA_DIR_NAME, f"{stock['code']}.json")
+    os.makedirs(os.path.dirname(data_path), exist_ok=True)
+    with open(data_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
+
+    # 旧版按 XXXXXX.html 输出；新架构不再保留每只股票一份 HTML。
+    if output_path.endswith(".html") and os.path.basename(output_path) not in ("index.html", "report.html"):
+        try:
+            if os.path.exists(output_path):
+                os.remove(output_path)
+        except OSError:
+            pass
+    return data_path
+
+
 # ============================================================
 # 六、生成索引页
 # ============================================================
 def generate_index(stocks_done, base_dir, screen_ts=None):
     """生成个股研报索引页面，按评分排序，可点击跳转。"""
+    ensure_deep_dive_app(base_dir)
     if not screen_ts:
         screen_ts = sorted([f for f in os.listdir(os.path.join(WORKDIR, "results"))
                            if f.startswith("astock_screen_") and f.endswith(".html")],
@@ -1142,7 +1255,7 @@ def generate_index(stocks_done, base_dir, screen_ts=None):
             <td>{i+1}</td>
             <td><span class="badge {badge_class}">{tier_label}</span></td>
             <td class="code">{s['code']}</td>
-            <td><a href="{s['code']}.html">{s['name']}{llm_tag}</a></td>
+            <td><a href="report.html?code={s['code']}">{s['name']}{llm_tag}</a></td>
             <td>{s.get('price', '')}</td>
             <td>{s.get('roe', '')}%</td>
             <td>{s.get('pe', '')}</td>
@@ -1208,7 +1321,7 @@ def _process_one(idx, s, total, csv_rows, screen_ts, no_llm, deepseek_key, no_kl
         with lock:
             print("OK" if analysis else "失败")
 
-    out_path = os.path.join(OUT_DIR, f"{code}.html")
+    out_path = os.path.join(OUT_DIR, DATA_DIR_NAME, f"{code}.json")
     generate_html(stock, financials, analysis, out_path, screen_ts)
 
     s["has_llm"] = bool(analysis)
@@ -1317,11 +1430,7 @@ def main():
                         print(f"  ⚠ [{s['code']}] 失败: {e}")
 
     # 合并已有研报（运行单股时不丢失其他研报的索引）
-    existing_codes = set()
-    if os.path.isdir(OUT_DIR):
-        for f in os.listdir(OUT_DIR):
-            if f.endswith(".html") and f != "index.html":
-                existing_codes.add(f.replace(".html", ""))
+    existing_codes = _existing_report_codes(OUT_DIR)
     for code in existing_codes:
         if code not in {s["code"] for s in stocks_done}:
             csv_info = next((r for r in csv_rows if r["code"] == code), {})
@@ -1332,7 +1441,7 @@ def main():
                 "gm": csv_info.get("gross_margin", ""), "mktcap": csv_info.get("mktcap_yi", ""),
                 "industry": csv_info.get("industry", ""),
                 "score": float(csv_info.get("score", 0)),
-                "has_llm": "护城河评分" in open(os.path.join(OUT_DIR, f"{code}.html"), encoding="utf-8").read() if os.path.exists(os.path.join(OUT_DIR, f"{code}.html")) else False,
+                "has_llm": _report_has_analysis(OUT_DIR, code),
             })
 
     # 按评分排序
