@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>中国汽研(601965) 深度研报 | 五层选股</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#0f1115;color:#e6e8eb;font-size:14px;line-height:1.6}
+.container{max-width:1100px;margin:0 auto;padding:24px 20px}
+header{padding:24px 0;border-bottom:1px solid #232936;margin-bottom:24px}
+header h1{margin:0;font-size:26px;color:#fff}
+header .sub{color:#8b93a1;font-size:14px;margin-top:6px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:28px}
+.kpi{background:#131820;border:1px solid #1e2634;border-radius:10px;padding:14px;text-align:center}
+.kpi .val{font-size:24px;font-weight:700}
+.kpi .lbl{font-size:11px;color:#6b7380;margin-top:4px}
+.kpi.green .val{color:#3ddc84}.kpi.yellow .val{color:#ffd166}.kpi.blue .val{color:#3a86ff}.kpi.red .val{color:#ff6b6b}
+/* 量化速览 */
+.quant-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:28px}
+.qs-item{background:#131820;border:1px solid #1e2634;border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:8px}
+.qs-label{color:#6b7380;font-size:11px;min-width:42px}
+.qs-val{font-size:18px;font-weight:700}
+.qs-tag{font-size:10px;padding:2px 6px;border-radius:3px;margin-left:auto;background:#1a1f29}
+/* K线周期按钮 */
+.kline-bar{display:flex;gap:6px;margin-bottom:12px}
+.kline-bar button{background:#1a1f29;border:1px solid #2a3140;color:#8b93a1;padding:5px 14px;border-radius:5px;cursor:pointer;font-size:12px}
+.kline-bar button.on{background:#3a86ff;border-color:#3a86ff;color:#fff}
+.section{margin:28px 0}
+.section h2{font-size:18px;border-bottom:1px solid #1e2634;padding-bottom:8px;margin-bottom:16px}
+canvas{width:100%;height:280px;border-radius:8px;background:#131820}
+.peer-table{width:100%;border-collapse:collapse;font-size:12px}
+.peer-table th{background:#1a1f29;color:#8b93a1;padding:8px 12px;text-align:left;border-bottom:1px solid #2a3140}
+.peer-table td{padding:6px 12px;border-bottom:1px solid #1c212b}
+.peer-table tr:hover td{background:#161b24}
+.code{color:#7fb3ff;font-variant-numeric:tabular-nums}
+/* AI 区块 */
+.ai-meta{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:16px;font-size:13px}
+.ai-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.ai-card{background:#131820;border:1px solid #1e2634;border-radius:10px;padding:16px}
+.ai-card h4{margin:0 0 8px;font-size:14px;color:#c7cdd6}
+.ai-card p{margin:0;font-size:13px;color:#9aa4b2;line-height:1.7}
+.ai-card.risk{border-color:#3d1f1f}
+.thesis{background:linear-gradient(135deg,#1a2a1a,#131820);border:1px solid #1e3e1e;border-radius:10px;padding:18px;margin-top:16px}
+.thesis h4{margin:0 0 6px;color:#3ddc84}
+.thesis p{margin:0;font-size:15px;color:#e6e8eb;font-style:italic}
+/* 财务表格 */
+.fin-table{width:100%;border-collapse:collapse;font-size:11px}
+.fin-table th{background:#1a1f29;color:#8b93a1;padding:6px 10px;text-align:right;border-bottom:1px solid #2a3140}
+.fin-table th.l{text-align:left}
+.fin-table td{padding:5px 10px;text-align:right;border-bottom:1px solid #1c212b}
+.fin-table td.l{text-align:left}
+.fin-table tr:hover td{background:#161b24}
+.pos{color:#3ddc84}.neg{color:#ff6b6b}
+footer{margin-top:40px;padding:16px 0;border-top:1px solid #232936;color:#5a6270;font-size:11px}
+.back{color:#7fb3ff;text-decoration:none;font-size:13px}
+.back:hover{text-decoration:underline}
+@media(max-width:768px){.container{padding:12px} .ai-grid{grid-template-columns:1fr}}
+</style></head><body>
+<div class="container">
+<header>
+    <a href="../astock_screen_20260627.html" class="back">← 回到选股总表</a>
+    <h1>中国汽研 <span style="font-size:16px;color:#8b93a1">601965</span></h1>
+    <div class="sub">专业服务 · 2023  |  2024  |  2025年</div>
+</header>
+
+<!-- KPI 卡片 -->
+<div class="kpis">
+    <div class="kpi green"><div class="val">11.68</div><div class="lbl">现价(元)</div></div>
+    <div class="kpi yellow"><div class="val">1168</div><div class="lbl">一手(元)</div></div>
+    <div class="kpi blue"><div class="val">11.2</div><div class="lbl">PE(TTM)</div></div>
+    <div class="kpi blue"><div class="val">1.5</div><div class="lbl">PB</div></div>
+    <div class="kpi green"><div class="val">14.3%</div><div class="lbl">ROE</div></div>
+    <div class="kpi green"><div class="val">45.9%</div><div class="lbl">毛利率</div></div>
+    <div class="kpi green"><div class="val">21.3%</div><div class="lbl">净利率</div></div>
+    <div class="kpi yellow"><div class="val">117亿</div><div class="lbl">总市值</div></div>
+    <div class="kpi"><div class="val">31.3%</div><div class="lbl">负债率</div></div>
+    <div class="kpi"><div class="val">7.5%</div><div class="lbl">ROA</div></div>
+</div>
+
+<!-- 量化速览 -->
+<div class="quant-summary">
+    <div class="qs-item"><span class="qs-label">ROE</span><span class="qs-val" style="color:#9aa4b2">14.3%</span><span class="qs-tag" style="color:#9aa4b2">一般</span></div>
+    <div class="qs-item"><span class="qs-label">毛利率</span><span class="qs-val" style="color:#7fb3ff">45.9%</span><span class="qs-tag" style="color:#7fb3ff">较强</span></div>
+    <div class="qs-item"><span class="qs-label">负债率</span><span class="qs-val" style="color:#7fb3ff">31.3%</span><span class="qs-tag" style="color:#7fb3ff">稳健</span></div>
+    <div class="qs-item"><span class="qs-label">现金流</span><span class="qs-val" style="color:#7fb3ff">1.16x</span><span class="qs-tag" style="color:#7fb3ff">健康</span></div>
+    <div class="qs-item"><span class="qs-label">净利增速</span><span class="qs-val">17.6%</span><span class="qs-tag" style="color:#ffd166">稳健</span></div>
+    <div class="qs-item"><span class="qs-label">3年CAGR</span><span class="qs-val">15.3%</span><span class="qs-tag">稳定</span></div>
+</div>
+
+<!-- K线图 -->
+<div class="section">
+    <h2>📈 股价走势 (前复权)</h2>
+    <div class="kline-bar">
+        <button class="on" onclick="switchKline('day')">日K</button>
+        <button onclick="switchKline('week')">周K</button>
+        <button onclick="switchKline('month')">月K</button>
+        <span style="color:#6b7380;font-size:11px;margin-left:12px;line-height:28px">
+            MA5 <span style="color:#ffe066">──</span>
+            MA10 <span style="color:#ff9f1c">──</span>
+            MA20 <span style="color:#e15554">──</span>
+            MA60 <span style="color:#4e9f3d">──</span>
+        </span>
+    </div>
+    <canvas id="cvKline"></canvas>
+</div>
+
+<!-- 财务趋势图表 -->
+<div class="section">
+    <h2>📊 5年财务趋势</h2>
+    <canvas id="cvTrend"></canvas>
+</div>
+
+<!-- 详细财务数据表 -->
+<div class="section">
+    <h2>📋 历年财务数据</h2>
+    <div style="overflow:auto">
+    <table class="fin-table">
+    <thead><tr>
+        <th class="l">年度</th><th>营收(亿)</th><th>净利(亿)</th><th>ROE%</th><th>毛利%</th><th>净利率%</th>
+        <th>ROA%</th><th>负债%</th><th>EPS</th><th>经营现金流</th><th>现金流/净利</th>
+    </tr></thead>
+    <tbody>
+
+    <tr>
+        <td class="l">2025</td>
+        <td>49.67亿</td>
+        <td>10.58亿</td>
+        <td class="">14.3%</td>
+        <td>45.9%</td>
+        <td class="pos">21.3%</td>
+        <td>7.5%</td>
+        <td>31.3%</td>
+        <td>1.06</td>
+        <td class="pos">12.27亿</td>
+        <td class="pos">1.16</td>
+    </tr>
+    <tr>
+        <td class="l">2024</td>
+        <td>47.32亿</td>
+        <td>9.00亿</td>
+        <td class="">13.3%</td>
+        <td>44.2%</td>
+        <td class="pos">19.0%</td>
+        <td>8.9%</td>
+        <td>26.1%</td>
+        <td>0.91</td>
+        <td class="pos">5.01亿</td>
+        <td class="neg">0.56</td>
+    </tr>
+    <tr>
+        <td class="l">2023</td>
+        <td>40.96亿</td>
+        <td>8.36亿</td>
+        <td class="">13.3%</td>
+        <td>42.9%</td>
+        <td class="pos">20.4%</td>
+        <td>9.2%</td>
+        <td>24.1%</td>
+        <td>0.85</td>
+        <td class="pos">8.90亿</td>
+        <td class="pos">1.06</td>
+    </tr>
+    <tr>
+        <td class="l">2022</td>
+        <td>32.91亿</td>
+        <td>6.89亿</td>
+        <td class="">12.4%</td>
+        <td>44.1%</td>
+        <td class="pos">20.9%</td>
+        <td>8.6%</td>
+        <td>22.9%</td>
+        <td>0.71</td>
+        <td class="pos">8.00亿</td>
+        <td class="pos">1.16</td>
+    </tr>
+    <tr>
+        <td class="l">2021</td>
+        <td>38.35亿</td>
+        <td>6.92亿</td>
+        <td class="">13.6%</td>
+        <td>33.4%</td>
+        <td class="pos">18.0%</td>
+        <td>9.6%</td>
+        <td>20.3%</td>
+        <td>0.71</td>
+        <td class="pos">7.09亿</td>
+        <td class="pos">1.02</td>
+    </tr>
+    </tbody></table></div>
+</div>
+
+<!-- 同行对比 -->
+<div class="section">
+    <h2>🏭 同行对比（同行业 专业服务 优质标的）</h2>
+    <table class="peer-table">
+    <thead><tr>
+        <th>#</th><th>代码/名称</th><th>PE</th><th>ROE%</th><th>毛利%</th><th>市值(亿)</th><th>评级</th>
+    </tr></thead>
+    <tbody>
+        <tr>
+            <td>1</td>
+            <td><a href="920160.html" class="code">920160</a> <a href="920160.html" title="查看深度研报">北矿检测</a></td>
+            <td>27.5</td>
+            <td>22.4%</td>
+            <td>59.0%</td>
+            <td>23亿</td>
+            <td>🟡B</td>
+        </tr>
+        <tr>
+            <td>2</td>
+            <td><a href="#" class="code deep-gen" data-code="300795" title="点击生成研报">300795</a> <a href="#" class="deep-gen" data-code="300795" title="点击一键生成研报" style="color:#7fb3ff">米奥会展</a> <span style="font-size:10px;color:#5a6270">⚡一键</span></td>
+            <td>17.0</td>
+            <td>21.4%</td>
+            <td>48.8%</td>
+            <td>25亿</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>3</td>
+            <td><a href="#" class="code deep-gen" data-code="301449" title="点击生成研报">301449</a> <a href="#" class="deep-gen" data-code="301449" title="点击一键生成研报" style="color:#7fb3ff">天溯计量</a> <span style="font-size:10px;color:#5a6270">⚡一键</span></td>
+            <td>36.9</td>
+            <td>18.0%</td>
+            <td>51.2%</td>
+            <td>34亿</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>4</td>
+            <td><a href="#" class="code deep-gen" data-code="600861" title="点击生成研报">600861</a> <a href="#" class="deep-gen" data-code="600861" title="点击一键生成研报" style="color:#7fb3ff">北京人力</a> <span style="font-size:10px;color:#5a6270">⚡一键</span></td>
+            <td>8.2</td>
+            <td>17.0%</td>
+            <td>5.5%</td>
+            <td>69亿</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>5</td>
+            <td><a href="#" class="code deep-gen" data-code="300662" title="点击生成研报">300662</a> <a href="#" class="deep-gen" data-code="300662" title="点击一键生成研报" style="color:#7fb3ff">科锐国际</a> <span style="font-size:10px;color:#5a6270">⚡一键</span></td>
+            <td>9.7</td>
+            <td>14.7%</td>
+            <td>5.9%</td>
+            <td>34亿</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>6</td>
+            <td><a href="#" class="code deep-gen" data-code="300012" title="点击生成研报">300012</a> <a href="#" class="deep-gen" data-code="300012" title="点击一键生成研报" style="color:#7fb3ff">华测检测</a> <span style="font-size:10px;color:#5a6270">⚡一键</span></td>
+            <td>21.6</td>
+            <td>14.0%</td>
+            <td>48.6%</td>
+            <td>228亿</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>7</td>
+            <td><a href="#" class="code deep-gen" data-code="600662" title="点击生成研报">600662</a> <a href="#" class="deep-gen" data-code="600662" title="点击一键生成研报" style="color:#7fb3ff">外服控股</a> <span style="font-size:10px;color:#5a6270">⚡一键</span></td>
+            <td>13.5</td>
+            <td>12.8%</td>
+            <td>8.6%</td>
+            <td>92亿</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>8</td>
+            <td><a href="#" class="code deep-gen" data-code="300797" title="点击生成研报">300797</a> <a href="#" class="deep-gen" data-code="300797" title="点击一键生成研报" style="color:#7fb3ff">钢研纳克</a> <span style="font-size:10px;color:#5a6270">⚡一键</span></td>
+            <td>31.6</td>
+            <td>12.4%</td>
+            <td>48.1%</td>
+            <td>52亿</td>
+            <td></td>
+        </tr></tbody></table>
+</div>
+
+<!-- AI 分析 -->
+
+    <div class="section">
+        <h2>🤖 AI 定性分析</h2>
+        <div id="aiPlaceholder" style="background:#131820;border:1px dashed #2a3140;border-radius:10px;padding:20px;text-align:center;color:#6b7380">
+            <p style="font-size:15px;margin:0 0 8px">AI 定性分析未运行</p>
+            <p style="font-size:12px;margin:0 0 12px">DeepSeek V4 Pro 将对生意模式、护城河、管理层、成长性、行业地位、风险做深度分析（约 5-10 秒）</p>
+            <button id="aiAnalyzeBtn" style="background:#1d2033;border:1px solid #3a86ff;color:#7fb3ff;padding:8px 20px;border-radius:7px;cursor:pointer;font-size:14px"
+                    onclick="runAiAnalysis('601965')">🤖 开始 AI 分析</button>
+            <div id="aiProgress" style="margin-top:10px;display:none;color:#7fb3ff;font-size:12px">⏳ 分析中…</div>
+        </div>
+    </div>
+    <script>
+    function runAiAnalysis(code){
+     var btn=document.getElementById('aiAnalyzeBtn');
+     var prog=document.getElementById('aiProgress');
+     if(!btn)return;
+     btn.disabled=true;btn.textContent='⏳ 分析中…';prog.style.display='block';
+     fetch('http://localhost:8899/api/deep?code='+code)
+      .then(function(r){return r.json()})
+      .then(function(d){
+       if(d.done){prog.textContent='✅ 完成！正在刷新…';setTimeout(function(){location.reload()},600)}
+       else{prog.textContent='⚠️ 失败: '+(d.error||'未知');btn.disabled=false;btn.textContent='🤖 重试'}
+      })
+      .catch(function(e){prog.textContent='⚠️ 无法连接服务，请通过 http://localhost:8899 打开';btn.disabled=false;btn.textContent='🤖 重试'});
+    }
+    </script>
+
+<footer>
+    数据来源：东方财富公开接口 · AI分析由 DeepSeek V4 Pro 生成，仅供参考不构成投资建议 · 生成于 2026-06-27 10:28
+</footer>
+</div>
+
+<script>
+// K线数据
+var KDATA={"day": [{"date": "2025-06-17", "open": 17.79, "close": 17.7, "high": 17.94, "low": 17.62, "volume": 22467.0}, {"date": "2025-06-18", "open": 17.56, "close": 17.6, "high": 17.76, "low": 17.53, "volume": 16616.0}, {"date": "2025-06-19", "open": 17.55, "close": 17.41, "high": 17.68, "low": 17.36, "volume": 19762.0}, {"date": "2025-06-20", "open": 17.43, "close": 17.4, "high": 17.48, "low": 17.28, "volume": 22621.0}, {"date": "2025-06-23", "open": 17.29, "close": 17.3, "high": 17.41, "low": 17.12, "volume": 22578.0}, {"date": "2025-06-24", "open": 17.4, "close": 17.82, "high": 17.96, "low": 17.4, "volume": 66204.0}, {"date": "2025-06-25", "open": 17.76, "close": 17.82, "high": 17.85, "low": 17.72, "volume": 23858.0}, {"date": "2025-06-26", "open": 17.82, "close": 17.47, "high": 17.84, "low": 17.45, "volume": 44993.0}, {"date": "2025-06-27", "open": 17.57, "close": 17.43, "high": 17.61, "low": 17.41, "volume": 28967.0}, {"date": "2025-06-30", "open": 17.46, "close": 17.41, "high": 17.61, "low": 17.31, "volume": 46513.0}, {"date": "2025-07-01", "open": 17.4, "close": 17.62, "high": 17.8, "low": 17.33, "volume": 51963.0}, {"date": "2025-07-02", "open": 17.59, "close": 17.47, "high": 17.61, "low": 17.25, "volume": 51569.0}, {"date": "2025-07-03", "open": 17.44, "close": 17.46, "high": 17.55, "low": 17.4, "volume": 28268.0}, {"date": "2025-07-04", "open": 17.46, "close": 18.41, "high": 18.52, "low": 17.37, "volume": 188065.0}, {"date": "2025-07-07", "open": 18.97, "close": 19.4, "high": 19.95, "low": 18.97, "volume": 302527.0}, {"date": "2025-07-08", "open": 19.39, "close": 18.88, "high": 19.5, "low": 18.58, "volume": 215140.0}, {"date": "2025-07-09", "open": 18.87, "close": 18.67, "high": 19.06, "low": 18.45, "volume": 96474.0}, {"date": "2025-07-10", "open": 18.6, "close": 19.44, "high": 19.49, "low": 18.4, "volume": 142014.0}, {"date": "2025-07-11", "open": 19.46, "close": 19.22, "high": 19.52, "low": 19.12, "volume": 82070.0}, {"date": "2025-07-14", "open": 19.18, "close": 19.26, "high": 19.43, "low": 19.0, "volume": 77170.0}, {"date": "2025-07-15", "open": 19.26, "close": 19.48, "high": 20.09, "low": 19.26, "volume": 89945.0}, {"date": "2025-07-16", "open": 19.49, "close": 19.5, "high": 19.65, "low": 19.23, "volume": 49683.0}, {"date": "2025-07-17", "open": 19.46, "close": 19.1, "high": 19.57, "low": 18.97, "volume": 80625.0}, {"date": "2025-07-18", "open": 19.07, "close": 18.83, "high": 19.18, "low": 18.62, "volume": 75101.0}, {"date": "2025-07-21", "open": 18.84, "close": 18.91, "high": 19.07, "low": 18.74, "volume": 51402.0}, {"date": "2025-07-22", "open": 18.9, "close": 19.48, "high": 19.57, "low": 18.83, "volume": 163513.0}, {"date": "2025-07-23", "open": 19.47, "close": 19.41, "high": 19.67, "low": 19.36, "volume": 38156.0}, {"date": "2025-07-24", "open": 19.41, "close": 20.19, "high": 20.25, "low": 19.41, "volume": 111181.0}, {"date": "2025-07-25", "open": 20.29, "close": 20.19, "high": 20.55, "low": 20.08, "volume": 55566.0}, {"date": "2025-07-28", "open": 20.2, "close": 20.2, "high": 20.78, "low": 20.15, "volume": 89739.0}, {"date": "2025-07-29", "open": 20.15, "close": 19.99, "high": 20.19, "low": 19.75, "volume": 73200.0}, {"date": "2025-07-30", "open": 19.88, "close": 19.66, "high": 19.98, "low": 19.58, "volume": 51332.0}, {"date": "2025-07-31", "open": 19.59, "close": 19.35, "high": 19.74, "low": 19.22, "volume": 61114.0}, {"date": "2025-08-01", "open": 19.31, "close": 19.25, "high": 19.42, "low": 19.06, "volume": 40581.0}, {"date": "2025-08-04", "open": 19.11, "close": 19.36, "high": 19.61, "low": 19.06, "volume": 73816.0}, {"date": "2025-08-05", "open": 19.52, "close": 19.37, "high": 19.62, "low": 19.2, "volume": 83891.0}, {"date": "2025-08-06", "open": 19.44, "close": 19.57, "high": 19.6, "low": 19.33, "volume": 62777.0}, {"date": "2025-08-07", "open": 19.59, "close": 19.32, "high": 19.65, "low": 19.31, "volume": 42230.0}, {"date": "2025-08-08", "open": 19.31, "close": 19.17, "high": 19.34, "low": 19.11, "volume": 27996.0}, {"date": "2025-08-11", "open": 19.28, "close": 19.54, "high": 19.65, "low": 19.17, "volume": 46268.0}, {"date": "2025-08-12", "open": 19.55, "close": 19.41, "high": 19.55, "low": 19.21, "volume": 39774.0}, {"date": "2025-08-13", "open": 19.46, "close": 19.31, "high": 19.51, "low": 19.2, "volume": 49004.0}, {"date": "2025-08-14", "open": 19.33, "close": 18.98, "high": 19.38, "low": 18.93, "volume": 51158.0}, {"date": "2025-08-15", "open": 18.98, "close": 18.99, "high": 19.01, "low": 18.7, "volume": 54649.0}, {"date": "2025-08-18", "open": 19.05, "close": 18.99, "high": 19.12, "low": 18.82, "volume": 71112.0}, {"date": "2025-08-19", "open": 18.99, "close": 19.02, "high": 19.04, "low": 18.78, "volume": 56401.0}, {"date": "2025-08-20", "open": 19.02, "close": 19.37, "high": 19.42, "low": 18.91, "volume": 59538.0}, {"date": "2025-08-21", "open": 19.42, "close": 19.3, "high": 19.56, "low": 19.22, "volume": 34802.0}, {"date": "2025-08-22", "open": 19.41, "close": 19.38, "high": 19.55, "low": 19.18, "volume": 45318.0}, {"date": "2025-08-25", "open": 19.54, "close": 19.31, "high": 19.55, "low": 19.17, "volume": 61464.0}, {"date": "2025-08-26", "open": 19.2, "close": 19.05, "high": 19.31, "low": 18.87, "volume": 100549.0}, {"date": "2025-08-27", "open": 19.12, "close": 18.77, "high": 19.45, "low": 18.72, "volume": 89031.0}, {"date": "2025-08-28", "open": 18.77, "close": 18.3, "high": 18.82, "low": 17.73, "volume": 127373.0}, {"date": "2025-08-29", "open": 18.26, "close": 18.21, "high": 18.47, "low": 18.0, "volume": 79541.0}, {"date": "2025-09-01", "open": 18.22, "close": 18.0, "high": 18.29, "low": 17.92, "volume": 60121.0}, {"date": "2025-09-02", "open": 18.05, "close": 18.06, "high": 18.16, "low": 17.8, "volume": 54818.0}, {"date": "2025-09-03", "open": 18.08, "close": 17.68, "high": 18.12, "low": 17.5, "volume": 65089.0}, {"date": "2025-09-04", "open": 17.65, "close": 17.44, "high": 17.74, "low": 17.23, "volume": 61162.0}, {"date": "2025-09-05", "open": 17.46, "close": 17.55, "high": 17.59, "low": 17.35, "volume": 49499.0}, {"date": "2025-09-08", "open": 17.59, "close": 17.49, "high": 17.69, "low": 17.33, "volume": 102427.0}, {"date": "2025-09-09", "open": 17.5, "close": 17.91, "high": 17.98, "low": 17.43, "volume": 99227.0}, {"date": "2025-09-10", "open": 17.9, "close": 18.27, "high": 19.28, "low": 17.85, "volume": 165341.0}, {"date": "2025-09-11", "open": 18.34, "close": 18.27, "high": 18.4, "low": 17.93, "volume": 72527.0}, {"date": "2025-09-12", "open": 18.29, "close": 18.13, "high": 18.41, "low": 18.11, "volume": 51249.0}, {"date": "2025-09-15", "open": 18.4, "close": 18.47, "high": 18.86, "low": 18.25, "volume": 98965.0}, {"date": "2025-09-16", "open": 18.4, "close": 18.12, "high": 18.47, "low": 17.97, "volume": 62814.0}, {"date": "2025-09-17", "open": 18.01, "close": 18.0, "high": 18.29, "low": 17.93, "volume": 72904.0}, {"date": "2025-09-18", "open": 18.8, "close": 18.94, "high": 19.81, "low": 18.38, "volume": 384975.0}, {"date": "2025-09-19", "open": 18.4, "close": 18.78, "high": 19.01, "low": 18.01, "volume": 235116.0}, {"date": "2025-09-22", "open": 18.64, "close": 18.37, "high": 18.93, "low": 18.2, "volume": 150937.0}, {"date": "2025-09-23", "open": 18.25, "close": 17.98, "high": 18.4, "low": 17.65, "volume": 152870.0}, {"date": "2025-09-24", "open": 17.81, "close": 18.08, "high": 18.18, "low": 17.68, "volume": 94225.0}, {"date": "2025-09-25", "open": 18.06, "close": 17.84, "high": 18.2, "low": 17.72, "volume": 117107.0}, {"date": "2025-09-26", "open": 17.75, "close": 17.66, "high": 18.0, "low": 17.63, "volume": 69436.0}, {"date": "2025-09-29", "open": 17.66, "close": 17.85, "high": 17.89, "low": 17.33, "volume": 77961.0}, {"date": "2025-09-30", "open": 17.78, "close": 17.78, "high": 17.89, "low": 17.7, "volume": 45004.0}, {"date": "2025-10-09", "open": 17.81, "close": 17.78, "high": 17.84, "low": 17.55, "volume": 50822.0}, {"date": "2025-10-10", "open": 17.76, "close": 17.9, "high": 18.07, "low": 17.7, "volume": 79027.0}, {"date": "2025-10-13", "open": 17.55, "close": 17.36, "high": 17.56, "low": 17.06, "volume": 121533.0}, {"date": "2025-10-14", "open": 17.41, "close": 17.22, "high": 17.53, "low": 17.13, "volume": 90130.0}, {"date": "2025-10-15", "open": 17.22, "close": 17.3, "high": 17.4, "low": 17.17, "volume": 86431.0}, {"date": "2025-10-16", "open": 17.21, "close": 17.54, "high": 17.74, "low": 17.18, "volume": 102619.0}, {"date": "2025-10-17", "open": 17.4, "close": 17.11, "high": 17.45, "low": 17.1, "volume": 75480.0}, {"date": "2025-10-20", "open": 17.2, "close": 16.9, "high": 17.25, "low": 16.85, "volume": 76496.0}, {"date": "2025-10-21", "open": 16.95, "close": 16.97, "high": 17.01, "low": 16.86, "volume": 28396.0}, {"date": "2025-10-22", "open": 16.91, "close": 16.98, "high": 17.08, "low": 16.91, "volume": 23895.0}, {"date": "2025-10-23", "open": 16.92, "close": 17.02, "high": 17.04, "low": 16.81, "volume": 32771.0}, {"date": "2025-10-24", "open": 16.99, "close": 17.09, "high": 17.13, "low": 16.99, "volume": 30057.0}, {"date": "2025-10-27", "open": 17.15, "close": 16.68, "high": 17.17, "low": 16.56, "volume": 133155.0}, {"date": "2025-10-28", "open": 16.83, "close": 17.32, "high": 17.36, "low": 16.83, "volume": 133935.0}, {"date": "2025-10-29", "open": 17.31, "close": 17.47, "high": 17.55, "low": 17.12, "volume": 85859.0}, {"date": "2025-10-30", "open": 17.47, "close": 17.4, "high": 17.7, "low": 17.34, "volume": 87114.0}, {"date": "2025-10-31", "open": 17.39, "close": 17.41, "high": 17.5, "low": 17.31, "volume": 40952.0}, {"date": "2025-11-03", "open": 17.45, "close": 17.34, "high": 17.45, "low": 17.17, "volume": 33202.0}, {"date": "2025-11-04", "open": 17.28, "close": 17.19, "high": 17.4, "low": 17.15, "volume": 24318.0}, {"date": "2025-11-05", "open": 17.1, "close": 17.13, "high": 17.21, "low": 17.06, "volume": 28150.0}, {"date": "2025-11-06", "open": 17.1, "close": 17.26, "high": 17.31, "low": 17.05, "volume": 39535.0}, {"date": "2025-11-07", "open": 17.3, "close": 17.1, "high": 17.38, "low": 17.08, "volume": 52569.0}, {"date": "2025-11-10", "open": 17.08, "close": 17.13, "high": 17.15, "low": 16.96, "volume": 35126.0}, {"date": "2025-11-11", "open": 17.13, "close": 17.09, "high": 17.17, "low": 17.05, "volume": 23958.0}, {"date": "2025-11-12", "open": 17.07, "close": 17.12, "high": 17.19, "low": 17.05, "volume": 23732.0}, {"date": "2025-11-13", "open": 17.12, "close": 17.14, "high": 17.17, "low": 16.93, "volume": 34354.0}, {"date": "2025-11-14", "open": 17.08, "close": 17.1, "high": 17.29, "low": 17.08, "volume": 41373.0}, {"date": "2025-11-17", "open": 17.1, "close": 16.91, "high": 17.12, "low": 16.89, "volume": 40546.0}, {"date": "2025-11-18", "open": 16.84, "close": 16.8, "high": 16.91, "low": 16.73, "volume": 27839.0}, {"date": "2025-11-19", "open": 16.81, "close": 16.84, "high": 16.85, "low": 16.72, "volume": 17415.0}, {"date": "2025-11-20", "open": 16.89, "close": 16.75, "high": 16.89, "low": 16.71, "volume": 17032.0}, {"date": "2025-11-21", "open": 16.67, "close": 16.69, "high": 16.85, "low": 16.63, "volume": 45596.0}, {"date": "2025-11-24", "open": 16.77, "close": 16.91, "high": 17.0, "low": 16.7, "volume": 32423.0}, {"date": "2025-11-25", "open": 16.92, "close": 16.81, "high": 16.95, "low": 16.8, "volume": 29832.0}, {"date": "2025-11-26", "open": 16.81, "close": 16.92, "high": 16.98, "low": 16.81, "volume": 25329.0}, {"date": "2025-11-27", "open": 16.92, "close": 16.82, "high": 16.99, "low": 16.8, "volume": 23105.0}, {"date": "2025-11-28", "open": 16.81, "close": 16.71, "high": 16.85, "low": 16.67, "volume": 36074.0}, {"date": "2025-12-01", "open": 16.7, "close": 16.81, "high": 16.84, "low": 16.69, "volume": 22004.0}, {"date": "2025-12-02", "open": 16.8, "close": 16.74, "high": 16.89, "low": 16.72, "volume": 23630.0}, {"date": "2025-12-03", "open": 16.7, "close": 16.62, "high": 16.75, "low": 16.57, "volume": 28953.0}, {"date": "2025-12-04", "open": 16.68, "close": 16.88, "high": 16.92, "low": 16.58, "volume": 43573.0}, {"date": "2025-12-05", "open": 16.87, "close": 16.85, "high": 16.92, "low": 16.71, "volume": 26475.0}, {"date": "2025-12-08", "open": 16.88, "close": 16.82, "high": 16.92, "low": 16.79, "volume": 22054.0}, {"date": "2025-12-09", "open": 16.78, "close": 16.6, "high": 16.82, "low": 16.55, "volume": 33235.0}, {"date": "2025-12-10", "open": 16.53, "close": 16.62, "high": 16.69, "low": 16.42, "volume": 23789.0}, {"date": "2025-12-11", "open": 16.62, "close": 16.35, "high": 16.64, "low": 16.26, "volume": 39306.0}, {"date": "2025-12-12", "open": 16.35, "close": 16.37, "high": 16.4, "low": 15.97, "volume": 50828.0}, {"date": "2025-12-15", "open": 16.28, "close": 16.28, "high": 16.44, "low": 16.19, "volume": 30265.0}, {"date": "2025-12-16", "open": 16.87, "close": 16.98, "high": 17.06, "low": 16.46, "volume": 119217.0}, {"date": "2025-12-17", "open": 16.8, "close": 17.24, "high": 17.54, "low": 16.75, "volume": 94365.0}, {"date": "2025-12-18", "open": 17.18, "close": 17.33, "high": 17.44, "low": 17.16, "volume": 57315.0}, {"date": "2025-12-19", "open": 17.39, "close": 17.59, "high": 17.78, "low": 17.33, "volume": 85161.0}, {"date": "2025-12-22", "open": 17.71, "close": 17.76, "high": 18.1, "low": 17.59, "volume": 121771.0}, {"date": "2025-12-23", "open": 17.6, "close": 17.27, "high": 17.81, "low": 17.21, "volume": 80558.0}, {"date": "2025-12-24", "open": 17.33, "close": 17.22, "high": 17.33, "low": 17.14, "volume": 42155.0}, {"date": "2025-12-25", "open": 17.22, "close": 17.39, "high": 17.5, "low": 17.15, "volume": 44616.0}, {"date": "2025-12-26", "open": 17.38, "close": 17.68, "high": 17.85, "low": 17.25, "volume": 76315.0}, {"date": "2025-12-29", "open": 17.63, "close": 16.84, "high": 17.75, "low": 16.77, "volume": 140598.0}, {"date": "2025-12-30", "open": 16.73, "close": 16.79, "high": 16.88, "low": 16.63, "volume": 52941.0}, {"date": "2025-12-31", "open": 16.8, "close": 16.6, "high": 16.89, "low": 16.5, "volume": 51272.0}, {"date": "2026-01-05", "open": 16.61, "close": 16.71, "high": 16.77, "low": 16.45, "volume": 48148.0}, {"date": "2026-01-06", "open": 16.71, "close": 17.81, "high": 17.94, "low": 16.68, "volume": 221916.0}, {"date": "2026-01-07", "open": 17.66, "close": 17.64, "high": 17.94, "low": 17.32, "volume": 109641.0}, {"date": "2026-01-08", "open": 17.57, "close": 17.33, "high": 17.64, "low": 17.21, "volume": 90509.0}, {"date": "2026-01-09", "open": 17.36, "close": 17.66, "high": 18.03, "low": 17.22, "volume": 138092.0}, {"date": "2026-01-12", "open": 17.63, "close": 17.74, "high": 17.95, "low": 17.56, "volume": 113062.0}, {"date": "2026-01-13", "open": 17.73, "close": 17.3, "high": 17.73, "low": 17.24, "volume": 88491.0}, {"date": "2026-01-14", "open": 17.24, "close": 17.03, "high": 17.51, "low": 16.88, "volume": 109130.0}, {"date": "2026-01-15", "open": 17.03, "close": 17.2, "high": 17.63, "low": 16.94, "volume": 100932.0}, {"date": "2026-01-16", "open": 17.16, "close": 17.17, "high": 17.39, "low": 17.06, "volume": 57695.0}, {"date": "2026-01-19", "open": 18.51, "close": 18.89, "high": 18.89, "low": 18.25, "volume": 244335.0}, {"date": "2026-01-20", "open": 19.55, "close": 19.89, "high": 20.18, "low": 19.18, "volume": 594056.0}, {"date": "2026-01-21", "open": 19.88, "close": 19.68, "high": 19.93, "low": 19.49, "volume": 286525.0}, {"date": "2026-01-22", "open": 19.72, "close": 19.35, "high": 19.91, "low": 19.2, "volume": 164202.0}, {"date": "2026-01-23", "open": 19.42, "close": 20.24, "high": 20.24, "low": 19.41, "volume": 279626.0}, {"date": "2026-01-26", "open": 20.2, "close": 19.88, "high": 20.2, "low": 19.51, "volume": 188554.0}, {"date": "2026-01-27", "open": 19.89, "close": 19.92, "high": 20.38, "low": 19.73, "volume": 136401.0}, {"date": "2026-01-28", "open": 19.89, "close": 19.8, "high": 19.99, "low": 19.6, "volume": 82794.0}, {"date": "2026-01-29", "open": 19.64, "close": 19.21, "high": 19.76, "low": 19.18, "volume": 137051.0}, {"date": "2026-01-30", "open": 19.21, "close": 18.95, "high": 19.5, "low": 18.76, "volume": 127138.0}, {"date": "2026-02-02", "open": 18.89, "close": 18.39, "high": 19.07, "low": 18.35, "volume": 145354.0}, {"date": "2026-02-03", "open": 18.61, "close": 18.83, "high": 18.93, "low": 18.28, "volume": 110127.0}, {"date": "2026-02-04", "open": 18.77, "close": 19.0, "high": 19.33, "low": 18.77, "volume": 89148.0}, {"date": "2026-02-05", "open": 19.07, "close": 18.94, "high": 19.17, "low": 18.76, "volume": 71023.0}, {"date": "2026-02-06", "open": 18.81, "close": 18.72, "high": 18.98, "low": 18.68, "volume": 88895.0}, {"date": "2026-02-09", "open": 18.85, "close": 19.09, "high": 19.39, "low": 18.83, "volume": 116708.0}, {"date": "2026-02-10", "open": 19.14, "close": 19.02, "high": 19.25, "low": 18.9, "volume": 56211.0}, {"date": "2026-02-11", "open": 19.01, "close": 18.93, "high": 19.16, "low": 18.89, "volume": 49809.0}, {"date": "2026-02-12", "open": 19.0, "close": 19.1, "high": 19.13, "low": 18.8, "volume": 73746.0}, {"date": "2026-02-13", "open": 19.15, "close": 19.33, "high": 20.51, "low": 19.15, "volume": 216035.0}, {"date": "2026-02-24", "open": 19.74, "close": 20.21, "high": 20.38, "low": 19.5, "volume": 191314.0}, {"date": "2026-02-25", "open": 20.2, "close": 19.91, "high": 20.27, "low": 19.85, "volume": 126091.0}, {"date": "2026-02-26", "open": 19.91, "close": 19.86, "high": 20.07, "low": 19.79, "volume": 80124.0}, {"date": "2026-02-27", "open": 19.75, "close": 20.0, "high": 20.18, "low": 19.75, "volume": 75782.0}, {"date": "2026-03-02", "open": 19.51, "close": 19.49, "high": 19.8, "low": 19.33, "volume": 112650.0}, {"date": "2026-03-03", "open": 19.49, "close": 18.87, "high": 19.93, "low": 18.83, "volume": 146832.0}, {"date": "2026-03-04", "open": 18.73, "close": 18.73, "high": 18.99, "low": 18.6, "volume": 91491.0}, {"date": "2026-03-05", "open": 18.9, "close": 19.02, "high": 19.27, "low": 18.87, "volume": 99341.0}, {"date": "2026-03-06", "open": 18.89, "close": 19.03, "high": 19.21, "low": 18.88, "volume": 51403.0}, {"date": "2026-03-09", "open": 18.85, "close": 18.98, "high": 19.05, "low": 18.26, "volume": 118370.0}, {"date": "2026-03-10", "open": 19.08, "close": 18.98, "high": 19.36, "low": 18.87, "volume": 63307.0}, {"date": "2026-03-11", "open": 18.96, "close": 18.71, "high": 19.04, "low": 18.65, "volume": 99658.0}, {"date": "2026-03-12", "open": 18.73, "close": 18.6, "high": 18.78, "low": 18.38, "volume": 81742.0}, {"date": "2026-03-13", "open": 18.43, "close": 18.52, "high": 18.78, "low": 18.42, "volume": 54886.0}, {"date": "2026-03-16", "open": 18.5, "close": 18.24, "high": 18.5, "low": 17.99, "volume": 82866.0}, {"date": "2026-03-17", "open": 18.33, "close": 18.05, "high": 18.59, "low": 17.95, "volume": 53622.0}, {"date": "2026-03-18", "open": 18.05, "close": 18.13, "high": 18.19, "low": 17.96, "volume": 40848.0}, {"date": "2026-03-19", "open": 17.96, "close": 17.68, "high": 18.07, "low": 17.59, "volume": 66067.0}, {"date": "2026-03-20", "open": 17.71, "close": 17.56, "high": 17.98, "low": 17.56, "volume": 46784.0}, {"date": "2026-03-23", "open": 17.25, "close": 16.78, "high": 17.33, "low": 16.7, "volume": 123848.0}, {"date": "2026-03-24", "open": 17.06, "close": 17.15, "high": 17.17, "low": 16.77, "volume": 81452.0}, {"date": "2026-03-25", "open": 17.29, "close": 17.33, "high": 17.44, "low": 17.23, "volume": 65910.0}, {"date": "2026-03-26", "open": 17.33, "close": 17.12, "high": 17.59, "low": 17.09, "volume": 58790.0}, {"date": "2026-03-27", "open": 16.98, "close": 17.5, "high": 17.56, "low": 16.84, "volume": 51650.0}, {"date": "2026-03-30", "open": 17.31, "close": 17.11, "high": 17.48, "low": 16.96, "volume": 84087.0}, {"date": "2026-03-31", "open": 17.13, "close": 17.23, "high": 17.53, "low": 17.09, "volume": 66757.0}, {"date": "2026-04-01", "open": 17.46, "close": 17.63, "high": 17.81, "low": 17.46, "volume": 75445.0}, {"date": "2026-04-02", "open": 17.61, "close": 17.16, "high": 17.66, "low": 17.0, "volume": 64840.0}, {"date": "2026-04-03", "open": 17.13, "close": 17.02, "high": 17.21, "low": 16.81, "volume": 51929.0}, {"date": "2026-04-07", "open": 17.04, "close": 16.97, "high": 17.21, "low": 16.95, "volume": 50502.0}, {"date": "2026-04-08", "open": 17.26, "close": 17.63, "high": 17.7, "low": 17.26, "volume": 74071.0}, {"date": "2026-04-09", "open": 17.46, "close": 17.18, "high": 17.53, "low": 17.15, "volume": 50406.0}, {"date": "2026-04-10", "open": 17.22, "close": 17.42, "high": 17.63, "low": 17.18, "volume": 57631.0}, {"date": "2026-04-13", "open": 17.24, "close": 17.01, "high": 17.39, "low": 17.0, "volume": 63325.0}, {"date": "2026-04-14", "open": 17.11, "close": 16.95, "high": 17.15, "low": 16.75, "volume": 79377.0}, {"date": "2026-04-15", "open": 17.21, "close": 17.1, "high": 17.28, "low": 17.09, "volume": 57684.0}, {"date": "2026-04-16", "open": 17.15, "close": 17.39, "high": 17.5, "low": 17.12, "volume": 67316.0}, {"date": "2026-04-17", "open": 17.42, "close": 17.35, "high": 17.42, "low": 17.2, "volume": 39457.0}, {"date": "2026-04-20", "open": 17.33, "close": 17.44, "high": 17.55, "low": 17.17, "volume": 49825.0}, {"date": "2026-04-21", "open": 17.41, "close": 17.5, "high": 17.58, "low": 17.34, "volume": 47253.0}, {"date": "2026-04-22", "open": 17.46, "close": 17.84, "high": 17.85, "low": 17.37, "volume": 70665.0}, {"date": "2026-04-23", "open": 17.0, "close": 16.73, "high": 17.06, "low": 16.36, "volume": 307427.0}, {"date": "2026-04-24", "open": 16.58, "close": 16.46, "high": 16.73, "low": 16.38, "volume": 87122.0}, {"date": "2026-04-27", "open": 16.39, "close": 16.2, "high": 16.45, "low": 16.13, "volume": 87862.0}, {"date": "2026-04-28", "open": 16.2, "close": 15.87, "high": 16.2, "low": 15.72, "volume": 91621.0}, {"date": "2026-04-29", "open": 15.8, "close": 16.04, "high": 16.35, "low": 15.75, "volume": 75550.0}, {"date": "2026-04-30", "open": 16.0, "close": 16.1, "high": 16.13, "low": 15.82, "volume": 64375.0}, {"date": "2026-05-06", "open": 16.11, "close": 15.99, "high": 16.28, "low": 15.94, "volume": 89238.0}, {"date": "2026-05-07", "open": 16.0, "close": 15.75, "high": 16.05, "low": 15.6, "volume": 103198.0}, {"date": "2026-05-08", "open": 15.72, "close": 15.99, "high": 16.04, "low": 15.63, "volume": 77287.0}, {"date": "2026-05-11", "open": 16.05, "close": 16.64, "high": 16.93, "low": 16.05, "volume": 213115.0}, {"date": "2026-05-12", "open": 16.53, "close": 16.64, "high": 16.92, "low": 16.48, "volume": 125576.0}, {"date": "2026-05-13", "open": 16.7, "close": 16.99, "high": 17.26, "low": 16.51, "volume": 190068.0}, {"date": "2026-05-14", "open": 17.0, "close": 17.94, "high": 18.32, "low": 17.0, "volume": 370485.0}, {"date": "2026-05-15", "open": 17.83, "close": 17.21, "high": 17.92, "low": 17.14, "volume": 177961.0}, {"date": "2026-05-18", "open": 17.09, "close": 16.91, "high": 17.24, "low": 16.72, "volume": 125054.0}, {"date": "2026-05-19", "open": 16.97, "close": 16.55, "high": 17.06, "low": 16.51, "volume": 107810.0}, {"date": "2026-05-20", "open": 16.55, "close": 16.15, "high": 16.55, "low": 15.98, "volume": 112957.0}, {"date": "2026-05-21", "open": 16.2, "close": 16.54, "high": 17.45, "low": 16.16, "volume": 263751.0}, {"date": "2026-05-22", "open": 16.59, "close": 16.59, "high": 16.83, "low": 16.15, "volume": 162628.0}, {"date": "2026-05-25", "open": 16.6, "close": 16.32, "high": 16.98, "low": 16.12, "volume": 112413.0}, {"date": "2026-05-26", "open": 16.3, "close": 16.2, "high": 16.34, "low": 16.01, "volume": 92589.0}, {"date": "2026-05-27", "open": 16.16, "close": 15.72, "high": 16.49, "low": 15.49, "volume": 148501.0}, {"date": "2026-05-28", "open": 15.69, "close": 15.35, "high": 15.74, "low": 15.19, "volume": 101157.0}, {"date": "2026-05-29", "open": 15.5, "close": 15.65, "high": 16.07, "low": 15.3, "volume": 125049.0}, {"date": "2026-06-01", "open": 15.55, "close": 15.81, "high": 15.97, "low": 15.41, "volume": 75629.0}, {"date": "2026-06-02", "open": 15.87, "close": 15.92, "high": 16.07, "low": 15.54, "volume": 73122.0}, {"date": "2026-06-03", "open": 15.84, "close": 15.85, "high": 16.04, "low": 15.73, "volume": 62009.0}, {"date": "2026-06-04", "open": 15.84, "close": 15.72, "high": 15.97, "low": 15.67, "volume": 51243.0}, {"date": "2026-06-05", "open": 15.82, "close": 15.4, "high": 15.82, "low": 15.34, "volume": 71004.0}, {"date": "2026-06-08", "open": 15.15, "close": 14.86, "high": 15.24, "low": 14.8, "volume": 79801.0}, {"date": "2026-06-09", "open": 14.98, "close": 14.86, "high": 15.05, "low": 14.64, "volume": 62886.0}, {"date": "2026-06-10", "open": 14.8, "close": 14.68, "high": 15.41, "low": 14.63, "volume": 93035.0}, {"date": "2026-06-11", "open": 14.67, "close": 13.85, "high": 14.69, "low": 13.51, "volume": 158767.0}, {"date": "2026-06-12", "open": 13.95, "close": 14.07, "high": 14.18, "low": 13.8, "volume": 107817.0}, {"date": "2026-06-15", "open": 14.09, "close": 14.07, "high": 14.48, "low": 13.91, "volume": 85259.0}, {"date": "2026-06-16", "open": 14.07, "close": 13.78, "high": 14.07, "low": 13.71, "volume": 66497.0}, {"date": "2026-06-17", "open": 13.7, "close": 13.39, "high": 13.7, "low": 13.28, "volume": 97827.0}, {"date": "2026-06-18", "open": 13.3, "close": 12.88, "high": 13.36, "low": 12.85, "volume": 138943.0}, {"date": "2026-06-22", "open": 12.95, "close": 12.48, "high": 12.95, "low": 12.08, "volume": 184444.0}, {"date": "2026-06-23", "open": 12.39, "close": 12.48, "high": 12.73, "low": 12.37, "volume": 94297.0}, {"date": "2026-06-24", "open": 12.62, "close": 12.24, "high": 12.71, "low": 12.16, "volume": 93998.0}, {"date": "2026-06-25", "open": 12.18, "close": 12.01, "high": 12.28, "low": 11.9, "volume": 95753.0}, {"date": "2026-06-26", "open": 12.05, "close": 11.68, "high": 12.09, "low": 11.59, "volume": 83438.0}], "week": [{"date": "2024-07-26", "open": 17.05, "close": 16.9, "high": 17.31, "low": 16.09, "volume": 201074.0}, {"date": "2024-08-02", "open": 16.8, "close": 16.42, "high": 17.16, "low": 15.97, "volume": 215743.0}, {"date": "2024-08-09", "open": 16.32, "close": 15.27, "high": 16.58, "low": 15.25, "volume": 177064.0}, {"date": "2024-08-16", "open": 15.3, "close": 15.47, "high": 15.86, "low": 14.96, "volume": 168102.0}, {"date": "2024-08-23", "open": 15.39, "close": 14.82, "high": 15.8, "low": 14.68, "volume": 148806.0}, {"date": "2024-08-30", "open": 14.93, "close": 16.03, "high": 16.29, "low": 14.57, "volume": 307049.0}, {"date": "2024-09-06", "open": 15.99, "close": 15.88, "high": 16.46, "low": 15.58, "volume": 213966.0}, {"date": "2024-09-13", "open": 15.67, "close": 16.09, "high": 16.74, "low": 15.61, "volume": 245196.0}, {"date": "2024-09-20", "open": 16.06, "close": 15.93, "high": 16.43, "low": 15.81, "volume": 85898.0}, {"date": "2024-09-27", "open": 15.85, "close": 17.36, "high": 17.43, "low": 15.59, "volume": 278148.0}, {"date": "2024-09-30", "open": 18.12, "close": 18.67, "high": 18.86, "low": 17.95, "volume": 132212.0}, {"date": "2024-10-11", "open": 20.56, "close": 18.2, "high": 20.56, "low": 17.46, "volume": 637797.0}, {"date": "2024-10-18", "open": 18.26, "close": 17.91, "high": 18.32, "low": 17.17, "volume": 358306.0}, {"date": "2024-10-25", "open": 17.91, "close": 17.59, "high": 18.21, "low": 17.22, "volume": 350415.0}, {"date": "2024-11-01", "open": 17.83, "close": 17.04, "high": 18.31, "low": 16.98, "volume": 365791.0}, {"date": "2024-11-08", "open": 17.2, "close": 19.01, "high": 19.22, "low": 16.95, "volume": 569005.0}, {"date": "2024-11-15", "open": 18.71, "close": 17.43, "high": 19.35, "low": 17.36, "volume": 595153.0}, {"date": "2024-11-22", "open": 17.39, "close": 17.24, "high": 18.43, "low": 17.12, "volume": 416009.0}, {"date": "2024-11-29", "open": 17.43, "close": 17.35, "high": 17.81, "low": 17.18, "volume": 290557.0}, {"date": "2024-12-06", "open": 17.41, "close": 18.31, "high": 18.56, "low": 17.3, "volume": 352680.0}, {"date": "2024-12-13", "open": 18.19, "close": 18.09, "high": 18.93, "low": 17.96, "volume": 336901.0}, {"date": "2024-12-20", "open": 18.09, "close": 17.87, "high": 18.32, "low": 17.56, "volume": 230464.0}, {"date": "2024-12-27", "open": 17.93, "close": 17.51, "high": 17.98, "low": 17.22, "volume": 241436.0}, {"date": "2025-01-03", "open": 17.54, "close": 16.32, "high": 17.77, "low": 16.28, "volume": 202300.0}, {"date": "2025-01-10", "open": 16.36, "close": 15.85, "high": 16.6, "low": 15.74, "volume": 247664.0}, {"date": "2025-01-17", "open": 15.86, "close": 16.57, "high": 16.76, "low": 15.79, "volume": 202372.0}, {"date": "2025-01-24", "open": 16.66, "close": 17.01, "high": 17.03, "low": 16.17, "volume": 324753.0}, {"date": "2025-01-27", "open": 17.06, "close": 16.52, "high": 17.13, "low": 16.51, "volume": 58229.0}, {"date": "2025-02-07", "open": 16.56, "close": 17.94, "high": 18.35, "low": 16.37, "volume": 395406.0}, {"date": "2025-02-14", "open": 17.92, "close": 18.16, "high": 18.41, "low": 17.48, "volume": 445286.0}, {"date": "2025-02-21", "open": 18.18, "close": 18.4, "high": 18.5, "low": 17.9, "volume": 353362.0}, {"date": "2025-02-28", "open": 18.39, "close": 18.01, "high": 19.13, "low": 17.92, "volume": 437373.0}, {"date": "2025-03-07", "open": 18.08, "close": 18.0, "high": 18.55, "low": 17.82, "volume": 329183.0}, {"date": "2025-03-14", "open": 18.06, "close": 18.57, "high": 18.61, "low": 17.69, "volume": 293431.0}, {"date": "2025-03-21", "open": 18.73, "close": 18.58, "high": 19.33, "low": 18.3, "volume": 364841.0}, {"date": "2025-03-28", "open": 18.52, "close": 18.55, "high": 18.9, "low": 18.28, "volume": 234142.0}, {"date": "2025-04-03", "open": 18.46, "close": 18.8, "high": 19.71, "low": 18.29, "volume": 274179.0}, {"date": "2025-04-11", "open": 17.66, "close": 18.15, "high": 18.38, "low": 16.76, "volume": 394627.0}, {"date": "2025-04-18", "open": 18.3, "close": 19.23, "high": 19.4, "low": 17.33, "volume": 365883.0}, {"date": "2025-04-25", "open": 19.06, "close": 19.21, "high": 19.65, "low": 18.83, "volume": 300458.0}, {"date": "2025-04-30", "open": 18.96, "close": 18.63, "high": 19.13, "low": 18.44, "volume": 189849.0}, {"date": "2025-05-09", "open": 18.76, "close": 18.25, "high": 19.06, "low": 18.16, "volume": 260092.0}, {"date": "2025-05-16", "open": 18.41, "close": 18.17, "high": 18.5, "low": 17.66, "volume": 265963.0}, {"date": "2025-05-23", "open": 18.17, "close": 17.7, "high": 18.26, "low": 17.57, "volume": 202077.0}, {"date": "2025-05-30", "open": 17.71, "close": 17.94, "high": 18.03, "low": 17.39, "volume": 209618.0}, {"date": "2025-06-06", "open": 17.85, "close": 18.19, "high": 18.26, "low": 17.59, "volume": 160369.0}, {"date": "2025-06-13", "open": 18.08, "close": 17.69, "high": 18.24, "low": 17.57, "volume": 215763.0}, {"date": "2025-06-20", "open": 17.57, "close": 17.4, "high": 17.95, "low": 17.28, "volume": 119053.0}, {"date": "2025-06-27", "open": 17.29, "close": 17.43, "high": 17.96, "low": 17.12, "volume": 186600.0}, {"date": "2025-07-04", "open": 17.46, "close": 18.41, "high": 18.52, "low": 17.25, "volume": 366378.0}, {"date": "2025-07-11", "open": 18.97, "close": 19.22, "high": 19.95, "low": 18.4, "volume": 838225.0}, {"date": "2025-07-18", "open": 19.18, "close": 18.83, "high": 20.09, "low": 18.62, "volume": 372524.0}, {"date": "2025-07-25", "open": 18.84, "close": 20.19, "high": 20.55, "low": 18.74, "volume": 419818.0}, {"date": "2025-08-01", "open": 20.2, "close": 19.25, "high": 20.78, "low": 19.06, "volume": 315966.0}, {"date": "2025-08-08", "open": 19.11, "close": 19.17, "high": 19.65, "low": 19.06, "volume": 290710.0}, {"date": "2025-08-15", "open": 19.28, "close": 18.99, "high": 19.65, "low": 18.7, "volume": 240853.0}, {"date": "2025-08-22", "open": 19.05, "close": 19.38, "high": 19.56, "low": 18.78, "volume": 267171.0}, {"date": "2025-08-29", "open": 19.54, "close": 18.21, "high": 19.55, "low": 17.73, "volume": 457958.0}, {"date": "2025-09-05", "open": 18.22, "close": 17.55, "high": 18.29, "low": 17.23, "volume": 290689.0}, {"date": "2025-09-12", "open": 17.59, "close": 18.13, "high": 19.28, "low": 17.33, "volume": 490771.0}, {"date": "2025-09-19", "open": 18.4, "close": 18.78, "high": 19.81, "low": 17.93, "volume": 854774.0}, {"date": "2025-09-26", "open": 18.64, "close": 17.66, "high": 18.93, "low": 17.63, "volume": 584575.0}, {"date": "2025-09-30", "open": 17.66, "close": 17.78, "high": 17.89, "low": 17.33, "volume": 122965.0}, {"date": "2025-10-10", "open": 17.81, "close": 17.9, "high": 18.07, "low": 17.55, "volume": 129849.0}, {"date": "2025-10-17", "open": 17.55, "close": 17.11, "high": 17.74, "low": 17.06, "volume": 476193.0}, {"date": "2025-10-24", "open": 17.2, "close": 17.09, "high": 17.25, "low": 16.81, "volume": 191615.0}, {"date": "2025-10-31", "open": 17.15, "close": 17.41, "high": 17.7, "low": 16.56, "volume": 481015.0}, {"date": "2025-11-07", "open": 17.45, "close": 17.1, "high": 17.45, "low": 17.05, "volume": 177774.0}, {"date": "2025-11-14", "open": 17.08, "close": 17.1, "high": 17.29, "low": 16.93, "volume": 158543.0}, {"date": "2025-11-21", "open": 17.1, "close": 16.69, "high": 17.12, "low": 16.63, "volume": 148428.0}, {"date": "2025-11-28", "open": 16.77, "close": 16.71, "high": 17.0, "low": 16.67, "volume": 146763.0}, {"date": "2025-12-05", "open": 16.7, "close": 16.85, "high": 16.92, "low": 16.57, "volume": 144635.0}, {"date": "2025-12-12", "open": 16.88, "close": 16.37, "high": 16.92, "low": 15.97, "volume": 169212.0}, {"date": "2025-12-19", "open": 16.28, "close": 17.59, "high": 17.78, "low": 16.19, "volume": 386323.0}, {"date": "2025-12-26", "open": 17.71, "close": 17.68, "high": 18.1, "low": 17.14, "volume": 365415.0}, {"date": "2025-12-31", "open": 17.63, "close": 16.6, "high": 17.75, "low": 16.5, "volume": 244811.0}, {"date": "2026-01-09", "open": 16.61, "close": 17.66, "high": 18.03, "low": 16.45, "volume": 608306.0}, {"date": "2026-01-16", "open": 17.63, "close": 17.17, "high": 17.95, "low": 16.88, "volume": 469310.0}, {"date": "2026-01-23", "open": 18.51, "close": 20.24, "high": 20.24, "low": 18.25, "volume": 1568744.0}, {"date": "2026-01-30", "open": 20.2, "close": 18.95, "high": 20.38, "low": 18.76, "volume": 671938.0}, {"date": "2026-02-06", "open": 18.89, "close": 18.72, "high": 19.33, "low": 18.28, "volume": 504547.0}, {"date": "2026-02-13", "open": 18.85, "close": 19.33, "high": 20.51, "low": 18.8, "volume": 512509.0}, {"date": "2026-02-27", "open": 19.74, "close": 20.0, "high": 20.38, "low": 19.5, "volume": 473311.0}, {"date": "2026-03-06", "open": 19.51, "close": 19.03, "high": 19.93, "low": 18.6, "volume": 501717.0}, {"date": "2026-03-13", "open": 18.85, "close": 18.52, "high": 19.36, "low": 18.26, "volume": 417963.0}, {"date": "2026-03-20", "open": 18.5, "close": 17.56, "high": 18.59, "low": 17.56, "volume": 290187.0}, {"date": "2026-03-27", "open": 17.25, "close": 17.5, "high": 17.59, "low": 16.7, "volume": 381650.0}, {"date": "2026-04-03", "open": 17.31, "close": 17.02, "high": 17.81, "low": 16.81, "volume": 343058.0}, {"date": "2026-04-10", "open": 17.04, "close": 17.42, "high": 17.7, "low": 16.95, "volume": 232610.0}, {"date": "2026-04-17", "open": 17.24, "close": 17.35, "high": 17.5, "low": 16.75, "volume": 307159.0}, {"date": "2026-04-24", "open": 17.33, "close": 16.46, "high": 17.85, "low": 16.36, "volume": 562292.0}, {"date": "2026-04-30", "open": 16.39, "close": 16.1, "high": 16.45, "low": 15.72, "volume": 319408.0}, {"date": "2026-05-08", "open": 16.11, "close": 15.99, "high": 16.28, "low": 15.6, "volume": 269723.0}, {"date": "2026-05-15", "open": 16.05, "close": 17.21, "high": 18.32, "low": 16.05, "volume": 1077205.0}, {"date": "2026-05-22", "open": 17.09, "close": 16.59, "high": 17.45, "low": 15.98, "volume": 772200.0}, {"date": "2026-05-29", "open": 16.6, "close": 15.65, "high": 16.98, "low": 15.19, "volume": 579709.0}, {"date": "2026-06-05", "open": 15.55, "close": 15.4, "high": 16.07, "low": 15.34, "volume": 333007.0}, {"date": "2026-06-12", "open": 15.15, "close": 14.07, "high": 15.41, "low": 13.51, "volume": 502306.0}, {"date": "2026-06-18", "open": 14.09, "close": 12.88, "high": 14.48, "low": 12.85, "volume": 388526.0}, {"date": "2026-06-26", "open": 12.95, "close": 11.68, "high": 12.95, "low": 11.59, "volume": 551930.0}], "month": [{"date": "2021-07-30", "open": 15.49, "close": 16.01, "high": 17.89, "low": 14.75, "volume": 1083436.0}, {"date": "2021-08-31", "open": 16.06, "close": 16.88, "high": 19.88, "low": 16.0, "volume": 1824357.0}, {"date": "2021-09-30", "open": 16.92, "close": 14.28, "high": 16.92, "low": 13.14, "volume": 1486138.0}, {"date": "2021-10-29", "open": 14.43, "close": 15.69, "high": 15.82, "low": 13.63, "volume": 814062.0}, {"date": "2021-11-30", "open": 15.61, "close": 19.45, "high": 19.8, "low": 15.13, "volume": 1347201.0}, {"date": "2021-12-31", "open": 19.45, "close": 17.24, "high": 19.63, "low": 16.15, "volume": 1464315.0}, {"date": "2022-01-28", "open": 17.24, "close": 14.54, "high": 17.29, "low": 14.01, "volume": 793363.0}, {"date": "2022-02-28", "open": 14.74, "close": 13.85, "high": 15.05, "low": 13.68, "volume": 432044.0}, {"date": "2022-03-31", "open": 13.91, "close": 13.07, "high": 14.2, "low": 11.54, "volume": 642022.0}, {"date": "2022-04-29", "open": 12.94, "close": 11.14, "high": 13.12, "low": 9.52, "volume": 711827.0}, {"date": "2022-05-31", "open": 11.12, "close": 13.61, "high": 14.61, "low": 10.24, "volume": 978057.0}, {"date": "2022-06-30", "open": 13.61, "close": 14.84, "high": 16.29, "low": 13.02, "volume": 1367104.0}, {"date": "2022-07-29", "open": 14.84, "close": 15.23, "high": 15.72, "low": 14.13, "volume": 1013663.0}, {"date": "2022-08-31", "open": 15.14, "close": 14.68, "high": 15.37, "low": 13.13, "volume": 1248993.0}, {"date": "2022-09-30", "open": 14.85, "close": 17.84, "high": 18.96, "low": 14.3, "volume": 2049274.0}, {"date": "2022-10-31", "open": 17.83, "close": 17.78, "high": 20.16, "low": 16.73, "volume": 1155988.0}, {"date": "2022-11-30", "open": 17.78, "close": 17.71, "high": 20.21, "low": 16.84, "volume": 970784.0}, {"date": "2022-12-30", "open": 17.71, "close": 18.31, "high": 18.42, "low": 16.55, "volume": 712459.0}, {"date": "2023-01-31", "open": 18.29, "close": 18.42, "high": 18.53, "low": 16.74, "volume": 526818.0}, {"date": "2023-02-28", "open": 18.45, "close": 23.8, "high": 24.43, "low": 18.34, "volume": 1536897.0}, {"date": "2023-03-31", "open": 24.05, "close": 23.47, "high": 25.17, "low": 20.56, "volume": 2287345.0}, {"date": "2023-04-28", "open": 23.5, "close": 21.2, "high": 24.92, "low": 21.2, "volume": 1707512.0}, {"date": "2023-05-31", "open": 21.15, "close": 18.85, "high": 23.03, "low": 18.42, "volume": 1547232.0}, {"date": "2023-06-30", "open": 18.73, "close": 19.58, "high": 21.08, "low": 18.57, "volume": 1380856.0}, {"date": "2023-07-31", "open": 19.57, "close": 22.68, "high": 22.98, "low": 19.54, "volume": 1441797.0}, {"date": "2023-08-31", "open": 22.62, "close": 20.23, "high": 22.83, "low": 19.66, "volume": 696826.0}, {"date": "2023-09-28", "open": 20.39, "close": 19.48, "high": 21.43, "low": 18.71, "volume": 613131.0}, {"date": "2023-10-31", "open": 19.42, "close": 17.79, "high": 20.48, "low": 17.46, "volume": 539391.0}, {"date": "2023-11-30", "open": 17.66, "close": 20.75, "high": 21.91, "low": 17.65, "volume": 1713581.0}, {"date": "2023-12-29", "open": 20.88, "close": 21.29, "high": 23.83, "low": 19.65, "volume": 2075298.0}, {"date": "2024-01-31", "open": 21.25, "close": 17.47, "high": 21.38, "low": 17.33, "volume": 1284033.0}, {"date": "2024-02-29", "open": 17.47, "close": 18.84, "high": 19.07, "low": 14.18, "volume": 1259894.0}, {"date": "2024-03-29", "open": 18.89, "close": 18.64, "high": 19.18, "low": 16.68, "volume": 1552931.0}, {"date": "2024-04-30", "open": 18.68, "close": 19.77, "high": 20.29, "low": 17.62, "volume": 1100114.0}, {"date": "2024-05-31", "open": 19.95, "close": 18.51, "high": 20.56, "low": 17.3, "volume": 1210407.0}, {"date": "2024-06-28", "open": 18.68, "close": 16.12, "high": 19.73, "low": 15.99, "volume": 1214398.0}, {"date": "2024-07-31", "open": 16.12, "close": 16.89, "high": 17.44, "low": 14.87, "volume": 1453516.0}, {"date": "2024-08-30", "open": 16.9, "close": 16.03, "high": 17.16, "low": 14.57, "volume": 899846.0}, {"date": "2024-09-30", "open": 15.99, "close": 18.67, "high": 18.86, "low": 15.58, "volume": 955420.0}, {"date": "2024-10-31", "open": 20.56, "close": 17.34, "high": 20.56, "low": 17.17, "volume": 1655799.0}, {"date": "2024-11-29", "open": 17.41, "close": 17.35, "high": 19.35, "low": 16.95, "volume": 1927234.0}, {"date": "2024-12-31", "open": 17.41, "close": 17.18, "high": 18.93, "low": 17.01, "volume": 1256266.0}, {"date": "2025-01-27", "open": 17.18, "close": 16.52, "high": 17.3, "low": 15.74, "volume": 940533.0}, {"date": "2025-02-28", "open": 16.56, "close": 18.01, "high": 19.13, "low": 16.37, "volume": 1631427.0}, {"date": "2025-03-31", "open": 18.08, "close": 18.49, "high": 19.33, "low": 17.69, "volume": 1258099.0}, {"date": "2025-04-30", "open": 18.4, "close": 18.63, "high": 19.71, "low": 16.76, "volume": 1488494.0}, {"date": "2025-05-30", "open": 18.76, "close": 17.94, "high": 19.06, "low": 17.39, "volume": 937750.0}, {"date": "2025-06-30", "open": 17.85, "close": 17.41, "high": 18.26, "low": 17.12, "volume": 728298.0}, {"date": "2025-07-31", "open": 17.4, "close": 19.35, "high": 20.78, "low": 17.25, "volume": 2225817.0}, {"date": "2025-08-29", "open": 19.31, "close": 18.21, "high": 19.65, "low": 17.73, "volume": 1297273.0}, {"date": "2025-09-30", "open": 18.22, "close": 17.78, "high": 19.81, "low": 17.23, "volume": 2343774.0}, {"date": "2025-10-31", "open": 17.81, "close": 17.41, "high": 18.07, "low": 16.56, "volume": 1278672.0}, {"date": "2025-11-28", "open": 17.45, "close": 16.71, "high": 17.45, "low": 16.63, "volume": 631508.0}, {"date": "2025-12-31", "open": 16.7, "close": 16.6, "high": 18.1, "low": 15.97, "volume": 1310396.0}, {"date": "2026-01-30", "open": 16.61, "close": 18.95, "high": 20.38, "low": 16.45, "volume": 3318298.0}, {"date": "2026-02-27", "open": 18.89, "close": 20.0, "high": 20.51, "low": 18.28, "volume": 1490367.0}, {"date": "2026-03-31", "open": 19.51, "close": 17.23, "high": 19.93, "low": 16.7, "volume": 1742361.0}, {"date": "2026-04-30", "open": 17.46, "close": 16.1, "high": 17.85, "low": 15.72, "volume": 1613683.0}, {"date": "2026-05-29", "open": 16.11, "close": 15.65, "high": 18.32, "low": 15.19, "volume": 2698837.0}, {"date": "2026-06-26", "open": 15.55, "close": 11.68, "high": 16.07, "low": 11.59, "volume": 1775769.0}]};
+var curPeriod='day';
+
+function switchKline(p){
+ curPeriod=p;
+ document.querySelectorAll('.kline-bar button').forEach(function(b){b.classList.remove('on')});
+ event.target.classList.add('on');
+ drawKline();
+}
+
+function calcMA(data, n){
+ var result=[];
+ for(var i=0;i<data.length;i++){
+  if(i<n-1){result.push(null);continue}
+  var sum=0;for(var j=i-n+1;j<=i;j++) sum+=data[j].close;
+  result.push(sum/n);
+ }
+ return result;
+}
+
+function drawKline(){
+ var data=KDATA[curPeriod];
+ if(!data||data.length===0) return;
+ var cv=document.getElementById('cvKline');
+ var W=cv.parentElement.clientWidth-4,H=380;
+ cv.width=W*2;cv.height=H*2;
+ cv.style.width=W+'px';cv.style.height=H+'px';
+ var ctx=cv.getContext('2d');
+ ctx.scale(2,2);
+
+ var n=data.length;
+ var chartH=H*0.68,volH=H*0.18,padL=50,padR=10,padT=10;
+
+ // 计算价格范围
+ var maxH=data[0].high,minL=data[0].low;
+ for(var i=0;i<n;i++){
+  if(data[i].high>maxH) maxH=data[i].high;
+  if(data[i].low<minL) minL=data[i].low;
+ }
+ var maxV=0;for(var i=0;i<n;i++){if(data[i].volume>maxV)maxV=data[i].volume;}
+ maxH=maxH*1.02;minL=minL*0.98;
+ var priceRange=maxH-minL;
+
+ // MAs
+ var ma5=calcMA(data,5),ma10=calcMA(data,10),ma20=calcMA(data,20),ma60=calcMA(data,60);
+ var barW=(W-padL-padR)/n*0.7;
+ var gap=(W-padL-padR)/n;
+ var candleW=Math.max(1,barW*0.6);
+
+ // X轴标签（只显示部分日期）
+ var skip=Math.max(1,Math.floor(n/8));
+
+ // 清除
+ ctx.clearRect(0,0,W,H);
+
+ // 网格线
+ ctx.strokeStyle='#1a1f29';ctx.lineWidth=0.5;
+ for(var i=0;i<=4;i++){
+  var y=padT+chartH*i/4;
+  ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(W-padR,y);ctx.stroke();
+  ctx.fillStyle='#5a6270';ctx.font='9px sans-serif';ctx.textAlign='right';
+  var p=maxH-priceRange*i/4;
+  ctx.fillText(p.toFixed(2),padL-4,y+3);
+ }
+
+ // 成交量柱
+ for(var i=0;i<n;i++){
+  var x=padL+i*gap;
+  var vh=data[i].volume/maxV*volH;
+  var vy=padT+chartH+10+volH-vh;
+  var c=data[i].close>=data[i].open?'rgba(61,220,132,0.35)':'rgba(255,107,107,0.35)';
+  ctx.fillStyle=c;ctx.fillRect(x-candleW/2,vy,candleW,vh);
+ }
+
+ // 成交量标签
+ ctx.fillStyle='#5a6270';ctx.font='9px sans-serif';ctx.textAlign='right';
+ ctx.fillText('VOL',padL-4,padT+chartH+20);
+
+ // 蜡烛图
+ for(var i=0;i<n;i++){
+  var x=padL+i*gap;
+  var oy=padT+(maxH-data[i].open)/priceRange*chartH;
+  var cy=padT+(maxH-data[i].close)/priceRange*chartH;
+  var hy=padT+(maxH-data[i].high)/priceRange*chartH;
+  var ly=padT+(maxH-data[i].low)/priceRange*chartH;
+  var up=data[i].close>=data[i].open;
+  ctx.strokeStyle=up?'#3ddc84':'#ff6b6b';
+  ctx.fillStyle=up?'#3ddc84':(data[i].close<data[i].open?'#ff6b6b':'#3ddc84');
+  // 影线
+  ctx.beginPath();ctx.moveTo(x,hy);ctx.lineTo(x,ly);ctx.stroke();
+  // 实体
+  var bodyH=Math.max(1,Math.abs(cy-oy));
+  var bodyY=Math.min(oy,cy);
+  ctx.fillRect(x-candleW/2,bodyY,candleW,bodyH);
+ }
+
+ // MA线
+ function drawMA(ma,color,lw){
+  ctx.strokeStyle=color;ctx.lineWidth=lw;
+  ctx.beginPath();var started=false;
+  for(var i=0;i<n;i++){
+   if(ma[i]===null) continue;
+   var x=padL+i*gap,y=padT+(maxH-ma[i])/priceRange*chartH;
+   if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+ }
+ drawMA(ma5,'#ffe066',1.2);
+ drawMA(ma10,'#ff9f1c',1.2);
+ drawMA(ma20,'#e15554',1.2);
+ drawMA(ma60,'#4e9f3d',1.2);
+
+ // X轴日期
+ ctx.fillStyle='#6b7380';ctx.font='9px sans-serif';ctx.textAlign='center';
+ for(var i=0;i<n;i+=skip){
+  var x=padL+i*gap;
+  ctx.fillText(data[i].date.slice(5),x,padT+chartH+volH+22);
+ }
+}
+
+// 初始化K线
+drawKline();
+
+// K线交互：十字线直接画在主canvas上（零图层），tooltip在canvas下方
+var crossIdx=-1;
+var tipK=document.createElement('div');
+tipK.style.cssText='margin-top:4px;padding:6px 10px;background:#131820;border:1px solid #232936;border-radius:6px;font-size:11px;color:#8b93a1;text-align:center;line-height:1.5;min-height:20px';
+cvKline.parentElement.appendChild(tipK);
+tipK.innerHTML='在K线上点击查看详情';
+
+function klineHit(e){
+ var data=KDATA[curPeriod];if(!data||!data.length)return-1;
+ var rect=cvKline.getBoundingClientRect();
+ var W=cvKline.parentElement.clientWidth-4,padL=50,padR=10;
+ var n=data.length,gap=(W-padL-padR)/n;
+ var idx=Math.round((e.clientX-rect.left-padL)/gap);
+ return (idx>=0&&idx<n)?idx:-1;
+}
+
+function showTip(idx,pinned){
+ if(idx<0||!KDATA[curPeriod]||!KDATA[curPeriod][idx]){tipK.innerHTML='在K线上点击查看详情';return}
+ var d=KDATA[curPeriod][idx];
+ var up=d.close>=d.open,chg=((d.close-d.open)/d.open*100).toFixed(2);
+ tipK.innerHTML='<b style="color:#fff">'+d.date+'</b>'
+  +' 开<b>'+d.open.toFixed(2)+'</b> 收<b style="color:'+(up?'#3ddc84':'#ff6b6b')+'">'+d.close.toFixed(2)+'</b>'
+  +' 高'+d.high.toFixed(2)+' 低'+d.low.toFixed(2)
+  +' <span style="color:'+(up?'#3ddc84':'#ff6b6b')+'">'+(up?'+':'')+chg+'%</span>'
+  +' 量'+(d.volume/10000).toFixed(0)+'万手'
+  +(pinned?' <span style="color:#6b7380;font-size:10px">·已固定·点击取消</span>':'');
+}
+
+// 扩展drawKline：在尾部追加十字线
+// 注意：_origDraw 内部会 cv.width=W*2 清空canvas 并 ctx.scale(2,2) 绘制，结束后不 restore
+// 所以这里需要重置变换再画十字线
+var _origDraw=drawKline;
+drawKline=function(){
+ _origDraw();
+ if(crossIdx<0||!KDATA[curPeriod]||!KDATA[curPeriod][crossIdx])return;
+ var data=KDATA[curPeriod],H=380,W=cvKline.parentElement.clientWidth-4;
+ var ctx=cvKline.getContext('2d');
+ // 重置变换矩阵后重新设置 2x HiDPI
+ ctx.setTransform(1,0,0,1,0,0);
+ ctx.scale(2,2);
+ var chartH=H*0.68,padL=50,padR=10,padT=10;
+ var n=data.length,gap=(W-padL-padR)/n;
+ var x=padL+crossIdx*gap;
+ var maxH=data[0].high,minL=data[0].low;
+ for(var i=0;i<n;i++){if(data[i].high>maxH)maxH=data[i].high;if(data[i].low<minL)minL=data[i].low;}
+ maxH*=1.02;minL*=0.98;
+ var cy=padT+(maxH-data[crossIdx].close)/(maxH-minL)*chartH;
+ // 极淡竖虚线 + 小圆点
+ ctx.strokeStyle='rgba(58,134,255,0.22)';ctx.lineWidth=1;ctx.setLineDash([3,5]);
+ ctx.beginPath();ctx.moveTo(x,padT);ctx.lineTo(x,padT+chartH);ctx.stroke();
+ ctx.setLineDash([]);
+ ctx.fillStyle='rgba(58,134,255,0.7)';ctx.beginPath();ctx.arc(x,cy,3,0,Math.PI*2);ctx.fill();
+};
+
+cvKline.addEventListener('click',function(e){
+ var idx=klineHit(e);
+ if(idx===crossIdx){crossIdx=-1;showTip(-1,false);drawKline();return}
+ crossIdx=idx;showTip(idx,true);drawKline();
+});
+cvKline.addEventListener('mousemove',function(e){
+ if(crossIdx>=0)return;var idx=klineHit(e);showTip(idx,false);
+});
+cvKline.addEventListener('mouseleave',function(){if(crossIdx<0)tipK.innerHTML='在K线上点击查看详情'});
+
+// ---- 一键生成研报：所有 .deep-gen 链接 ----
+document.querySelectorAll('.deep-gen').forEach(function(el){
+ el.addEventListener('click',function(e){
+  e.preventDefault();
+  var code=el.getAttribute('data-code');
+  el.textContent='⏳';el.style.pointerEvents='none';
+  fetch('http://localhost:8899/api/deep?code='+code)
+   .then(function(r){return r.json()})
+   .then(function(d){
+    if(d.done){location.href=code+'.html';}
+    else{el.textContent=code;el.style.pointerEvents='auto';alert('生成失败');}
+   })
+   .catch(function(e){el.textContent=code;el.style.pointerEvents='auto';alert('无法连接本地服务(端口8899)');});
+ });
+});
+
+// 财务趋势图表
+(function(){
+var data = [{"year": "2021", "rev": 3835074037.15, "netp": 691667708.29, "roe": 13.55, "gm": 33.4335078358, "nm": 18.03531565726972, "debt": 20.3355222712, "roa": 9.627683401601905, "ocf": "7.09亿", "ocf_ratio": 1.024697645625575}, {"year": "2022", "rev": 3290598584.36, "netp": 689143235.47, "roe": 12.39, "gm": 44.0623805168, "nm": 20.942792558942095, "debt": 22.8767466832, "roa": 8.570782832840063, "ocf": "8.00亿", "ocf_ratio": 1.160332074441163}, {"year": "2023", "rev": 4096251488.3, "netp": 836168650.52, "roe": 13.29, "gm": 42.8666205131, "nm": 20.413020365285757, "debt": 24.1343620643, "roa": 9.16421330338272, "ocf": "8.90亿", "ocf_ratio": 1.0649209819648717}, {"year": "2024", "rev": 4732062472.42, "netp": 899541963.26, "roe": 13.27, "gm": 44.2448876997, "nm": 19.00951157138823, "debt": 26.0997280203, "roa": 8.897363426862475, "ocf": "5.01亿", "ocf_ratio": 0.5570482484263688}, {"year": "2025", "rev": 4966679182.35, "netp": 1057677423.32, "roe": 14.31, "gm": 45.8797304551, "nm": 21.295464927121717, "debt": 31.3357142516, "roa": 7.516035602230289, "ocf": "12.27亿", "ocf_ratio": 1.1602788871373222}];
+var cv = document.getElementById('cvTrend');
+var W = cv.parentElement.clientWidth - 4, H = 280;
+cv.width = W * 2; cv.height = H * 2;
+cv.style.width = W + 'px'; cv.style.height = H + 'px';
+var ctx = cv.getContext('2d');
+ctx.scale(2, 2);
+
+// 绘制双轴图：营收+净利柱状图, ROE+毛利率折线
+var years = data.map(function(d){return d.year});
+var revs = data.map(function(d){return d.rev ? d.rev/1e8 : 0});
+var netps = data.map(function(d){return d.netp ? d.netp/1e8 : 0});
+var roes = data.map(function(d){return d.roe || 0});
+var gms = data.map(function(d){return d.gm || 0});
+
+var maxRev = Math.max.apply(null, revs.concat([1]));
+var maxPct = Math.max.apply(null, roes.concat(gms).concat([50]));
+
+var n = data.length;
+var barW = (W - 100) / n * 0.35;
+var groupW = (W - 100) / n;
+
+// 营收柱
+for(var i = 0; i < n; i++){
+    var bh = revs[i] / maxRev * (H - 80), x = 60 + i * groupW, y = H - 40 - bh;
+    ctx.fillStyle = 'rgba(58,134,255,0.7)';
+    ctx.fillRect(x - barW, y, barW, bh);
+    ctx.fillStyle = '#7fb3ff'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText((revs[i]||0).toFixed(1), x - barW/2, y - 4);
+}
+// 净利柱
+for(var i = 0; i < n; i++){
+    var bh = netps[i] / maxRev * (H - 80), x = 60 + i * groupW, y = H - 40 - bh;
+    ctx.fillStyle = 'rgba(61,220,132,0.7)';
+    ctx.fillRect(x, y, barW, bh);
+    ctx.fillStyle = '#3ddc84'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText((netps[i]||0).toFixed(1), x + barW/2, y - 4);
+}
+
+// ROE 折线
+ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2;
+ctx.beginPath();
+for(var i = 0; i < n; i++){
+    var x = 60 + i * groupW, y = H - 40 - (roes[i] / maxPct * (H - 80));
+    if(i == 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+}
+ctx.stroke();
+// ROE 点
+for(var i = 0; i < n; i++){
+    var x = 60 + i * groupW, y = H - 40 - (roes[i] / maxPct * (H - 80));
+    ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#ffd166'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(roes[i]+'%', x, y - 8);
+}
+
+// 毛利率折线
+ctx.strokeStyle = '#9aa4b2'; ctx.lineWidth = 2; ctx.setLineDash([4,3]);
+ctx.beginPath();
+for(var i = 0; i < n; i++){
+    var x = 60 + i * groupW, y = H - 40 - (gms[i] / maxPct * (H - 80));
+    if(i == 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+}
+ctx.stroke();
+ctx.setLineDash([]);
+
+// 图例
+ctx.fillStyle = '#7fb3ff'; ctx.fillRect(60, H-20, 10, 10);
+ctx.fillStyle = '#8b93a1'; ctx.font = '10px sans-serif'; ctx.textAlign = 'left';
+ctx.fillText('营收(亿)', 74, H-11);
+ctx.fillStyle = '#3ddc84'; ctx.fillRect(130, H-20, 10, 10);
+ctx.fillText('净利(亿)', 144, H-11);
+ctx.strokeStyle = '#ffd166'; ctx.beginPath(); ctx.moveTo(210, H-15); ctx.lineTo(230, H-15); ctx.stroke();
+ctx.fillText('ROE%', 234, H-11);
+ctx.strokeStyle = '#9aa4b2'; ctx.setLineDash([4,3]); ctx.beginPath(); ctx.moveTo(290, H-15); ctx.lineTo(310, H-15); ctx.stroke();
+ctx.setLineDash([]);
+ctx.fillText('毛利率%', 314, H-11);
+
+// X轴标签
+ctx.fillStyle = '#6b7380'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+for(var i = 0; i < n; i++){
+    ctx.fillText(years[i], 60 + i * groupW, H - 4);
+}
+})();
+</script>
+</body></html>

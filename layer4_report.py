@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """把第4层定性研判(cache/verdicts/*.json)与量化结果(CSV)合并，产出定性修正后的最终榜单。"""
-import os, csv, json, glob, sys, re
+import os, csv, json, glob, re
 from datetime import datetime
 
 
@@ -113,8 +113,12 @@ quant = {}
 for r in csv.DictReader(open(csvs[-1], encoding="utf-8-sig")):
     quant[r["code"]] = r
 
-# 2) 定性研判（按文件索引 join 权威代码，不信任 agent 回填的 code，避免错配）
-codes = json.load(open(os.path.join(WORK, "cache", "_codes.json"), encoding="utf-8"))
+# 2) 定性研判。优先按 _codes.json 的文件索引 join；缺失时回退到 verdict 自带 code。
+codes_path = os.path.join(WORK, "cache", "_codes.json")
+try:
+    codes = json.load(open(codes_path, encoding="utf-8"))
+except (FileNotFoundError, json.JSONDecodeError, OSError):
+    codes = []
 verdicts = {}
 for fp in glob.glob(os.path.join(WORK, "cache", "verdicts", "*.json")):
     try:
@@ -122,7 +126,9 @@ for fp in glob.glob(os.path.join(WORK, "cache", "verdicts", "*.json")):
         v = tolerant_load(fp)
     except Exception:
         continue
-    code = codes[i] if 0 <= i < len(codes) else str(v.get("code"))
+    code = codes[i] if 0 <= i < len(codes) else str(v.get("code") or "")
+    if not code:
+        continue
     v["code"] = code  # 用权威代码覆盖
     verdicts[code] = v
 

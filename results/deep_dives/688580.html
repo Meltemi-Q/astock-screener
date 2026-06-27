@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>伟思医疗(688580) 深度研报 | 五层选股</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#0f1115;color:#e6e8eb;font-size:14px;line-height:1.6}
+.container{max-width:1100px;margin:0 auto;padding:24px 20px}
+header{padding:24px 0;border-bottom:1px solid #232936;margin-bottom:24px}
+header h1{margin:0;font-size:26px;color:#fff}
+header .sub{color:#8b93a1;font-size:14px;margin-top:6px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:28px}
+.kpi{background:#131820;border:1px solid #1e2634;border-radius:10px;padding:14px;text-align:center}
+.kpi .val{font-size:24px;font-weight:700}
+.kpi .lbl{font-size:11px;color:#6b7380;margin-top:4px}
+.kpi.green .val{color:#3ddc84}.kpi.yellow .val{color:#ffd166}.kpi.blue .val{color:#3a86ff}.kpi.red .val{color:#ff6b6b}
+/* 量化速览 */
+.quant-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:28px}
+.qs-item{background:#131820;border:1px solid #1e2634;border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:8px}
+.qs-label{color:#6b7380;font-size:11px;min-width:42px}
+.qs-val{font-size:18px;font-weight:700}
+.qs-tag{font-size:10px;padding:2px 6px;border-radius:3px;margin-left:auto;background:#1a1f29}
+/* K线周期按钮 */
+.kline-bar{display:flex;gap:6px;margin-bottom:12px}
+.kline-bar button{background:#1a1f29;border:1px solid #2a3140;color:#8b93a1;padding:5px 14px;border-radius:5px;cursor:pointer;font-size:12px}
+.kline-bar button.on{background:#3a86ff;border-color:#3a86ff;color:#fff}
+.section{margin:28px 0}
+.section h2{font-size:18px;border-bottom:1px solid #1e2634;padding-bottom:8px;margin-bottom:16px}
+canvas{width:100%;height:280px;border-radius:8px;background:#131820}
+.peer-table{width:100%;border-collapse:collapse;font-size:12px}
+.peer-table th{background:#1a1f29;color:#8b93a1;padding:8px 12px;text-align:left;border-bottom:1px solid #2a3140}
+.peer-table td{padding:6px 12px;border-bottom:1px solid #1c212b}
+.peer-table tr:hover td{background:#161b24}
+.code{color:#7fb3ff;font-variant-numeric:tabular-nums}
+/* AI 区块 */
+.ai-meta{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:16px;font-size:13px}
+.ai-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.ai-card{background:#131820;border:1px solid #1e2634;border-radius:10px;padding:16px}
+.ai-card h4{margin:0 0 8px;font-size:14px;color:#c7cdd6}
+.ai-card p{margin:0;font-size:13px;color:#9aa4b2;line-height:1.7}
+.ai-card.risk{border-color:#3d1f1f}
+.thesis{background:linear-gradient(135deg,#1a2a1a,#131820);border:1px solid #1e3e1e;border-radius:10px;padding:18px;margin-top:16px}
+.thesis h4{margin:0 0 6px;color:#3ddc84}
+.thesis p{margin:0;font-size:15px;color:#e6e8eb;font-style:italic}
+/* 财务表格 */
+.fin-table{width:100%;border-collapse:collapse;font-size:11px}
+.fin-table th{background:#1a1f29;color:#8b93a1;padding:6px 10px;text-align:right;border-bottom:1px solid #2a3140}
+.fin-table th.l{text-align:left}
+.fin-table td{padding:5px 10px;text-align:right;border-bottom:1px solid #1c212b}
+.fin-table td.l{text-align:left}
+.fin-table tr:hover td{background:#161b24}
+.pos{color:#3ddc84}.neg{color:#ff6b6b}
+footer{margin-top:40px;padding:16px 0;border-top:1px solid #232936;color:#5a6270;font-size:11px}
+.back{color:#7fb3ff;text-decoration:none;font-size:13px}
+.back:hover{text-decoration:underline}
+@media(max-width:768px){.container{padding:12px} .ai-grid{grid-template-columns:1fr}}
+</style></head><body>
+<div class="container">
+<header>
+    <a href="../astock_screen_20260627.html" class="back">← 回到选股总表</a>
+    <h1>伟思医疗 <span style="font-size:16px;color:#8b93a1">688580</span></h1>
+    <div class="sub">医疗器械 · 2023  |  2024  |  2025年</div>
+</header>
+
+<!-- KPI 卡片 -->
+<div class="kpis">
+    <div class="kpi green"><div class="val">53.90</div><div class="lbl">现价(元)</div></div>
+    <div class="kpi yellow"><div class="val">5390</div><div class="lbl">一手(元)</div></div>
+    <div class="kpi blue"><div class="val">31.0</div><div class="lbl">PE(TTM)</div></div>
+    <div class="kpi blue"><div class="val">3.1</div><div class="lbl">PB</div></div>
+    <div class="kpi green"><div class="val">8.3%</div><div class="lbl">ROE</div></div>
+    <div class="kpi green"><div class="val">66.2%</div><div class="lbl">毛利率</div></div>
+    <div class="kpi green"><div class="val">29.8%</div><div class="lbl">净利率</div></div>
+    <div class="kpi yellow"><div class="val">52亿</div><div class="lbl">总市值</div></div>
+    <div class="kpi"><div class="val">11.3%</div><div class="lbl">负债率</div></div>
+    <div class="kpi"><div class="val">7.2%</div><div class="lbl">ROA</div></div>
+</div>
+
+<!-- 量化速览 -->
+<div class="quant-summary">
+    <div class="qs-item"><span class="qs-label">ROE</span><span class="qs-val" style="color:#9aa4b2">8.3%</span><span class="qs-tag" style="color:#9aa4b2">一般</span></div>
+    <div class="qs-item"><span class="qs-label">毛利率</span><span class="qs-val" style="color:#3ddc84">66.2%</span><span class="qs-tag" style="color:#3ddc84">强定价权</span></div>
+    <div class="qs-item"><span class="qs-label">负债率</span><span class="qs-val" style="color:#3ddc84">11.3%</span><span class="qs-tag" style="color:#3ddc84">极稳健</span></div>
+    <div class="qs-item"><span class="qs-label">现金流</span><span class="qs-val" style="color:#7fb3ff">1.28x</span><span class="qs-tag" style="color:#7fb3ff">健康</span></div>
+    <div class="qs-item"><span class="qs-label">净利增速</span><span class="qs-val">35.4%</span><span class="qs-tag" style="color:#3ddc84">高增长</span></div>
+    <div class="qs-item"><span class="qs-label">3年CAGR</span><span class="qs-val">13.7%</span><span class="qs-tag">稳定</span></div>
+</div>
+
+<!-- K线图 -->
+<div class="section">
+    <h2>📈 股价走势 (前复权)</h2>
+    <div class="kline-bar">
+        <button class="on" onclick="switchKline('day')">日K</button>
+        <button onclick="switchKline('week')">周K</button>
+        <button onclick="switchKline('month')">月K</button>
+        <span style="color:#6b7380;font-size:11px;margin-left:12px;line-height:28px">
+            MA5 <span style="color:#ffe066">──</span>
+            MA10 <span style="color:#ff9f1c">──</span>
+            MA20 <span style="color:#e15554">──</span>
+            MA60 <span style="color:#4e9f3d">──</span>
+        </span>
+    </div>
+    <canvas id="cvKline"></canvas>
+</div>
+
+<!-- 财务趋势图表 -->
+<div class="section">
+    <h2>📊 5年财务趋势</h2>
+    <canvas id="cvTrend"></canvas>
+</div>
+
+<!-- 详细财务数据表 -->
+<div class="section">
+    <h2>📋 历年财务数据</h2>
+    <div style="overflow:auto">
+    <table class="fin-table">
+    <thead><tr>
+        <th class="l">年度</th><th>营收(亿)</th><th>净利(亿)</th><th>ROE%</th><th>毛利%</th><th>净利率%</th>
+        <th>ROA%</th><th>负债%</th><th>EPS</th><th>经营现金流</th><th>现金流/净利</th>
+    </tr></thead>
+    <tbody>
+
+    <tr>
+        <td class="l">2025</td>
+        <td>4.63亿</td>
+        <td>1.38亿</td>
+        <td class="">8.3%</td>
+        <td>66.2%</td>
+        <td class="pos">29.8%</td>
+        <td>7.2%</td>
+        <td>11.3%</td>
+        <td>1.44</td>
+        <td class="pos">1.77亿</td>
+        <td class="pos">1.28</td>
+    </tr>
+    <tr>
+        <td class="l">2024</td>
+        <td>4.00亿</td>
+        <td>1.02亿</td>
+        <td class="">6.3%</td>
+        <td>65.4%</td>
+        <td class="pos">25.5%</td>
+        <td>5.6%</td>
+        <td>10.6%</td>
+        <td>1.07</td>
+        <td class="pos">1.18亿</td>
+        <td class="pos">1.16</td>
+    </tr>
+    <tr>
+        <td class="l">2023</td>
+        <td>4.62亿</td>
+        <td>1.36亿</td>
+        <td class="">8.6%</td>
+        <td>67.7%</td>
+        <td class="pos">29.5%</td>
+        <td>7.5%</td>
+        <td>9.9%</td>
+        <td>1.43</td>
+        <td class="pos">1.34亿</td>
+        <td class="pos">0.98</td>
+    </tr>
+    <tr>
+        <td class="l">2022</td>
+        <td>3.22亿</td>
+        <td>9383万</td>
+        <td class="">6.1%</td>
+        <td>72.5%</td>
+        <td class="pos">29.2%</td>
+        <td>5.6%</td>
+        <td>9.2%</td>
+        <td>1.37</td>
+        <td class="pos">8617万</td>
+        <td class="pos">0.92</td>
+    </tr>
+    <tr>
+        <td class="l">2021</td>
+        <td>4.30亿</td>
+        <td>1.78亿</td>
+        <td class="">12.2%</td>
+        <td>74.8%</td>
+        <td class="pos">41.3%</td>
+        <td>10.9%</td>
+        <td>6.4%</td>
+        <td>2.60</td>
+        <td class="pos">1.57亿</td>
+        <td class="pos">0.89</td>
+    </tr>
+    </tbody></table></div>
+</div>
+
+<!-- 同行对比 -->
+<div class="section">
+    <h2>🏭 同行对比（同行业 医疗器械 优质标的）</h2>
+    <table class="peer-table">
+    <thead><tr>
+        <th>#</th><th>代码/名称</th><th>PE</th><th>ROE%</th><th>毛利%</th><th>市值(亿)</th><th>评级</th>
+    </tr></thead>
+    <tbody>
+        <tr>
+            <td>1</td>
+            <td><a href="688617.html" class="code">688617</a> <a href="688617.html" title="查看深度研报">惠泰医疗</a></td>
+            <td>29.6</td>
+            <td>28.8%</td>
+            <td>72.9%</td>
+            <td>256亿</td>
+            <td>🟡B</td>
+        </tr>
+        <tr>
+            <td>2</td>
+            <td><a href="#" class="code deep-gen" data-code="300760" title="点击生成研报">300760</a> <a href="#" class="deep-gen" data-code="300760" title="点击一键生成研报" style="color:#7fb3ff">迈瑞医疗</a> <span style="font-size:10px;color:#5a6270">⚡一键</span></td>
+            <td>20.7</td>
+            <td>21.6%</td>
+            <td>60.3%</td>
+            <td>1624亿</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>3</td>
+            <td><a href="300453.html" class="code">300453</a> <a href="300453.html" title="查看深度研报">三鑫医疗</a></td>
+            <td>16.6</td>
+            <td>19.2%</td>
+            <td>36.0%</td>
+            <td>46亿</td>
+            <td>🟡B</td>
+        </tr>
+        <tr>
+            <td>4</td>
+            <td><a href="#" class="code deep-gen" data-code="920166" title="点击生成研报">920166</a> <a href="#" class="deep-gen" data-code="920166" title="点击一键生成研报" style="color:#7fb3ff">海圣医疗</a> <span style="font-size:10px;color:#5a6270">⚡一键</span></td>
+            <td>18.7</td>
+            <td>18.9%</td>
+            <td>52.0%</td>
+            <td>16亿</td>
+            <td>⚪C</td>
+        </tr>
+        <tr>
+            <td>5</td>
+            <td><a href="300685.html" class="code">300685</a> <a href="300685.html" title="查看深度研报">艾德生物</a></td>
+            <td>17.7</td>
+            <td>18.6%</td>
+            <td>82.6%</td>
+            <td>63亿</td>
+            <td>🟡B</td>
+        </tr>
+        <tr>
+            <td>6</td>
+            <td><a href="#" class="code deep-gen" data-code="300832" title="点击生成研报">300832</a> <a href="#" class="deep-gen" data-code="300832" title="点击一键生成研报" style="color:#7fb3ff">新产业</a> <span style="font-size:10px;color:#5a6270">⚡一键</span></td>
+            <td>20.5</td>
+            <td>18.4%</td>
+            <td>69.3%</td>
+            <td>333亿</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>7</td>
+            <td><a href="920009.html" class="code">920009</a> <a href="920009.html" title="查看深度研报">丹娜生物</a></td>
+            <td>31.2</td>
+            <td>18.3%</td>
+            <td>85.5%</td>
+            <td>28亿</td>
+            <td>🟡B</td>
+        </tr>
+        <tr>
+            <td>8</td>
+            <td><a href="002901.html" class="code">002901</a> <a href="002901.html" title="查看深度研报">大博医疗</a></td>
+            <td>26.9</td>
+            <td>18.1%</td>
+            <td>70.5%</td>
+            <td>173亿</td>
+            <td>🟡B</td>
+        </tr></tbody></table>
+</div>
+
+<!-- AI 分析 -->
+
+    <div class="section">
+        <h2>🤖 AI 定性分析</h2>
+        <div id="aiPlaceholder" style="background:#131820;border:1px dashed #2a3140;border-radius:10px;padding:20px;text-align:center;color:#6b7380">
+            <p style="font-size:15px;margin:0 0 8px">AI 定性分析未运行</p>
+            <p style="font-size:12px;margin:0 0 12px">DeepSeek V4 Pro 将对生意模式、护城河、管理层、成长性、行业地位、风险做深度分析（约 5-10 秒）</p>
+            <button id="aiAnalyzeBtn" style="background:#1d2033;border:1px solid #3a86ff;color:#7fb3ff;padding:8px 20px;border-radius:7px;cursor:pointer;font-size:14px"
+                    onclick="runAiAnalysis('688580')">🤖 开始 AI 分析</button>
+            <div id="aiProgress" style="margin-top:10px;display:none;color:#7fb3ff;font-size:12px">⏳ 分析中…</div>
+        </div>
+    </div>
+    <script>
+    function runAiAnalysis(code){
+     var btn=document.getElementById('aiAnalyzeBtn');
+     var prog=document.getElementById('aiProgress');
+     if(!btn)return;
+     btn.disabled=true;btn.textContent='⏳ 分析中…';prog.style.display='block';
+     fetch('http://localhost:8899/api/deep?code='+code)
+      .then(function(r){return r.json()})
+      .then(function(d){
+       if(d.done){prog.textContent='✅ 完成！正在刷新…';setTimeout(function(){location.reload()},600)}
+       else{prog.textContent='⚠️ 失败: '+(d.error||'未知');btn.disabled=false;btn.textContent='🤖 重试'}
+      })
+      .catch(function(e){prog.textContent='⚠️ 无法连接服务，请通过 http://localhost:8899 打开';btn.disabled=false;btn.textContent='🤖 重试'});
+    }
+    </script>
+
+<footer>
+    数据来源：东方财富公开接口 · AI分析由 DeepSeek V4 Pro 生成，仅供参考不构成投资建议 · 生成于 2026-06-27 10:29
+</footer>
+</div>
+
+<script>
+// K线数据
+var KDATA={"day": [{"date": "2025-06-17", "open": 45.979, "close": 44.569, "high": 46.919, "low": 44.499, "volume": 2494559.0}, {"date": "2025-06-18", "open": 44.329, "close": 44.299, "high": 46.099, "low": 44.259, "volume": 1680102.0}, {"date": "2025-06-19", "open": 43.029, "close": 42.219, "high": 43.499, "low": 42.199, "volume": 1928229.0}, {"date": "2025-06-20", "open": 42.219, "close": 40.989, "high": 42.719, "low": 40.939, "volume": 1420543.0}, {"date": "2025-06-23", "open": 41.119, "close": 42.109, "high": 42.419, "low": 41.039, "volume": 1164919.0}, {"date": "2025-06-24", "open": 42.639, "close": 42.919, "high": 43.199, "low": 42.149, "volume": 1303737.0}, {"date": "2025-06-25", "open": 42.959, "close": 43.519, "high": 43.659, "low": 42.559, "volume": 1334167.0}, {"date": "2025-06-26", "open": 43.539, "close": 43.479, "high": 44.199, "low": 42.949, "volume": 1345466.0}, {"date": "2025-06-27", "open": 43.489, "close": 43.289, "high": 44.109, "low": 43.219, "volume": 1368345.0}, {"date": "2025-06-30", "open": 43.899, "close": 45.409, "high": 45.719, "low": 43.819, "volume": 2577176.0}, {"date": "2025-07-01", "open": 45.419, "close": 46.819, "high": 49.419, "low": 44.799, "volume": 4261712.0}, {"date": "2025-07-02", "open": 46.079, "close": 45.359, "high": 46.519, "low": 44.779, "volume": 2807681.0}, {"date": "2025-07-03", "open": 45.379, "close": 44.849, "high": 45.539, "low": 44.659, "volume": 1348718.0}, {"date": "2025-07-04", "open": 46.399, "close": 45.269, "high": 47.219, "low": 44.919, "volume": 3001235.0}, {"date": "2025-07-07", "open": 45.279, "close": 44.519, "high": 45.279, "low": 44.069, "volume": 1556643.0}, {"date": "2025-07-08", "open": 44.479, "close": 44.529, "high": 45.169, "low": 44.129, "volume": 1361007.0}, {"date": "2025-07-09", "open": 44.699, "close": 43.949, "high": 44.799, "low": 43.799, "volume": 1547808.0}, {"date": "2025-07-10", "open": 43.929, "close": 43.919, "high": 44.289, "low": 43.249, "volume": 1051457.0}, {"date": "2025-07-11", "open": 44.389, "close": 44.469, "high": 44.699, "low": 43.619, "volume": 1231713.0}, {"date": "2025-07-14", "open": 44.439, "close": 44.609, "high": 44.899, "low": 44.049, "volume": 1133783.0}, {"date": "2025-07-15", "open": 44.909, "close": 44.859, "high": 45.049, "low": 43.549, "volume": 1725417.0}, {"date": "2025-07-16", "open": 44.859, "close": 45.899, "high": 46.179, "low": 44.559, "volume": 2286234.0}, {"date": "2025-07-17", "open": 45.529, "close": 45.909, "high": 46.129, "low": 45.529, "volume": 1454271.0}, {"date": "2025-07-18", "open": 46.479, "close": 45.579, "high": 46.499, "low": 45.019, "volume": 1637101.0}, {"date": "2025-07-21", "open": 45.619, "close": 45.859, "high": 46.419, "low": 45.619, "volume": 1710080.0}, {"date": "2025-07-22", "open": 45.719, "close": 45.969, "high": 46.719, "low": 45.129, "volume": 2126547.0}, {"date": "2025-07-23", "open": 44.469, "close": 43.059, "high": 44.629, "low": 42.419, "volume": 3716186.0}, {"date": "2025-07-24", "open": 43.139, "close": 43.299, "high": 43.799, "low": 43.019, "volume": 1936018.0}, {"date": "2025-07-25", "open": 43.519, "close": 43.919, "high": 44.309, "low": 43.129, "volume": 1696982.0}, {"date": "2025-07-28", "open": 43.929, "close": 43.899, "high": 44.619, "low": 43.819, "volume": 1189792.0}, {"date": "2025-07-29", "open": 43.889, "close": 44.709, "high": 44.909, "low": 43.169, "volume": 2409490.0}, {"date": "2025-07-30", "open": 44.799, "close": 45.489, "high": 45.819, "low": 44.419, "volume": 2696019.0}, {"date": "2025-07-31", "open": 45.869, "close": 45.159, "high": 45.869, "low": 44.429, "volume": 2173513.0}, {"date": "2025-08-01", "open": 45.559, "close": 44.419, "high": 45.559, "low": 43.639, "volume": 2586222.0}, {"date": "2025-08-04", "open": 44.469, "close": 45.229, "high": 45.289, "low": 42.919, "volume": 2159251.0}, {"date": "2025-08-05", "open": 45.449, "close": 47.379, "high": 47.409, "low": 45.149, "volume": 5008300.0}, {"date": "2025-08-06", "open": 47.689, "close": 49.549, "high": 50.489, "low": 46.979, "volume": 6267903.0}, {"date": "2025-08-07", "open": 49.029, "close": 52.469, "high": 54.919, "low": 49.029, "volume": 7089628.0}, {"date": "2025-08-08", "open": 53.919, "close": 51.649, "high": 57.749, "low": 50.929, "volume": 8310862.0}, {"date": "2025-08-11", "open": 51.029, "close": 51.919, "high": 52.759, "low": 50.629, "volume": 4916359.0}, {"date": "2025-08-12", "open": 51.919, "close": 54.779, "high": 55.489, "low": 51.579, "volume": 5543509.0}, {"date": "2025-08-13", "open": 53.919, "close": 54.919, "high": 56.219, "low": 52.849, "volume": 4865740.0}, {"date": "2025-08-14", "open": 54.419, "close": 53.439, "high": 55.899, "low": 52.619, "volume": 4696040.0}, {"date": "2025-08-15", "open": 54.019, "close": 54.429, "high": 55.219, "low": 53.099, "volume": 3579464.0}, {"date": "2025-08-18", "open": 54.659, "close": 54.699, "high": 55.619, "low": 53.729, "volume": 4178983.0}, {"date": "2025-08-19", "open": 54.149, "close": 56.419, "high": 58.419, "low": 53.929, "volume": 4146846.0}, {"date": "2025-08-20", "open": 56.419, "close": 54.799, "high": 56.419, "low": 53.719, "volume": 2824615.0}, {"date": "2025-08-21", "open": 54.799, "close": 53.039, "high": 55.119, "low": 52.719, "volume": 2584833.0}, {"date": "2025-08-22", "open": 53.419, "close": 53.639, "high": 54.279, "low": 53.009, "volume": 1931383.0}, {"date": "2025-08-25", "open": 52.969, "close": 54.469, "high": 55.419, "low": 52.969, "volume": 2761697.0}, {"date": "2025-08-26", "open": 54.419, "close": 53.819, "high": 55.479, "low": 53.429, "volume": 2044922.0}, {"date": "2025-08-27", "open": 53.819, "close": 52.319, "high": 54.419, "low": 52.219, "volume": 2622168.0}, {"date": "2025-08-28", "open": 52.809, "close": 51.519, "high": 53.419, "low": 50.319, "volume": 3311406.0}, {"date": "2025-08-29", "open": 51.569, "close": 51.879, "high": 52.569, "low": 51.259, "volume": 2170322.0}, {"date": "2025-09-01", "open": 51.449, "close": 52.499, "high": 52.709, "low": 50.919, "volume": 2580625.0}, {"date": "2025-09-02", "open": 52.269, "close": 50.169, "high": 52.679, "low": 49.579, "volume": 2549443.0}, {"date": "2025-09-03", "open": 50.869, "close": 50.119, "high": 51.079, "low": 49.619, "volume": 1603091.0}, {"date": "2025-09-04", "open": 50.909, "close": 49.719, "high": 51.329, "low": 48.529, "volume": 1870310.0}, {"date": "2025-09-05", "open": 50.299, "close": 50.519, "high": 50.689, "low": 48.629, "volume": 1449193.0}, {"date": "2025-09-08", "open": 50.419, "close": 52.839, "high": 53.719, "low": 50.119, "volume": 2668344.0}, {"date": "2025-09-09", "open": 53.409, "close": 50.169, "high": 53.409, "low": 49.929, "volume": 1837459.0}, {"date": "2025-09-10", "open": 50.139, "close": 50.069, "high": 51.019, "low": 49.969, "volume": 910811.0}, {"date": "2025-09-11", "open": 49.819, "close": 50.059, "high": 50.099, "low": 48.129, "volume": 1783252.0}, {"date": "2025-09-12", "open": 50.219, "close": 49.799, "high": 50.369, "low": 49.069, "volume": 1652382.0}, {"date": "2025-09-15", "open": 49.799, "close": 49.689, "high": 50.279, "low": 49.419, "volume": 1013732.0}, {"date": "2025-09-16", "open": 49.699, "close": 51.099, "high": 51.299, "low": 49.689, "volume": 1400855.0}, {"date": "2025-09-17", "open": 50.919, "close": 51.099, "high": 51.399, "low": 50.419, "volume": 1280985.0}, {"date": "2025-09-18", "open": 51.249, "close": 49.949, "high": 51.899, "low": 49.439, "volume": 1945980.0}, {"date": "2025-09-19", "open": 49.489, "close": 48.469, "high": 50.349, "low": 48.159, "volume": 1506751.0}, {"date": "2025-09-22", "open": 48.889, "close": 48.469, "high": 49.279, "low": 47.999, "volume": 983839.0}, {"date": "2025-09-23", "open": 48.469, "close": 47.439, "high": 48.579, "low": 46.069, "volume": 1564110.0}, {"date": "2025-09-24", "open": 47.359, "close": 48.459, "high": 48.519, "low": 47.299, "volume": 1100512.0}, {"date": "2025-09-25", "open": 48.009, "close": 47.919, "high": 49.019, "low": 47.829, "volume": 1202828.0}, {"date": "2025-09-26", "open": 47.829, "close": 47.329, "high": 48.029, "low": 47.089, "volume": 895470.0}, {"date": "2025-09-29", "open": 47.579, "close": 48.169, "high": 48.169, "low": 46.729, "volume": 822682.0}, {"date": "2025-09-30", "open": 47.819, "close": 48.509, "high": 48.719, "low": 47.599, "volume": 956934.0}, {"date": "2025-10-09", "open": 48.379, "close": 50.419, "high": 50.919, "low": 48.369, "volume": 2255557.0}, {"date": "2025-10-10", "open": 50.919, "close": 49.679, "high": 51.889, "low": 49.599, "volume": 1793118.0}, {"date": "2025-10-13", "open": 47.969, "close": 49.209, "high": 50.219, "low": 46.939, "volume": 1474596.0}, {"date": "2025-10-14", "open": 48.959, "close": 48.249, "high": 50.059, "low": 48.049, "volume": 1057970.0}, {"date": "2025-10-15", "open": 48.399, "close": 48.779, "high": 49.219, "low": 47.469, "volume": 1167920.0}, {"date": "2025-10-16", "open": 48.709, "close": 48.149, "high": 49.499, "low": 47.919, "volume": 1252396.0}, {"date": "2025-10-17", "open": 48.149, "close": 45.499, "high": 48.219, "low": 45.499, "volume": 1705124.0}, {"date": "2025-10-20", "open": 46.119, "close": 46.289, "high": 47.499, "low": 46.109, "volume": 1373739.0}, {"date": "2025-10-21", "open": 46.809, "close": 47.089, "high": 47.089, "low": 46.179, "volume": 727286.0}, {"date": "2025-10-22", "open": 47.299, "close": 46.709, "high": 47.299, "low": 46.579, "volume": 582452.0}, {"date": "2025-10-23", "open": 46.769, "close": 45.809, "high": 46.769, "low": 44.629, "volume": 1383533.0}, {"date": "2025-10-24", "open": 45.939, "close": 48.019, "high": 48.909, "low": 45.689, "volume": 2051264.0}, {"date": "2025-10-27", "open": 49.429, "close": 51.599, "high": 52.109, "low": 48.159, "volume": 4027133.0}, {"date": "2025-10-28", "open": 51.419, "close": 51.809, "high": 52.719, "low": 51.009, "volume": 2624869.0}, {"date": "2025-10-29", "open": 51.919, "close": 52.889, "high": 54.249, "low": 51.249, "volume": 3277256.0}, {"date": "2025-10-30", "open": 52.549, "close": 52.909, "high": 53.569, "low": 51.969, "volume": 2558374.0}, {"date": "2025-10-31", "open": 52.269, "close": 53.049, "high": 54.419, "low": 52.039, "volume": 2583063.0}, {"date": "2025-11-03", "open": 52.919, "close": 52.069, "high": 52.949, "low": 51.229, "volume": 1968233.0}, {"date": "2025-11-04", "open": 51.699, "close": 51.039, "high": 51.809, "low": 49.619, "volume": 2082997.0}, {"date": "2025-11-05", "open": 50.279, "close": 49.849, "high": 50.769, "low": 49.479, "volume": 1373804.0}, {"date": "2025-11-06", "open": 50.119, "close": 49.379, "high": 50.139, "low": 49.069, "volume": 1580162.0}, {"date": "2025-11-07", "open": 49.339, "close": 48.139, "high": 49.339, "low": 47.919, "volume": 1554867.0}, {"date": "2025-11-10", "open": 48.469, "close": 47.839, "high": 49.169, "low": 47.589, "volume": 1424294.0}, {"date": "2025-11-11", "open": 47.869, "close": 47.089, "high": 47.919, "low": 46.849, "volume": 1179724.0}, {"date": "2025-11-12", "open": 47.219, "close": 47.119, "high": 48.409, "low": 46.849, "volume": 1883399.0}, {"date": "2025-11-13", "open": 46.919, "close": 47.189, "high": 47.359, "low": 46.279, "volume": 1400464.0}, {"date": "2025-11-14", "open": 46.719, "close": 46.819, "high": 47.189, "low": 46.719, "volume": 879288.0}, {"date": "2025-11-17", "open": 46.829, "close": 46.699, "high": 46.979, "low": 46.049, "volume": 767628.0}, {"date": "2025-11-18", "open": 46.669, "close": 45.849, "high": 46.699, "low": 45.529, "volume": 910815.0}, {"date": "2025-11-19", "open": 45.669, "close": 44.899, "high": 45.919, "low": 44.619, "volume": 866691.0}, {"date": "2025-11-20", "open": 44.919, "close": 44.719, "high": 45.189, "low": 44.639, "volume": 516383.0}, {"date": "2025-11-21", "open": 44.279, "close": 42.259, "high": 44.819, "low": 42.119, "volume": 1378024.0}, {"date": "2025-11-24", "open": 42.319, "close": 43.269, "high": 43.539, "low": 42.159, "volume": 745576.0}, {"date": "2025-11-25", "open": 43.669, "close": 43.739, "high": 44.209, "low": 43.549, "volume": 775656.0}, {"date": "2025-11-26", "open": 43.649, "close": 43.519, "high": 44.139, "low": 43.399, "volume": 591372.0}, {"date": "2025-11-27", "open": 43.859, "close": 43.829, "high": 44.209, "low": 43.429, "volume": 548450.0}, {"date": "2025-11-28", "open": 44.139, "close": 44.149, "high": 44.359, "low": 43.509, "volume": 493433.0}, {"date": "2025-12-01", "open": 44.269, "close": 44.849, "high": 44.999, "low": 44.219, "volume": 1001482.0}, {"date": "2025-12-02", "open": 44.919, "close": 44.079, "high": 44.919, "low": 43.979, "volume": 499172.0}, {"date": "2025-12-03", "open": 44.219, "close": 43.999, "high": 44.919, "low": 43.929, "volume": 637732.0}, {"date": "2025-12-04", "open": 44.069, "close": 43.369, "high": 44.069, "low": 43.119, "volume": 574884.0}, {"date": "2025-12-05", "open": 43.369, "close": 44.219, "high": 44.269, "low": 43.059, "volume": 539284.0}, {"date": "2025-12-08", "open": 44.389, "close": 44.719, "high": 44.889, "low": 44.319, "volume": 548944.0}, {"date": "2025-12-09", "open": 44.699, "close": 44.349, "high": 45.169, "low": 44.319, "volume": 619490.0}, {"date": "2025-12-10", "open": 44.619, "close": 43.859, "high": 44.619, "low": 43.519, "volume": 478162.0}, {"date": "2025-12-11", "open": 44.059, "close": 43.339, "high": 44.059, "low": 43.149, "volume": 447112.0}, {"date": "2025-12-12", "open": 43.519, "close": 43.459, "high": 43.649, "low": 43.009, "volume": 461882.0}, {"date": "2025-12-15", "open": 43.669, "close": 43.239, "high": 44.349, "low": 43.219, "volume": 512329.0}, {"date": "2025-12-16", "open": 43.119, "close": 42.819, "high": 43.679, "low": 42.609, "volume": 675898.0}, {"date": "2025-12-17", "open": 43.019, "close": 43.639, "high": 43.879, "low": 42.469, "volume": 1040145.0}, {"date": "2025-12-18", "open": 43.069, "close": 45.319, "high": 45.909, "low": 43.069, "volume": 1953898.0}, {"date": "2025-12-19", "open": 44.869, "close": 45.529, "high": 46.389, "low": 44.639, "volume": 1373299.0}, {"date": "2025-12-22", "open": 45.639, "close": 45.979, "high": 46.339, "low": 45.419, "volume": 1371091.0}, {"date": "2025-12-23", "open": 45.869, "close": 45.419, "high": 45.929, "low": 45.179, "volume": 874296.0}, {"date": "2025-12-24", "open": 45.379, "close": 45.529, "high": 45.919, "low": 44.709, "volume": 889033.0}, {"date": "2025-12-25", "open": 45.599, "close": 48.199, "high": 49.119, "low": 45.599, "volume": 3353634.0}, {"date": "2025-12-26", "open": 48.369, "close": 46.989, "high": 48.369, "low": 46.829, "volume": 2091846.0}, {"date": "2025-12-29", "open": 46.829, "close": 48.269, "high": 49.029, "low": 46.819, "volume": 2260440.0}, {"date": "2025-12-30", "open": 47.939, "close": 47.519, "high": 48.119, "low": 46.969, "volume": 1549144.0}, {"date": "2025-12-31", "open": 47.519, "close": 47.319, "high": 47.749, "low": 47.049, "volume": 797361.0}, {"date": "2026-01-05", "open": 50.899, "close": 56.999, "high": 56.999, "low": 50.819, "volume": 7019163.0}, {"date": "2026-01-06", "open": 63.929, "close": 68.619, "high": 68.619, "low": 62.809, "volume": 10288577.0}, {"date": "2026-01-07", "open": 71.189, "close": 63.449, "high": 71.189, "low": 58.579, "volume": 12621212.0}, {"date": "2026-01-08", "open": 63.219, "close": 66.349, "high": 68.899, "low": 61.639, "volume": 10297393.0}, {"date": "2026-01-09", "open": 64.919, "close": 64.619, "high": 67.909, "low": 63.359, "volume": 7398285.0}, {"date": "2026-01-12", "open": 64.419, "close": 67.029, "high": 68.419, "low": 64.409, "volume": 8490677.0}, {"date": "2026-01-13", "open": 66.969, "close": 66.919, "high": 69.619, "low": 63.079, "volume": 8621543.0}, {"date": "2026-01-14", "open": 64.919, "close": 65.979, "high": 69.419, "low": 64.919, "volume": 8063237.0}, {"date": "2026-01-15", "open": 64.929, "close": 64.339, "high": 67.139, "low": 63.219, "volume": 4486967.0}, {"date": "2026-01-16", "open": 63.819, "close": 61.779, "high": 64.409, "low": 61.139, "volume": 4324828.0}, {"date": "2026-01-19", "open": 58.919, "close": 58.769, "high": 60.299, "low": 58.299, "volume": 4099363.0}, {"date": "2026-01-20", "open": 59.219, "close": 56.869, "high": 59.219, "low": 56.219, "volume": 2891609.0}, {"date": "2026-01-21", "open": 56.629, "close": 56.419, "high": 57.219, "low": 55.729, "volume": 1884262.0}, {"date": "2026-01-22", "open": 56.319, "close": 56.179, "high": 57.109, "low": 55.929, "volume": 1808481.0}, {"date": "2026-01-23", "open": 56.719, "close": 58.269, "high": 58.419, "low": 56.329, "volume": 3127606.0}, {"date": "2026-01-26", "open": 58.289, "close": 55.919, "high": 58.659, "low": 55.599, "volume": 2646826.0}, {"date": "2026-01-27", "open": 55.519, "close": 56.459, "high": 56.899, "low": 54.229, "volume": 1970400.0}, {"date": "2026-01-28", "open": 56.109, "close": 55.639, "high": 56.419, "low": 55.339, "volume": 1452867.0}, {"date": "2026-01-29", "open": 55.419, "close": 54.939, "high": 57.109, "low": 54.799, "volume": 2072154.0}, {"date": "2026-01-30", "open": 55.019, "close": 54.339, "high": 55.819, "low": 53.219, "volume": 1650874.0}, {"date": "2026-02-02", "open": 54.219, "close": 53.879, "high": 55.769, "low": 53.719, "volume": 1138757.0}, {"date": "2026-02-03", "open": 54.059, "close": 55.049, "high": 55.239, "low": 54.059, "volume": 951652.0}, {"date": "2026-02-04", "open": 55.189, "close": 56.129, "high": 56.299, "low": 54.609, "volume": 2136015.0}, {"date": "2026-02-05", "open": 56.419, "close": 55.229, "high": 57.149, "low": 54.919, "volume": 2181114.0}, {"date": "2026-02-06", "open": 53.869, "close": 54.189, "high": 55.029, "low": 53.529, "volume": 1459625.0}, {"date": "2026-02-09", "open": 54.929, "close": 55.719, "high": 56.119, "low": 54.769, "volume": 1412405.0}, {"date": "2026-02-10", "open": 55.159, "close": 55.509, "high": 55.939, "low": 54.939, "volume": 885741.0}, {"date": "2026-02-11", "open": 55.799, "close": 55.099, "high": 56.119, "low": 54.919, "volume": 940487.0}, {"date": "2026-02-12", "open": 54.959, "close": 55.479, "high": 55.769, "low": 54.739, "volume": 941959.0}, {"date": "2026-02-13", "open": 55.809, "close": 56.229, "high": 56.869, "low": 54.999, "volume": 1852396.0}, {"date": "2026-02-24", "open": 56.699, "close": 54.869, "high": 56.699, "low": 54.289, "volume": 1606777.0}, {"date": "2026-02-25", "open": 54.939, "close": 55.379, "high": 56.279, "low": 54.919, "volume": 1326675.0}, {"date": "2026-02-26", "open": 55.689, "close": 54.729, "high": 55.689, "low": 54.539, "volume": 1215931.0}, {"date": "2026-02-27", "open": 54.879, "close": 57.459, "high": 57.459, "low": 54.779, "volume": 2803100.0}, {"date": "2026-03-02", "open": 56.419, "close": 56.659, "high": 58.259, "low": 55.489, "volume": 2005933.0}, {"date": "2026-03-03", "open": 56.719, "close": 52.719, "high": 57.009, "low": 52.619, "volume": 2488784.0}, {"date": "2026-03-04", "open": 52.419, "close": 52.659, "high": 54.219, "low": 52.419, "volume": 1411070.0}, {"date": "2026-03-05", "open": 54.169, "close": 54.009, "high": 55.319, "low": 53.209, "volume": 1777613.0}, {"date": "2026-03-06", "open": 53.419, "close": 55.629, "high": 57.209, "low": 53.419, "volume": 2563196.0}, {"date": "2026-03-09", "open": 55.629, "close": 58.149, "high": 58.869, "low": 55.319, "volume": 3827354.0}, {"date": "2026-03-10", "open": 58.919, "close": 59.449, "high": 60.189, "low": 57.529, "volume": 3785934.0}, {"date": "2026-03-11", "open": 60.799, "close": 61.419, "high": 62.869, "low": 58.999, "volume": 4303628.0}, {"date": "2026-03-12", "open": 60.419, "close": 61.759, "high": 62.589, "low": 59.519, "volume": 3386166.0}, {"date": "2026-03-13", "open": 60.449, "close": 61.329, "high": 64.469, "low": 58.619, "volume": 4262484.0}, {"date": "2026-03-16", "open": 60.919, "close": 58.219, "high": 60.969, "low": 58.079, "volume": 3323789.0}, {"date": "2026-03-17", "open": 58.469, "close": 56.819, "high": 58.969, "low": 56.739, "volume": 1798832.0}, {"date": "2026-03-18", "open": 56.849, "close": 57.189, "high": 58.419, "low": 55.799, "volume": 1225603.0}, {"date": "2026-03-19", "open": 55.919, "close": 55.449, "high": 57.169, "low": 55.039, "volume": 1739686.0}, {"date": "2026-03-20", "open": 55.589, "close": 52.259, "high": 55.919, "low": 52.259, "volume": 2168961.0}, {"date": "2026-03-23", "open": 51.609, "close": 48.599, "high": 52.259, "low": 48.109, "volume": 2095983.0}, {"date": "2026-03-24", "open": 49.579, "close": 50.879, "high": 50.909, "low": 48.769, "volume": 1842599.0}, {"date": "2026-03-25", "open": 50.899, "close": 51.109, "high": 51.699, "low": 50.619, "volume": 1237776.0}, {"date": "2026-03-26", "open": 50.989, "close": 49.969, "high": 51.709, "low": 49.599, "volume": 970941.0}, {"date": "2026-03-27", "open": 49.129, "close": 51.239, "high": 51.399, "low": 49.129, "volume": 822941.0}, {"date": "2026-03-30", "open": 50.379, "close": 50.869, "high": 51.229, "low": 50.379, "volume": 929135.0}, {"date": "2026-03-31", "open": 50.479, "close": 49.949, "high": 51.879, "low": 49.949, "volume": 1096723.0}, {"date": "2026-04-01", "open": 50.919, "close": 52.269, "high": 52.779, "low": 50.809, "volume": 1569198.0}, {"date": "2026-04-02", "open": 52.619, "close": 51.909, "high": 53.279, "low": 51.719, "volume": 1424518.0}, {"date": "2026-04-03", "open": 51.739, "close": 51.009, "high": 52.409, "low": 50.929, "volume": 884677.0}, {"date": "2026-04-07", "open": 51.329, "close": 51.069, "high": 52.199, "low": 49.919, "volume": 858113.0}, {"date": "2026-04-08", "open": 52.009, "close": 53.769, "high": 53.769, "low": 51.989, "volume": 1361956.0}, {"date": "2026-04-09", "open": 52.929, "close": 52.439, "high": 53.509, "low": 52.269, "volume": 941623.0}, {"date": "2026-04-10", "open": 52.799, "close": 53.869, "high": 54.779, "low": 52.569, "volume": 1517297.0}, {"date": "2026-04-13", "open": 53.539, "close": 57.789, "high": 58.869, "low": 53.539, "volume": 3290271.0}, {"date": "2026-04-14", "open": 58.589, "close": 58.679, "high": 59.019, "low": 57.269, "volume": 2175837.0}, {"date": "2026-04-15", "open": 58.619, "close": 56.949, "high": 58.849, "low": 56.729, "volume": 1694312.0}, {"date": "2026-04-16", "open": 56.949, "close": 57.199, "high": 58.249, "low": 56.689, "volume": 1316049.0}, {"date": "2026-04-17", "open": 57.709, "close": 58.309, "high": 58.819, "low": 56.799, "volume": 1560814.0}, {"date": "2026-04-20", "open": 58.349, "close": 60.539, "high": 62.719, "low": 57.919, "volume": 3574576.0}, {"date": "2026-04-21", "open": 59.939, "close": 59.879, "high": 60.619, "low": 58.259, "volume": 1969905.0}, {"date": "2026-04-22", "open": 60.199, "close": 59.469, "high": 60.199, "low": 58.599, "volume": 1293341.0}, {"date": "2026-04-23", "open": 59.399, "close": 58.189, "high": 59.399, "low": 57.579, "volume": 1559230.0}, {"date": "2026-04-24", "open": 57.829, "close": 59.149, "high": 60.889, "low": 57.829, "volume": 2155953.0}, {"date": "2026-04-27", "open": 58.619, "close": 60.599, "high": 61.829, "low": 58.029, "volume": 1969931.0}, {"date": "2026-04-28", "open": 62.749, "close": 61.939, "high": 63.899, "low": 60.109, "volume": 4256297.0}, {"date": "2026-04-29", "open": 61.919, "close": 62.419, "high": 63.299, "low": 60.129, "volume": 3242924.0}, {"date": "2026-04-30", "open": 62.059, "close": 63.179, "high": 66.919, "low": 59.929, "volume": 6373026.0}, {"date": "2026-05-06", "open": 61.939, "close": 60.819, "high": 63.119, "low": 60.429, "volume": 3821235.0}, {"date": "2026-05-07", "open": 60.919, "close": 63.599, "high": 63.909, "low": 60.599, "volume": 3840424.0}, {"date": "2026-05-08", "open": 63.259, "close": 64.129, "high": 64.719, "low": 62.319, "volume": 2450688.0}, {"date": "2026-05-11", "open": 64.319, "close": 63.419, "high": 65.419, "low": 63.019, "volume": 2558894.0}, {"date": "2026-05-12", "open": 62.919, "close": 62.079, "high": 63.439, "low": 60.549, "volume": 2906991.0}, {"date": "2026-05-13", "open": 61.939, "close": 62.009, "high": 63.359, "low": 61.439, "volume": 3053872.0}, {"date": "2026-05-14", "open": 61.999, "close": 60.789, "high": 62.419, "low": 60.369, "volume": 1931322.0}, {"date": "2026-05-15", "open": 61.919, "close": 61.099, "high": 62.189, "low": 60.339, "volume": 1860657.0}, {"date": "2026-05-18", "open": 60.919, "close": 60.069, "high": 61.129, "low": 59.619, "volume": 1673234.0}, {"date": "2026-05-19", "open": 60.919, "close": 59.829, "high": 63.209, "low": 58.999, "volume": 2636536.0}, {"date": "2026-05-20", "open": 59.059, "close": 58.079, "high": 59.719, "low": 57.519, "volume": 2105196.0}, {"date": "2026-05-21", "open": 58.119, "close": 56.019, "high": 58.979, "low": 55.809, "volume": 2111467.0}, {"date": "2026-05-22", "open": 56.039, "close": 56.699, "high": 57.069, "low": 55.419, "volume": 1811362.0}, {"date": "2026-05-25", "open": 56.799, "close": 56.179, "high": 57.669, "low": 55.279, "volume": 1477217.0}, {"date": "2026-05-26", "open": 55.809, "close": 54.799, "high": 55.809, "low": 54.169, "volume": 1343095.0}, {"date": "2026-05-27", "open": 54.989, "close": 53.679, "high": 55.219, "low": 53.299, "volume": 1453346.0}, {"date": "2026-05-28", "open": 53.879, "close": 55.839, "high": 55.849, "low": 52.379, "volume": 2293580.0}, {"date": "2026-05-29", "open": 55.279, "close": 50.419, "high": 55.439, "low": 50.419, "volume": 3132554.0}, {"date": "2026-06-01", "open": 50.309, "close": 50.769, "high": 51.919, "low": 50.289, "volume": 1370930.0}, {"date": "2026-06-02", "open": 50.829, "close": 51.129, "high": 52.219, "low": 50.269, "volume": 1406429.0}, {"date": "2026-06-03", "open": 50.959, "close": 50.359, "high": 51.459, "low": 49.919, "volume": 1350189.0}, {"date": "2026-06-04", "open": 50.069, "close": 49.389, "high": 50.339, "low": 48.849, "volume": 1239760.0}, {"date": "2026-06-05", "open": 49.379, "close": 49.619, "high": 50.709, "low": 49.379, "volume": 1318375.0}, {"date": "2026-06-08", "open": 48.809, "close": 48.589, "high": 49.979, "low": 47.699, "volume": 1405231.0}, {"date": "2026-06-09", "open": 48.699, "close": 48.989, "high": 49.149, "low": 48.139, "volume": 963470.0}, {"date": "2026-06-10", "open": 48.989, "close": 47.819, "high": 49.009, "low": 47.159, "volume": 1077217.0}, {"date": "2026-06-11", "open": 47.249, "close": 47.119, "high": 48.279, "low": 46.759, "volume": 761665.0}, {"date": "2026-06-12", "open": 47.619, "close": 49.219, "high": 49.689, "low": 47.419, "volume": 1465516.0}, {"date": "2026-06-15", "open": 49.979, "close": 52.109, "high": 52.739, "low": 49.519, "volume": 2047747.0}, {"date": "2026-06-16", "open": 51.759, "close": 52.319, "high": 52.789, "low": 50.529, "volume": 1691019.0}, {"date": "2026-06-17", "open": 52.019, "close": 52.479, "high": 52.909, "low": 51.219, "volume": 1328255.0}, {"date": "2026-06-18", "open": 53.0, "close": 53.45, "high": 53.8, "low": 52.23, "volume": 1657902.0}, {"date": "2026-06-22", "open": 53.05, "close": 53.91, "high": 54.45, "low": 51.28, "volume": 1811164.0}, {"date": "2026-06-23", "open": 53.01, "close": 54.96, "high": 56.1, "low": 53.01, "volume": 2116719.0}, {"date": "2026-06-24", "open": 55.86, "close": 55.47, "high": 58.0, "low": 55.0, "volume": 3935322.0}, {"date": "2026-06-25", "open": 54.45, "close": 56.17, "high": 56.58, "low": 53.77, "volume": 2414559.0}, {"date": "2026-06-26", "open": 57.13, "close": 53.9, "high": 57.29, "low": 53.87, "volume": 1971428.0}], "week": [{"date": "2024-07-26", "open": 23.239, "close": 22.519, "high": 23.699, "low": 21.219, "volume": 2362013.0}, {"date": "2024-08-02", "open": 22.779, "close": 23.019, "high": 24.009, "low": 21.989, "volume": 1696494.0}, {"date": "2024-08-09", "open": 22.919, "close": 22.819, "high": 23.809, "low": 22.539, "volume": 1673856.0}, {"date": "2024-08-16", "open": 22.619, "close": 22.459, "high": 23.409, "low": 22.129, "volume": 1433893.0}, {"date": "2024-08-23", "open": 22.429, "close": 19.729, "high": 22.599, "low": 19.729, "volume": 1732893.0}, {"date": "2024-08-30", "open": 19.729, "close": 21.429, "high": 21.829, "low": 19.609, "volume": 2125027.0}, {"date": "2024-09-06", "open": 21.519, "close": 19.919, "high": 21.709, "low": 19.899, "volume": 1649327.0}, {"date": "2024-09-13", "open": 20.029, "close": 19.029, "high": 20.399, "low": 18.939, "volume": 1656695.0}, {"date": "2024-09-20", "open": 19.069, "close": 19.009, "high": 19.619, "low": 18.379, "volume": 963680.0}, {"date": "2024-09-27", "open": 19.009, "close": 23.469, "high": 23.619, "low": 18.819, "volume": 2868511.0}, {"date": "2024-09-30", "open": 24.839, "close": 27.599, "high": 28.039, "low": 24.839, "volume": 2198195.0}, {"date": "2024-10-11", "open": 33.479, "close": 25.279, "high": 33.479, "low": 24.999, "volume": 7077510.0}, {"date": "2024-10-18", "open": 25.279, "close": 25.539, "high": 26.269, "low": 23.919, "volume": 4019576.0}, {"date": "2024-10-25", "open": 25.619, "close": 26.289, "high": 26.599, "low": 25.099, "volume": 4369355.0}, {"date": "2024-11-01", "open": 26.199, "close": 26.269, "high": 29.419, "low": 26.079, "volume": 5764462.0}, {"date": "2024-11-08", "open": 26.279, "close": 29.769, "high": 30.619, "low": 26.149, "volume": 6799103.0}, {"date": "2024-11-15", "open": 29.539, "close": 28.409, "high": 33.619, "low": 28.329, "volume": 8056042.0}, {"date": "2024-11-22", "open": 28.549, "close": 26.929, "high": 29.299, "low": 26.669, "volume": 3965889.0}, {"date": "2024-11-29", "open": 27.009, "close": 28.079, "high": 28.419, "low": 26.789, "volume": 2556718.0}, {"date": "2024-12-06", "open": 28.279, "close": 28.239, "high": 29.269, "low": 27.659, "volume": 3136572.0}, {"date": "2024-12-13", "open": 28.549, "close": 30.819, "high": 32.109, "low": 27.999, "volume": 6313754.0}, {"date": "2024-12-20", "open": 30.699, "close": 30.139, "high": 33.299, "low": 28.019, "volume": 10995683.0}, {"date": "2024-12-27", "open": 30.299, "close": 28.169, "high": 30.399, "low": 27.779, "volume": 4300312.0}, {"date": "2025-01-03", "open": 28.019, "close": 24.879, "high": 28.109, "low": 24.819, "volume": 3074935.0}, {"date": "2025-01-10", "open": 25.229, "close": 24.649, "high": 26.369, "low": 24.119, "volume": 3789175.0}, {"date": "2025-01-17", "open": 24.919, "close": 24.899, "high": 25.599, "low": 23.799, "volume": 3773586.0}, {"date": "2025-01-24", "open": 25.109, "close": 25.119, "high": 25.769, "low": 24.399, "volume": 2594133.0}, {"date": "2025-01-27", "open": 25.269, "close": 25.139, "high": 25.539, "low": 24.809, "volume": 447974.0}, {"date": "2025-02-07", "open": 25.229, "close": 26.909, "high": 27.459, "low": 24.969, "volume": 2457977.0}, {"date": "2025-02-14", "open": 26.999, "close": 29.089, "high": 29.829, "low": 26.809, "volume": 7309194.0}, {"date": "2025-02-21", "open": 29.709, "close": 32.439, "high": 32.499, "low": 28.139, "volume": 11397042.0}, {"date": "2025-02-28", "open": 32.139, "close": 29.669, "high": 35.099, "low": 29.509, "volume": 11559791.0}, {"date": "2025-03-07", "open": 29.919, "close": 33.519, "high": 35.849, "low": 29.619, "volume": 13010494.0}, {"date": "2025-03-14", "open": 34.119, "close": 35.939, "high": 36.319, "low": 32.719, "volume": 13423776.0}, {"date": "2025-03-21", "open": 36.019, "close": 32.639, "high": 37.089, "low": 32.589, "volume": 9988288.0}, {"date": "2025-03-28", "open": 32.629, "close": 32.109, "high": 32.909, "low": 30.819, "volume": 5729280.0}, {"date": "2025-04-03", "open": 32.099, "close": 42.919, "high": 46.489, "low": 30.719, "volume": 21167600.0}, {"date": "2025-04-11", "open": 37.999, "close": 36.799, "high": 38.699, "low": 29.149, "volume": 34548674.0}, {"date": "2025-04-18", "open": 38.049, "close": 38.469, "high": 40.419, "low": 37.119, "volume": 17791345.0}, {"date": "2025-04-25", "open": 37.929, "close": 41.489, "high": 41.789, "low": 35.369, "volume": 15544070.0}, {"date": "2025-04-30", "open": 40.989, "close": 49.499, "high": 49.999, "low": 40.329, "volume": 15592792.0}, {"date": "2025-05-09", "open": 49.089, "close": 45.169, "high": 52.559, "low": 44.919, "volume": 29098014.0}, {"date": "2025-05-16", "open": 45.689, "close": 44.949, "high": 47.919, "low": 43.859, "volume": 15896468.0}, {"date": "2025-05-23", "open": 45.119, "close": 42.989, "high": 47.099, "low": 42.129, "volume": 14027193.0}, {"date": "2025-05-30", "open": 42.769, "close": 44.409, "high": 46.229, "low": 41.669, "volume": 11807190.0}, {"date": "2025-06-06", "open": 44.079, "close": 42.749, "high": 45.379, "low": 41.829, "volume": 6812950.0}, {"date": "2025-06-13", "open": 42.999, "close": 43.809, "high": 47.619, "low": 42.759, "volume": 14224526.0}, {"date": "2025-06-20", "open": 43.659, "close": 40.989, "high": 46.919, "low": 40.939, "volume": 8583319.0}, {"date": "2025-06-27", "open": 41.119, "close": 43.289, "high": 44.199, "low": 41.039, "volume": 6516634.0}, {"date": "2025-07-04", "open": 43.899, "close": 45.269, "high": 49.419, "low": 43.819, "volume": 13996522.0}, {"date": "2025-07-11", "open": 45.279, "close": 44.469, "high": 45.279, "low": 43.249, "volume": 6748628.0}, {"date": "2025-07-18", "open": 44.439, "close": 45.579, "high": 46.499, "low": 43.549, "volume": 8236806.0}, {"date": "2025-07-25", "open": 45.619, "close": 43.919, "high": 46.719, "low": 42.419, "volume": 11185813.0}, {"date": "2025-08-01", "open": 43.929, "close": 44.419, "high": 45.869, "low": 43.169, "volume": 11055036.0}, {"date": "2025-08-08", "open": 44.469, "close": 51.649, "high": 57.749, "low": 42.919, "volume": 28835944.0}, {"date": "2025-08-15", "open": 51.029, "close": 54.429, "high": 56.219, "low": 50.629, "volume": 23601112.0}, {"date": "2025-08-22", "open": 54.659, "close": 53.639, "high": 58.419, "low": 52.719, "volume": 15666660.0}, {"date": "2025-08-29", "open": 52.969, "close": 51.879, "high": 55.479, "low": 50.319, "volume": 12910515.0}, {"date": "2025-09-05", "open": 51.449, "close": 50.519, "high": 52.709, "low": 48.529, "volume": 10052662.0}, {"date": "2025-09-12", "open": 50.419, "close": 49.799, "high": 53.719, "low": 48.129, "volume": 8852248.0}, {"date": "2025-09-19", "open": 49.799, "close": 48.469, "high": 51.899, "low": 48.159, "volume": 7148303.0}, {"date": "2025-09-26", "open": 48.889, "close": 47.329, "high": 49.279, "low": 46.069, "volume": 5746759.0}, {"date": "2025-09-30", "open": 47.579, "close": 48.509, "high": 48.719, "low": 46.729, "volume": 1779616.0}, {"date": "2025-10-10", "open": 48.379, "close": 49.679, "high": 51.889, "low": 48.369, "volume": 4048675.0}, {"date": "2025-10-17", "open": 47.969, "close": 45.499, "high": 50.219, "low": 45.499, "volume": 6658006.0}, {"date": "2025-10-24", "open": 46.119, "close": 48.019, "high": 48.909, "low": 44.629, "volume": 6118274.0}, {"date": "2025-10-31", "open": 49.429, "close": 53.049, "high": 54.419, "low": 48.159, "volume": 15070695.0}, {"date": "2025-11-07", "open": 52.919, "close": 48.139, "high": 52.949, "low": 47.919, "volume": 8560063.0}, {"date": "2025-11-14", "open": 48.469, "close": 46.819, "high": 49.169, "low": 46.279, "volume": 6767169.0}, {"date": "2025-11-21", "open": 46.829, "close": 42.259, "high": 46.979, "low": 42.119, "volume": 4439541.0}, {"date": "2025-11-28", "open": 42.319, "close": 44.149, "high": 44.359, "low": 42.159, "volume": 3154487.0}, {"date": "2025-12-05", "open": 44.269, "close": 44.219, "high": 44.999, "low": 43.059, "volume": 3252554.0}, {"date": "2025-12-12", "open": 44.389, "close": 43.459, "high": 45.169, "low": 43.009, "volume": 2555590.0}, {"date": "2025-12-19", "open": 43.669, "close": 45.529, "high": 46.389, "low": 42.469, "volume": 5555569.0}, {"date": "2025-12-26", "open": 45.639, "close": 46.989, "high": 49.119, "low": 44.709, "volume": 8579900.0}, {"date": "2025-12-31", "open": 46.829, "close": 47.319, "high": 49.029, "low": 46.819, "volume": 4606945.0}, {"date": "2026-01-09", "open": 50.899, "close": 64.619, "high": 71.189, "low": 50.819, "volume": 47624630.0}, {"date": "2026-01-16", "open": 64.419, "close": 61.779, "high": 69.619, "low": 61.139, "volume": 33987252.0}, {"date": "2026-01-23", "open": 58.919, "close": 58.269, "high": 60.299, "low": 55.729, "volume": 13811321.0}, {"date": "2026-01-30", "open": 58.289, "close": 54.339, "high": 58.659, "low": 53.219, "volume": 9793121.0}, {"date": "2026-02-06", "open": 54.219, "close": 54.189, "high": 57.149, "low": 53.529, "volume": 7867163.0}, {"date": "2026-02-13", "open": 54.929, "close": 56.229, "high": 56.869, "low": 54.739, "volume": 6032988.0}, {"date": "2026-02-27", "open": 56.699, "close": 57.459, "high": 57.459, "low": 54.289, "volume": 6952483.0}, {"date": "2026-03-06", "open": 56.419, "close": 55.629, "high": 58.259, "low": 52.419, "volume": 10246596.0}, {"date": "2026-03-13", "open": 55.629, "close": 61.329, "high": 64.469, "low": 55.319, "volume": 19565566.0}, {"date": "2026-03-20", "open": 60.919, "close": 52.259, "high": 60.969, "low": 52.259, "volume": 10256871.0}, {"date": "2026-03-27", "open": 51.609, "close": 51.239, "high": 52.259, "low": 48.109, "volume": 6970240.0}, {"date": "2026-04-03", "open": 50.379, "close": 51.009, "high": 53.279, "low": 49.949, "volume": 5904251.0}, {"date": "2026-04-10", "open": 51.329, "close": 53.869, "high": 54.779, "low": 49.919, "volume": 4678989.0}, {"date": "2026-04-17", "open": 53.539, "close": 58.309, "high": 59.019, "low": 53.539, "volume": 10037283.0}, {"date": "2026-04-24", "open": 58.349, "close": 59.149, "high": 62.719, "low": 57.579, "volume": 10553005.0}, {"date": "2026-04-30", "open": 58.619, "close": 63.179, "high": 66.919, "low": 58.029, "volume": 15842178.0}, {"date": "2026-05-08", "open": 61.939, "close": 64.129, "high": 64.719, "low": 60.429, "volume": 10112347.0}, {"date": "2026-05-15", "open": 64.319, "close": 61.099, "high": 65.419, "low": 60.339, "volume": 12311736.0}, {"date": "2026-05-22", "open": 60.919, "close": 56.699, "high": 63.209, "low": 55.419, "volume": 10337795.0}, {"date": "2026-05-29", "open": 56.799, "close": 50.419, "high": 57.669, "low": 50.419, "volume": 9699792.0}, {"date": "2026-06-05", "open": 50.309, "close": 49.619, "high": 52.219, "low": 48.849, "volume": 6685683.0}, {"date": "2026-06-12", "open": 48.809, "close": 49.219, "high": 49.979, "low": 46.759, "volume": 5673099.0}, {"date": "2026-06-18", "open": 49.979, "close": 53.45, "high": 53.8, "low": 49.519, "volume": 6724923.0}, {"date": "2026-06-26", "open": 53.05, "close": 53.9, "high": 58.0, "low": 51.28, "volume": 12249192.0}], "month": [{"date": "2021-07-30", "open": 117.352, "close": 80.83, "high": 125.32, "low": 73.02, "volume": 21158539.0}, {"date": "2021-08-31", "open": 80.823, "close": 70.548, "high": 86.319, "low": 67.674, "volume": 11082209.0}, {"date": "2021-09-30", "open": 70.154, "close": 64.12, "high": 73.02, "low": 60.896, "volume": 8555306.0}, {"date": "2021-10-29", "open": 65.116, "close": 62.472, "high": 69.365, "low": 55.121, "volume": 4510380.0}, {"date": "2021-11-30", "open": 62.401, "close": 70.247, "high": 76.817, "low": 60.839, "volume": 7007971.0}, {"date": "2021-12-31", "open": 70.369, "close": 73.593, "high": 75.076, "low": 61.885, "volume": 8079481.0}, {"date": "2022-01-28", "open": 73.593, "close": 61.269, "high": 77.921, "low": 60.251, "volume": 6352652.0}, {"date": "2022-02-28", "open": 61.57, "close": 57.356, "high": 63.698, "low": 56.539, "volume": 3921372.0}, {"date": "2022-03-31", "open": 57.75, "close": 40.625, "high": 57.872, "low": 39.364, "volume": 14001275.0}, {"date": "2022-04-29", "open": 40.281, "close": 31.031, "high": 41.549, "low": 25.943, "volume": 13845505.0}, {"date": "2022-05-31", "open": 31.317, "close": 30.744, "high": 34.685, "low": 28.387, "volume": 8460994.0}, {"date": "2022-06-30", "open": 30.744, "close": 43.209, "high": 46.354, "low": 30.429, "volume": 17909078.0}, {"date": "2022-07-29", "open": 43.173, "close": 39.798, "high": 46.333, "low": 36.717, "volume": 11992072.0}, {"date": "2022-08-31", "open": 39.562, "close": 31.751, "high": 45.91, "low": 31.357, "volume": 11184395.0}, {"date": "2022-09-30", "open": 31.135, "close": 32.962, "high": 34.675, "low": 27.624, "volume": 9052465.0}, {"date": "2022-10-31", "open": 33.213, "close": 36.66, "high": 43.395, "low": 31.099, "volume": 15138782.0}, {"date": "2022-11-30", "open": 35.313, "close": 35.843, "high": 43.245, "low": 35.126, "volume": 13240087.0}, {"date": "2022-12-30", "open": 36.38, "close": 34.682, "high": 38.745, "low": 32.389, "volume": 6530717.0}, {"date": "2023-01-31", "open": 34.825, "close": 38.179, "high": 40.622, "low": 33.664, "volume": 6107741.0}, {"date": "2023-02-28", "open": 38.25, "close": 43.94, "high": 48.898, "low": 37.899, "volume": 13037817.0}, {"date": "2023-03-31", "open": 43.495, "close": 45.709, "high": 46.562, "low": 37.835, "volume": 11981240.0}, {"date": "2023-04-28", "open": 44.606, "close": 53.735, "high": 55.892, "low": 41.023, "volume": 15824124.0}, {"date": "2023-05-31", "open": 53.914, "close": 49.686, "high": 55.318, "low": 44.792, "volume": 14749801.0}, {"date": "2023-06-30", "open": 48.748, "close": 48.858, "high": 55.175, "low": 45.06, "volume": 11425370.0}, {"date": "2023-07-31", "open": 49.359, "close": 42.373, "high": 49.359, "low": 42.008, "volume": 7623697.0}, {"date": "2023-08-31", "open": 42.366, "close": 45.06, "high": 46.006, "low": 35.566, "volume": 17855314.0}, {"date": "2023-09-28", "open": 44.781, "close": 46.07, "high": 46.837, "low": 40.223, "volume": 14911718.0}, {"date": "2023-10-31", "open": 46.529, "close": 40.947, "high": 48.249, "low": 37.185, "volume": 12530769.0}, {"date": "2023-11-30", "open": 40.811, "close": 46.593, "high": 48.485, "low": 39.657, "volume": 10849008.0}, {"date": "2023-12-29", "open": 46.593, "close": 42.86, "high": 46.687, "low": 39.715, "volume": 8493572.0}, {"date": "2024-01-31", "open": 42.839, "close": 29.303, "high": 42.882, "low": 28.723, "volume": 11590683.0}, {"date": "2024-02-29", "open": 29.217, "close": 34.033, "high": 37.149, "low": 23.32, "volume": 12336802.0}, {"date": "2024-03-29", "open": 34.047, "close": 32.234, "high": 37.78, "low": 31.302, "volume": 12796942.0}, {"date": "2024-04-30", "open": 32.736, "close": 29.934, "high": 34.204, "low": 27.218, "volume": 11463136.0}, {"date": "2024-05-31", "open": 30.342, "close": 29.432, "high": 32.162, "low": 27.863, "volume": 9931674.0}, {"date": "2024-06-28", "open": 29.361, "close": 24.879, "high": 29.654, "low": 24.379, "volume": 8818543.0}, {"date": "2024-07-31", "open": 24.749, "close": 23.739, "high": 25.369, "low": 21.219, "volume": 9607337.0}, {"date": "2024-08-30", "open": 23.719, "close": 21.429, "high": 24.009, "low": 19.609, "volume": 7750244.0}, {"date": "2024-09-30", "open": 21.519, "close": 27.599, "high": 28.039, "low": 18.379, "volume": 9336408.0}, {"date": "2024-10-31", "open": 33.479, "close": 27.139, "high": 33.479, "low": 23.919, "volume": 20322386.0}, {"date": "2024-11-29", "open": 27.499, "close": 28.079, "high": 33.619, "low": 26.149, "volume": 22286269.0}, {"date": "2024-12-31", "open": 28.279, "close": 26.029, "high": 33.299, "low": 25.999, "volume": 26674505.0}, {"date": "2025-01-27", "open": 26.059, "close": 25.139, "high": 26.369, "low": 23.799, "volume": 11751619.0}, {"date": "2025-02-28", "open": 25.229, "close": 29.669, "high": 35.099, "low": 24.969, "volume": 32724004.0}, {"date": "2025-03-31", "open": 29.919, "close": 32.039, "high": 37.089, "low": 29.619, "volume": 43172593.0}, {"date": "2025-04-30", "open": 32.039, "close": 49.499, "high": 49.999, "low": 29.149, "volume": 103623726.0}, {"date": "2025-05-30", "open": 49.089, "close": 44.409, "high": 52.559, "low": 41.669, "volume": 70828865.0}, {"date": "2025-06-30", "open": 44.079, "close": 45.409, "high": 47.619, "low": 40.939, "volume": 38714605.0}, {"date": "2025-07-31", "open": 45.419, "close": 45.159, "high": 49.419, "low": 42.419, "volume": 46059407.0}, {"date": "2025-08-29", "open": 45.559, "close": 51.879, "high": 58.419, "low": 42.919, "volume": 83600453.0}, {"date": "2025-09-30", "open": 51.449, "close": 48.509, "high": 53.719, "low": 46.069, "volume": 33579588.0}, {"date": "2025-10-31", "open": 48.379, "close": 53.049, "high": 54.419, "low": 44.629, "volume": 31895650.0}, {"date": "2025-11-28", "open": 52.919, "close": 44.149, "high": 52.949, "low": 42.119, "volume": 22921260.0}, {"date": "2025-12-31", "open": 44.269, "close": 47.319, "high": 49.119, "low": 42.469, "volume": 24550558.0}, {"date": "2026-01-30", "open": 50.899, "close": 54.339, "high": 71.189, "low": 50.819, "volume": 105216324.0}, {"date": "2026-02-27", "open": 54.219, "close": 57.459, "high": 57.459, "low": 53.529, "volume": 20852634.0}, {"date": "2026-03-31", "open": 56.419, "close": 49.949, "high": 64.469, "low": 48.109, "volume": 49065131.0}, {"date": "2026-04-30", "open": 50.919, "close": 63.179, "high": 66.919, "low": 49.919, "volume": 44989848.0}, {"date": "2026-05-29", "open": 61.939, "close": 50.419, "high": 65.419, "low": 50.419, "volume": 42461670.0}, {"date": "2026-06-26", "open": 50.309, "close": 53.9, "high": 58.0, "low": 46.759, "volume": 31332897.0}]};
+var curPeriod='day';
+
+function switchKline(p){
+ curPeriod=p;
+ document.querySelectorAll('.kline-bar button').forEach(function(b){b.classList.remove('on')});
+ event.target.classList.add('on');
+ drawKline();
+}
+
+function calcMA(data, n){
+ var result=[];
+ for(var i=0;i<data.length;i++){
+  if(i<n-1){result.push(null);continue}
+  var sum=0;for(var j=i-n+1;j<=i;j++) sum+=data[j].close;
+  result.push(sum/n);
+ }
+ return result;
+}
+
+function drawKline(){
+ var data=KDATA[curPeriod];
+ if(!data||data.length===0) return;
+ var cv=document.getElementById('cvKline');
+ var W=cv.parentElement.clientWidth-4,H=380;
+ cv.width=W*2;cv.height=H*2;
+ cv.style.width=W+'px';cv.style.height=H+'px';
+ var ctx=cv.getContext('2d');
+ ctx.scale(2,2);
+
+ var n=data.length;
+ var chartH=H*0.68,volH=H*0.18,padL=50,padR=10,padT=10;
+
+ // 计算价格范围
+ var maxH=data[0].high,minL=data[0].low;
+ for(var i=0;i<n;i++){
+  if(data[i].high>maxH) maxH=data[i].high;
+  if(data[i].low<minL) minL=data[i].low;
+ }
+ var maxV=0;for(var i=0;i<n;i++){if(data[i].volume>maxV)maxV=data[i].volume;}
+ maxH=maxH*1.02;minL=minL*0.98;
+ var priceRange=maxH-minL;
+
+ // MAs
+ var ma5=calcMA(data,5),ma10=calcMA(data,10),ma20=calcMA(data,20),ma60=calcMA(data,60);
+ var barW=(W-padL-padR)/n*0.7;
+ var gap=(W-padL-padR)/n;
+ var candleW=Math.max(1,barW*0.6);
+
+ // X轴标签（只显示部分日期）
+ var skip=Math.max(1,Math.floor(n/8));
+
+ // 清除
+ ctx.clearRect(0,0,W,H);
+
+ // 网格线
+ ctx.strokeStyle='#1a1f29';ctx.lineWidth=0.5;
+ for(var i=0;i<=4;i++){
+  var y=padT+chartH*i/4;
+  ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(W-padR,y);ctx.stroke();
+  ctx.fillStyle='#5a6270';ctx.font='9px sans-serif';ctx.textAlign='right';
+  var p=maxH-priceRange*i/4;
+  ctx.fillText(p.toFixed(2),padL-4,y+3);
+ }
+
+ // 成交量柱
+ for(var i=0;i<n;i++){
+  var x=padL+i*gap;
+  var vh=data[i].volume/maxV*volH;
+  var vy=padT+chartH+10+volH-vh;
+  var c=data[i].close>=data[i].open?'rgba(61,220,132,0.35)':'rgba(255,107,107,0.35)';
+  ctx.fillStyle=c;ctx.fillRect(x-candleW/2,vy,candleW,vh);
+ }
+
+ // 成交量标签
+ ctx.fillStyle='#5a6270';ctx.font='9px sans-serif';ctx.textAlign='right';
+ ctx.fillText('VOL',padL-4,padT+chartH+20);
+
+ // 蜡烛图
+ for(var i=0;i<n;i++){
+  var x=padL+i*gap;
+  var oy=padT+(maxH-data[i].open)/priceRange*chartH;
+  var cy=padT+(maxH-data[i].close)/priceRange*chartH;
+  var hy=padT+(maxH-data[i].high)/priceRange*chartH;
+  var ly=padT+(maxH-data[i].low)/priceRange*chartH;
+  var up=data[i].close>=data[i].open;
+  ctx.strokeStyle=up?'#3ddc84':'#ff6b6b';
+  ctx.fillStyle=up?'#3ddc84':(data[i].close<data[i].open?'#ff6b6b':'#3ddc84');
+  // 影线
+  ctx.beginPath();ctx.moveTo(x,hy);ctx.lineTo(x,ly);ctx.stroke();
+  // 实体
+  var bodyH=Math.max(1,Math.abs(cy-oy));
+  var bodyY=Math.min(oy,cy);
+  ctx.fillRect(x-candleW/2,bodyY,candleW,bodyH);
+ }
+
+ // MA线
+ function drawMA(ma,color,lw){
+  ctx.strokeStyle=color;ctx.lineWidth=lw;
+  ctx.beginPath();var started=false;
+  for(var i=0;i<n;i++){
+   if(ma[i]===null) continue;
+   var x=padL+i*gap,y=padT+(maxH-ma[i])/priceRange*chartH;
+   if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+ }
+ drawMA(ma5,'#ffe066',1.2);
+ drawMA(ma10,'#ff9f1c',1.2);
+ drawMA(ma20,'#e15554',1.2);
+ drawMA(ma60,'#4e9f3d',1.2);
+
+ // X轴日期
+ ctx.fillStyle='#6b7380';ctx.font='9px sans-serif';ctx.textAlign='center';
+ for(var i=0;i<n;i+=skip){
+  var x=padL+i*gap;
+  ctx.fillText(data[i].date.slice(5),x,padT+chartH+volH+22);
+ }
+}
+
+// 初始化K线
+drawKline();
+
+// K线交互：十字线直接画在主canvas上（零图层），tooltip在canvas下方
+var crossIdx=-1;
+var tipK=document.createElement('div');
+tipK.style.cssText='margin-top:4px;padding:6px 10px;background:#131820;border:1px solid #232936;border-radius:6px;font-size:11px;color:#8b93a1;text-align:center;line-height:1.5;min-height:20px';
+cvKline.parentElement.appendChild(tipK);
+tipK.innerHTML='在K线上点击查看详情';
+
+function klineHit(e){
+ var data=KDATA[curPeriod];if(!data||!data.length)return-1;
+ var rect=cvKline.getBoundingClientRect();
+ var W=cvKline.parentElement.clientWidth-4,padL=50,padR=10;
+ var n=data.length,gap=(W-padL-padR)/n;
+ var idx=Math.round((e.clientX-rect.left-padL)/gap);
+ return (idx>=0&&idx<n)?idx:-1;
+}
+
+function showTip(idx,pinned){
+ if(idx<0||!KDATA[curPeriod]||!KDATA[curPeriod][idx]){tipK.innerHTML='在K线上点击查看详情';return}
+ var d=KDATA[curPeriod][idx];
+ var up=d.close>=d.open,chg=((d.close-d.open)/d.open*100).toFixed(2);
+ tipK.innerHTML='<b style="color:#fff">'+d.date+'</b>'
+  +' 开<b>'+d.open.toFixed(2)+'</b> 收<b style="color:'+(up?'#3ddc84':'#ff6b6b')+'">'+d.close.toFixed(2)+'</b>'
+  +' 高'+d.high.toFixed(2)+' 低'+d.low.toFixed(2)
+  +' <span style="color:'+(up?'#3ddc84':'#ff6b6b')+'">'+(up?'+':'')+chg+'%</span>'
+  +' 量'+(d.volume/10000).toFixed(0)+'万手'
+  +(pinned?' <span style="color:#6b7380;font-size:10px">·已固定·点击取消</span>':'');
+}
+
+// 扩展drawKline：在尾部追加十字线
+// 注意：_origDraw 内部会 cv.width=W*2 清空canvas 并 ctx.scale(2,2) 绘制，结束后不 restore
+// 所以这里需要重置变换再画十字线
+var _origDraw=drawKline;
+drawKline=function(){
+ _origDraw();
+ if(crossIdx<0||!KDATA[curPeriod]||!KDATA[curPeriod][crossIdx])return;
+ var data=KDATA[curPeriod],H=380,W=cvKline.parentElement.clientWidth-4;
+ var ctx=cvKline.getContext('2d');
+ // 重置变换矩阵后重新设置 2x HiDPI
+ ctx.setTransform(1,0,0,1,0,0);
+ ctx.scale(2,2);
+ var chartH=H*0.68,padL=50,padR=10,padT=10;
+ var n=data.length,gap=(W-padL-padR)/n;
+ var x=padL+crossIdx*gap;
+ var maxH=data[0].high,minL=data[0].low;
+ for(var i=0;i<n;i++){if(data[i].high>maxH)maxH=data[i].high;if(data[i].low<minL)minL=data[i].low;}
+ maxH*=1.02;minL*=0.98;
+ var cy=padT+(maxH-data[crossIdx].close)/(maxH-minL)*chartH;
+ // 极淡竖虚线 + 小圆点
+ ctx.strokeStyle='rgba(58,134,255,0.22)';ctx.lineWidth=1;ctx.setLineDash([3,5]);
+ ctx.beginPath();ctx.moveTo(x,padT);ctx.lineTo(x,padT+chartH);ctx.stroke();
+ ctx.setLineDash([]);
+ ctx.fillStyle='rgba(58,134,255,0.7)';ctx.beginPath();ctx.arc(x,cy,3,0,Math.PI*2);ctx.fill();
+};
+
+cvKline.addEventListener('click',function(e){
+ var idx=klineHit(e);
+ if(idx===crossIdx){crossIdx=-1;showTip(-1,false);drawKline();return}
+ crossIdx=idx;showTip(idx,true);drawKline();
+});
+cvKline.addEventListener('mousemove',function(e){
+ if(crossIdx>=0)return;var idx=klineHit(e);showTip(idx,false);
+});
+cvKline.addEventListener('mouseleave',function(){if(crossIdx<0)tipK.innerHTML='在K线上点击查看详情'});
+
+// ---- 一键生成研报：所有 .deep-gen 链接 ----
+document.querySelectorAll('.deep-gen').forEach(function(el){
+ el.addEventListener('click',function(e){
+  e.preventDefault();
+  var code=el.getAttribute('data-code');
+  el.textContent='⏳';el.style.pointerEvents='none';
+  fetch('http://localhost:8899/api/deep?code='+code)
+   .then(function(r){return r.json()})
+   .then(function(d){
+    if(d.done){location.href=code+'.html';}
+    else{el.textContent=code;el.style.pointerEvents='auto';alert('生成失败');}
+   })
+   .catch(function(e){el.textContent=code;el.style.pointerEvents='auto';alert('无法连接本地服务(端口8899)');});
+ });
+});
+
+// 财务趋势图表
+(function(){
+var data = [{"year": "2021", "rev": 430044459.65, "netp": 177811885.55, "roe": 12.15, "gm": 74.7808586539, "nm": 41.34732620313622, "debt": 6.4488385239, "roa": 10.850506351326281, "ocf": "1.57亿", "ocf_ratio": 0.8850196493515559}, {"year": "2022", "rev": 321621418.85, "netp": 93825897.99, "roe": 6.13, "gm": 72.4778298701, "nm": 29.172776591026466, "debt": 9.2428240443, "roa": 5.570893320036994, "ocf": "8617万", "ocf_ratio": 0.9183854426757936}, {"year": "2023", "rev": 462223134.18, "netp": 136258629.02, "roe": 8.63, "gm": 67.7294458023, "nm": 29.47897215524004, "debt": 9.9261592374, "roa": 7.544674152509661, "ocf": "1.34亿", "ocf_ratio": 0.9848889121018692}, {"year": "2024", "rev": 400058923.31, "netp": 101969230.54, "roe": 6.28, "gm": 65.4484786175, "nm": 25.488552960231182, "debt": 10.5968777834, "roa": 5.601582463150989, "ocf": "1.18亿", "ocf_ratio": 1.1600325894741226}, {"year": "2025", "rev": 462725664.61, "netp": 138072645.5, "roe": 8.31, "gm": 66.1880317462, "nm": 29.83898583113432, "debt": 11.3146482655, "roa": 7.232538408602681, "ocf": "1.77亿", "ocf_ratio": 1.280082010596371}];
+var cv = document.getElementById('cvTrend');
+var W = cv.parentElement.clientWidth - 4, H = 280;
+cv.width = W * 2; cv.height = H * 2;
+cv.style.width = W + 'px'; cv.style.height = H + 'px';
+var ctx = cv.getContext('2d');
+ctx.scale(2, 2);
+
+// 绘制双轴图：营收+净利柱状图, ROE+毛利率折线
+var years = data.map(function(d){return d.year});
+var revs = data.map(function(d){return d.rev ? d.rev/1e8 : 0});
+var netps = data.map(function(d){return d.netp ? d.netp/1e8 : 0});
+var roes = data.map(function(d){return d.roe || 0});
+var gms = data.map(function(d){return d.gm || 0});
+
+var maxRev = Math.max.apply(null, revs.concat([1]));
+var maxPct = Math.max.apply(null, roes.concat(gms).concat([50]));
+
+var n = data.length;
+var barW = (W - 100) / n * 0.35;
+var groupW = (W - 100) / n;
+
+// 营收柱
+for(var i = 0; i < n; i++){
+    var bh = revs[i] / maxRev * (H - 80), x = 60 + i * groupW, y = H - 40 - bh;
+    ctx.fillStyle = 'rgba(58,134,255,0.7)';
+    ctx.fillRect(x - barW, y, barW, bh);
+    ctx.fillStyle = '#7fb3ff'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText((revs[i]||0).toFixed(1), x - barW/2, y - 4);
+}
+// 净利柱
+for(var i = 0; i < n; i++){
+    var bh = netps[i] / maxRev * (H - 80), x = 60 + i * groupW, y = H - 40 - bh;
+    ctx.fillStyle = 'rgba(61,220,132,0.7)';
+    ctx.fillRect(x, y, barW, bh);
+    ctx.fillStyle = '#3ddc84'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText((netps[i]||0).toFixed(1), x + barW/2, y - 4);
+}
+
+// ROE 折线
+ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2;
+ctx.beginPath();
+for(var i = 0; i < n; i++){
+    var x = 60 + i * groupW, y = H - 40 - (roes[i] / maxPct * (H - 80));
+    if(i == 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+}
+ctx.stroke();
+// ROE 点
+for(var i = 0; i < n; i++){
+    var x = 60 + i * groupW, y = H - 40 - (roes[i] / maxPct * (H - 80));
+    ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#ffd166'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(roes[i]+'%', x, y - 8);
+}
+
+// 毛利率折线
+ctx.strokeStyle = '#9aa4b2'; ctx.lineWidth = 2; ctx.setLineDash([4,3]);
+ctx.beginPath();
+for(var i = 0; i < n; i++){
+    var x = 60 + i * groupW, y = H - 40 - (gms[i] / maxPct * (H - 80));
+    if(i == 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+}
+ctx.stroke();
+ctx.setLineDash([]);
+
+// 图例
+ctx.fillStyle = '#7fb3ff'; ctx.fillRect(60, H-20, 10, 10);
+ctx.fillStyle = '#8b93a1'; ctx.font = '10px sans-serif'; ctx.textAlign = 'left';
+ctx.fillText('营收(亿)', 74, H-11);
+ctx.fillStyle = '#3ddc84'; ctx.fillRect(130, H-20, 10, 10);
+ctx.fillText('净利(亿)', 144, H-11);
+ctx.strokeStyle = '#ffd166'; ctx.beginPath(); ctx.moveTo(210, H-15); ctx.lineTo(230, H-15); ctx.stroke();
+ctx.fillText('ROE%', 234, H-11);
+ctx.strokeStyle = '#9aa4b2'; ctx.setLineDash([4,3]); ctx.beginPath(); ctx.moveTo(290, H-15); ctx.lineTo(310, H-15); ctx.stroke();
+ctx.setLineDash([]);
+ctx.fillText('毛利率%', 314, H-11);
+
+// X轴标签
+ctx.fillStyle = '#6b7380'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+for(var i = 0; i < n; i++){
+    ctx.fillText(years[i], 60 + i * groupW, H - 4);
+}
+})();
+</script>
+</body></html>

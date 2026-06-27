@@ -92,8 +92,7 @@ class ScreenerHandler(SimpleHTTPRequestHandler):
         try:
             result = subprocess.run(args, capture_output=True, text=True,
                                     timeout=120, cwd=WORKDIR)
-            self.send_json({"done": True, "output": result.stdout[-500:],
-                           "exit_code": result.returncode})
+            self._send_process_result(result, "刷新数据")
         except subprocess.TimeoutExpired:
             self.send_json({"error": "刷新超时(>120s)"}, status=504)
 
@@ -105,41 +104,44 @@ class ScreenerHandler(SimpleHTTPRequestHandler):
         try:
             result = subprocess.run(args, capture_output=True, text=True,
                                     timeout=120, cwd=WORKDIR)
-            self.send_json({"done": True, "code": code,
-                           "output": result.stdout[-500:], "exit_code": result.returncode})
+            self._send_process_result(result, f"{code} 研报生成", {"code": code})
         except subprocess.TimeoutExpired:
             self.send_json({"error": f"{code} 研报生成超时"}, status=504)
 
     def _api_layer4(self, tier):
         """对指定 tier 的全部标的运行 DeepSeek AI 定性分析（异步 + 进度追踪）"""
         global _job
-        if _job["status"] == "running":
-            self.send_json({"done": False, "msg": "已有任务运行中",
-                           "tier": _job["tier"], "progress": f"{_job['done']}/{_job['target']}"})
-            return
+        with _job_lock:
+            if _job["status"] == "running":
+                self.send_json({"done": False, "msg": "已有任务运行中",
+                               "tier": _job["tier"], "progress": f"{_job['done']}/{_job['target']}"})
+                return
 
         tier = tier.upper()
         if tier not in ("A", "B", "C"):
             tier = "A"
-        tier_map = {"A": "A_可买入", "B": "B_优质待跌", "C": "C_接近合格"}
-        target_tier = tier_map.get(tier, "A_可买入")
         total = _count_tier_stocks(tier)
         before = _count_existing()
 
-        _job = {"status": "running", "tier": tier, "started": time.time(),
-                "target": total, "done": 0, "before": before}
+        with _job_lock:
+            _job = {"status": "running", "tier": tier, "started": time.time(),
+                    "target": total, "done": 0, "before": before}
 
         def run():
             global _job
+            exit_code = 0
             try:
-                subprocess.run(
+                result = subprocess.run(
                     [sys.executable, os.path.join(WORKDIR, "stock_deep_dive.py"),
                      "--tier", tier, "--parallel", "20"],
                     capture_output=True, text=True, timeout=600, cwd=WORKDIR)
+                exit_code = result.returncode
             except Exception:
-                pass
-            _job["status"] = "done"
-            _job["done"] = _job["target"]
+                exit_code = 1
+            with _job_lock:
+                _job["status"] = "done" if exit_code == 0 else "failed"
+                _job["done"] = _job["target"] if exit_code == 0 else _job["done"]
+                _job["exit_code"] = exit_code
 
         threading.Thread(target=run, daemon=True).start()
         self.send_json({"done": False, "msg": f"已启动 Tier {tier} 分析（{total} 只）",
@@ -155,28 +157,33 @@ class ScreenerHandler(SimpleHTTPRequestHandler):
 
         # 进度：按文件增量估算
         progress = None
-        if _job["status"] == "running":
-            current = _count_existing()
-            delta = current - _job.get("before", 0)
-            _job["done"] = max(_job["done"], delta)
+        with _job_lock:
+            if _job["status"] == "running":
+                current = _count_existing()
+                delta = current - _job.get("before", 0)
+                _job["done"] = max(_job["done"], delta)
 
-            # 估算完成数（每只股票生成1个HTML = 1个完成）
-            elapsed = time.time() - _job["started"]
-            if _job["done"] > 0 and elapsed > 2:
-                eta = int((_job["target"] - _job["done"]) * elapsed / _job["done"])
-                eta_str = f"约{eta//60}分{eta%60}秒" if eta > 0 else "<1分钟"
-            else:
-                eta_str = "计算中…"
-            progress = {
-                "tier": _job["tier"],
-                "done": _job["done"],
-                "target": _job["target"],
-                "elapsed": int(elapsed),
-                "eta": eta_str,
-            }
-        elif _job["status"] == "done":
-            progress = {"done": True, "tier": _job["tier"]}
-            _job["status"] = "idle"
+                # 估算完成数（每只股票生成1个HTML = 1个完成）
+                elapsed = time.time() - _job["started"]
+                if _job["done"] > 0 and elapsed > 2:
+                    eta = int((_job["target"] - _job["done"]) * elapsed / _job["done"])
+                    eta_str = f"约{eta//60}分{eta%60}秒" if eta > 0 else "<1分钟"
+                else:
+                    eta_str = "计算中…"
+                progress = {
+                    "tier": _job["tier"],
+                    "done": _job["done"],
+                    "target": _job["target"],
+                    "elapsed": int(elapsed),
+                    "eta": eta_str,
+                }
+            elif _job["status"] == "done":
+                progress = {"done": True, "tier": _job["tier"]}
+                _job["status"] = "idle"
+            elif _job["status"] == "failed":
+                progress = {"done": False, "failed": True, "tier": _job["tier"],
+                            "exit_code": _job.get("exit_code", 1)}
+                _job["status"] = "idle"
 
         self.send_json({"latest_ts": latest_ts, "deep_count": deep_count,
                        "progress": progress})
@@ -189,6 +196,21 @@ class ScreenerHandler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def _send_process_result(self, result, label, extra=None):
+        data = {
+            "done": result.returncode == 0,
+            "output": result.stdout[-500:],
+            "stderr": result.stderr[-500:],
+            "exit_code": result.returncode,
+        }
+        if extra:
+            data.update(extra)
+        if result.returncode != 0:
+            data["error"] = f"{label}失败"
+            self.send_json(data, status=500)
+            return
+        self.send_json(data)
 
     def log_message(self, format, *args):
         pass
@@ -213,7 +235,7 @@ def main():
     print(f"   刷新: http://localhost:{args.port}/api/refresh?fresh=1")
     print(f"   研报: http://localhost:{args.port}/api/deep?code=000423")
     print(f"   分析: http://localhost:{args.port}/api/layer4?tier=A")
-    print(f"   Ctrl+C 停止")
+    print("   Ctrl+C 停止")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

@@ -11,6 +11,22 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+usage() {
+  cat <<'EOF'
+用法:
+  ./run.sh                 普通运行 → 自动启动服务 + 打开浏览器
+  ./run.sh --fresh         强制刷新行情
+  ./run.sh --deep          选股后自动生成个股深度研报（含 AI 定性）
+  ./run.sh --deep --no-llm 深度研报但不调用 AI（仅量化数据）
+  ./run.sh --code 600519   单独生成某只股票的深度研报
+  ./run.sh --serve-only    仅启动服务（不跑选股）
+  ./run.sh --serve=8900    指定 HTTP 服务端口
+  ./run.sh --no-serve      只跑选股，不启动服务
+  ./run.sh --year 2024     使用 2024 年报
+  ./run.sh --help          显示帮助
+EOF
+}
+
 PY=$(command -v python3 || true)
 if [ -z "$PY" ]; then echo "❌ 未找到 python3"; exit 1; fi
 
@@ -21,6 +37,7 @@ DO_SCREENER=true
 DO_DEEP=false
 DO_SERVE=true       # 默认启动服务（离线→在线）
 SERVE_PORT=8899
+REUSE_SERVER=false
 EXPECT_CODE=""
 EXPECT_YEAR=""
 
@@ -33,6 +50,7 @@ for arg in "$@"; do
   fi
 
   case "$arg" in
+    -h|--help)   usage; exit 0 ;;
     --fresh)     SCREENER_ARGS+=("$arg") ;;
     --deep)      DO_DEEP=true ;;
     --no-llm)    DEEP_ARGS+=("$arg") ;;
@@ -41,7 +59,7 @@ for arg in "$@"; do
     --serve-only) DO_SCREENER=false; DO_SERVE=true ;;
     --serve=*)   DO_SERVE=true; SERVE_PORT="${arg#*=}" ;;
     --no-serve)  DO_SERVE=false ;;
-    *)           echo "⚠️  未知参数: $arg" >&2 ;;
+    *)           echo "❌ 未知参数: $arg" >&2; usage >&2; exit 2 ;;
   esac
 done
 
@@ -83,21 +101,42 @@ fi
 
 # ── 启动本地 HTTP 服务 + 打开浏览器 ──
 if [ "$DO_SERVE" = true ]; then
+  START_PORT=$SERVE_PORT
+  for try_port in $(seq "$SERVE_PORT" $((SERVE_PORT + 10))); do
+    if lsof -nP -iTCP:"$try_port" -sTCP:LISTEN >/dev/null 2>&1; then
+      if curl -fsS "http://localhost:$try_port/api/status" >/dev/null 2>&1; then
+        SERVE_PORT=$try_port
+        REUSE_SERVER=true
+        break
+      fi
+      continue
+    fi
+    SERVE_PORT=$try_port
+    break
+  done
+
+  if [ "$START_PORT" != "$SERVE_PORT" ]; then
+    echo "⚠️  端口 $START_PORT 被占用，改用 $SERVE_PORT"
+  fi
+
   echo ""
   echo "========================================="
   echo "▶ 启动本地服务 (端口 $SERVE_PORT)"
   echo "========================================="
 
-  # 后台启动 server
-  "$PY" server.py --port "$SERVE_PORT" &
-  SVR_PID=$!
-  sleep 1.5
+  if [ "$REUSE_SERVER" = true ]; then
+    echo "  ● 复用现有服务 — 按钮可用：🔄刷新 · ⚡一键研报 · 🧠定性分析"
+  else
+    "$PY" server.py --port "$SERVE_PORT" &
+    SVR_PID=$!
+    sleep 1.5
 
-  if ! kill -0 $SVR_PID 2>/dev/null; then
-    echo "❌ 服务启动失败"; exit 1
+    if ! kill -0 $SVR_PID 2>/dev/null; then
+      echo "❌ 服务启动失败"; exit 1
+    fi
+    echo "  ● 已连接 — 按钮可用：🔄刷新 · ⚡一键研报 · 🧠定性分析"
   fi
 
-  echo "  ● 已连接 — 按钮可用：🔄刷新 · ⚡一键研报 · 🧠定性分析"
   echo "  http://localhost:$SERVE_PORT"
 
   # 用浏览器打开（通过 http:// 而非 file://，使所有按钮可用）
@@ -110,8 +149,10 @@ if [ "$DO_SERVE" = true ]; then
     fi
   fi
 
-  echo "  Ctrl+C 停止"
-  wait $SVR_PID 2>/dev/null || true
+  if [ "$REUSE_SERVER" = false ]; then
+    echo "  Ctrl+C 停止"
+    wait $SVR_PID 2>/dev/null || true
+  fi
 fi
 
 echo ""

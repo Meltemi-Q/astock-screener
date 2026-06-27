@@ -21,7 +21,6 @@
 
 import os, sys, json, time, csv, ssl, argparse, re
 from urllib import request, parse
-from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
@@ -577,7 +576,6 @@ def generate_html(stock, financials, analysis, output_path, screen_ts=None):
     # 量化速览（零 LLM，自动生成）
     q_roe = fy.get('roe')
     q_gm = fy.get('gm')
-    q_nm = fy.get('nm')
     q_debt = fy.get('debt')
     q_ocf = fy.get('ocf_ratio')
     q_yoy = fy.get('netp_yoy')
@@ -660,18 +658,19 @@ def generate_html(stock, financials, analysis, output_path, screen_ts=None):
         </div>
     </div>
     <script>
+    var API=window.location.protocol==="file:"?"http://localhost:8899":window.location.origin;
     function runAiAnalysis(code){{
      var btn=document.getElementById('aiAnalyzeBtn');
      var prog=document.getElementById('aiProgress');
      if(!btn)return;
      btn.disabled=true;btn.textContent='⏳ 分析中…';prog.style.display='block';
-     fetch('http://localhost:8899/api/deep?code='+code)
+     fetch(API+'/api/deep?code='+code)
       .then(function(r){{return r.json()}})
       .then(function(d){{
        if(d.done){{prog.textContent='✅ 完成！正在刷新…';setTimeout(function(){{location.reload()}},600)}}
        else{{prog.textContent='⚠️ 失败: '+(d.error||'未知');btn.disabled=false;btn.textContent='🤖 重试'}}
       }})
-      .catch(function(e){{prog.textContent='⚠️ 无法连接服务，请通过 http://localhost:8899 打开';btn.disabled=false;btn.textContent='🤖 重试'}});
+      .catch(function(e){{prog.textContent='⚠️ 无法连接服务，请通过 ./run.sh 打开 HTTP 页面';btn.disabled=false;btn.textContent='🤖 重试'}});
     }}
     </script>"""
 
@@ -760,9 +759,9 @@ footer{{margin-top:40px;padding:16px 0;border-top:1px solid #232936;color:#5a627
 <div class="section">
     <h2>📈 股价走势 (前复权)</h2>
     <div class="kline-bar">
-        <button class="on" onclick="switchKline('day')">日K</button>
-        <button onclick="switchKline('week')">周K</button>
-        <button onclick="switchKline('month')">月K</button>
+        <button class="on" onclick="switchKline('day', this)">日K</button>
+        <button onclick="switchKline('week', this)">周K</button>
+        <button onclick="switchKline('month', this)">月K</button>
         <span style="color:#6b7380;font-size:11px;margin-left:12px;line-height:28px">
             MA5 <span style="color:#ffe066">──</span>
             MA10 <span style="color:#ff9f1c">──</span>
@@ -789,8 +788,7 @@ footer{{margin-top:40px;padding:16px 0;border-top:1px solid #232936;color:#5a627
         <th>ROA%</th><th>负债%</th><th>EPS</th><th>经营现金流</th><th>现金流/净利</th>
     </tr></thead>
     <tbody>
-    {''.join(f'''
-    <tr>
+    {''.join(f'''<tr>
         <td class="l">{d['year']}</td>
         <td>{rmb(d.get('rev'))}</td>
         <td>{rmb(d.get('netp'))}</td>
@@ -828,11 +826,12 @@ footer{{margin-top:40px;padding:16px 0;border-top:1px solid #232936;color:#5a627
 // K线数据
 var KDATA={kline_json};
 var curPeriod='day';
+var API=window.location.protocol==="file:"?"http://localhost:8899":window.location.origin;
 
-function switchKline(p){{
+function switchKline(p, btn){{
  curPeriod=p;
  document.querySelectorAll('.kline-bar button').forEach(function(b){{b.classList.remove('on')}});
- event.target.classList.add('on');
+ if(btn)btn.classList.add('on');
  drawKline();
 }}
 
@@ -1019,13 +1018,13 @@ document.querySelectorAll('.deep-gen').forEach(function(el){{
   e.preventDefault();
   var code=el.getAttribute('data-code');
   el.textContent='⏳';el.style.pointerEvents='none';
-  fetch('http://localhost:8899/api/deep?code='+code)
+  fetch(API+'/api/deep?code='+code)
    .then(function(r){{return r.json()}})
    .then(function(d){{
     if(d.done){{location.href=code+'.html';}}
     else{{el.textContent=code;el.style.pointerEvents='auto';alert('生成失败');}}
    }})
-   .catch(function(e){{el.textContent=code;el.style.pointerEvents='auto';alert('无法连接本地服务(端口8899)');}});
+   .catch(function(e){{el.textContent=code;el.style.pointerEvents='auto';alert('无法连接本地服务，请通过 ./run.sh 打开 HTTP 页面');}});
  }});
 }});
 
@@ -1228,7 +1227,7 @@ def main():
     ap.add_argument("--no-llm", action="store_true", help="跳过 DeepSeek AI 分析")
     ap.add_argument("--parallel", type=int, default=20, help="并行生成研报的线程数（默认20）")
     ap.add_argument("--no-parallel", action="store_true", help="禁用并行，逐只生成")
-    ap.add_argument("--no-kline", action="store_true", help="跳过 K 线图（提速 ~40%，适合批量跑）")
+    ap.add_argument("--no-kline", action="store_true", help="跳过 K 线图（提速 ~40%%，适合批量跑）")
     args = ap.parse_args()
 
     os.makedirs(OUT_DIR, exist_ok=True)
