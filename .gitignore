@@ -3,6 +3,8 @@ cache/
 results/*
 !results/
 !results/astock_screen_20260627.html
+!results/astock_screen_20260628.html
+!results/astock_shortlist_20260628.md
 !results/astock_layer4_final_20260627.html
 !results/deep_dives/
 results/deep_dives/*

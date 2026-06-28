@@ -33,9 +33,21 @@ function stockCodeFromLocation(){
   var code=params.get("code")||(window.location.hash||"").replace(/^#/,"");
   return /^[0-9]{6}$/.test(code||"")?code:"";
 }
+function updateBackLinkFromStatus(){
+  if(window.location.protocol==="file:")return;
+  fetch(API+"/api/status").then(function(r){return r.json()}).then(function(d){
+    if(d.latest_ts)$("backLink").href="../astock_screen_"+d.latest_ts+".html";
+  }).catch(function(){});
+}
 function showError(message){
   $("status").className="status error";
   $("status").textContent=message;
+  $("content").hidden=true;
+}
+function showStatus(message){
+  $("status").className="status";
+  $("status").textContent=message;
+  $("status").hidden=false;
   $("content").hidden=true;
 }
 
@@ -53,7 +65,28 @@ function loadReport(){
       renderReport(payload);
     })
     .catch(function(e){
-      showError("无法加载 data/"+code+".json。请通过 ./run.sh 启动本地 HTTP 服务后访问该页面。");
+      generateMissingReport(code);
+    });
+}
+
+function generateMissingReport(code){
+  if(window.location.protocol==="file:"){
+    showError("无法加载 data/"+code+".json。请通过 ./run.sh 启动本地 HTTP 服务后访问该页面。");
+    return;
+  }
+  showStatus("本地还没有这只股票的深度研报，正在生成 "+code+" …");
+  fetch(API+"/api/deep?code="+code)
+    .then(function(r){return r.json()})
+    .then(function(d){
+      if(d.done){
+        showStatus("研报已生成，正在加载…");
+        setTimeout(function(){location.reload()},600);
+      }else{
+        showError("生成 "+code+" 研报失败: "+(d.error||d.stderr||"未知错误"));
+      }
+    })
+    .catch(function(){
+      showError("无法连接本地服务生成 "+code+" 研报，请通过 ./run.sh 启动后访问。");
     });
 }
 
@@ -405,4 +438,7 @@ function drawTrend(financials){
 window.addEventListener("resize",function(){
   if(PAYLOAD){drawKline();drawTrend(PAYLOAD.financials||[])}
 });
-document.addEventListener("DOMContentLoaded",loadReport);
+document.addEventListener("DOMContentLoaded",function(){
+  updateBackLinkFromStatus();
+  loadReport();
+});

@@ -568,7 +568,7 @@ h1{margin:0 0 4px;font-size:18px}
 .dash{padding:16px 20px;background:#0d1117;border-bottom:1px solid #232936;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
 .dash-card{background:#131820;border:1px solid #1e2634;border-radius:10px;padding:14px;overflow:hidden}
 .dash-card h3{margin:0 0 10px;font-size:13px;color:#8b93a1;font-weight:500}
-.dash-card canvas{width:100%;height:160px}
+.dash-card canvas{width:100%;height:170px}
 .kpi-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .kpi{background:#1a1f29;border:1px solid #232936;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;flex:1}
 .kpi .val{font-size:22px;font-weight:700;line-height:1.2}
@@ -612,6 +612,7 @@ tr.warn:hover td{background:#26200f}
 .bA{background:#143524;color:#3ddc84}.bB{background:#332a10;color:#ffd166}.bC{background:#23282f;color:#9aa4b2}.b-{background:#1c1f26;color:#5a6270}
 .pos{color:#3ddc84}.neg{color:#ff6b6b}
 .code{color:#7fb3ff;font-variant-numeric:tabular-nums}
+.code.pending{color:#8b93a1}
 .note{color:#c79a4a;font-size:11px;text-align:left;max-width:320px;white-space:normal}
 .cnt{color:#8b93a1;font-size:12px;margin-left:auto}
 footer{padding:10px 20px;color:#5a6270;font-size:11px;border-top:1px solid #232936}
@@ -651,7 +652,7 @@ footer{padding:10px 20px;color:#5a6270;font-size:11px;border-top:1px solid #2329
 <select id="ind"></select>
 <label class="chk"><input type="checkbox" id="warn">仅看⚠风险</label>
 <label class="chk"><input type="checkbox" id="pass">仅通过排雷(第0层)</label>
-<button class="btn refresh" id="refreshBtn" title="重新运行选股脚本获取最新数据">🔄 刷新数据</button>
+<button class="btn refresh" id="refreshBtn" title="重新运行选股脚本，刷新价格、估值、财务和筛选评分">🔄 刷新指标</button>
 <button class="btn refresh" id="layer4Btn" title="对 Tier A 标的运行 DeepSeek AI 定性分析" style="background:#1d2033;border-color:#1e2340;color:#7fb3ff">🧠 定性分析</button>
 <span class="cnt" id="cnt"></span>
 </div>
@@ -691,18 +692,21 @@ function drawScoreChart(){
 }
 function drawIndChart(){
  var cv=document.getElementById("cvInd");if(!cv)return;
- var W=cv.parentElement.clientWidth-28,H=140;
+ var W=cv.parentElement.clientWidth-28,H=170,labelPad=54;
  cv.width=W*2;cv.height=H*2;cv.style.width=W+"px";cv.style.height=H+"px";
  var ctx=cv.getContext("2d");ctx.scale(2,2);
- var inds=META.topInds.slice(0,8),max=inds[0][1],barW=(W-70)/inds.length;
+ var visibleCount=W<420?6:8;
+ var inds=META.topInds.slice(0,visibleCount);
+ if(!inds.length){ctx.fillStyle="#6b7380";ctx.font="12px sans-serif";ctx.textAlign="center";ctx.fillText("暂无 A+B 行业分布",W/2,H/2);return}
+ var max=inds[0][1],barW=(W-70)/inds.length;
  var colors=["#3ddc84","#3a86ff","#ffd166","#7fb3ff","#ff9f1c","#c79a4a","#8b93a1","#5a6270"];
  ctx.clearRect(0,0,W,H);
  for(var i=0;i<inds.length;i++){
-  var bh=inds[i][1]/max*(H-35),x=50+i*barW,y=H-20-bh;
+  var bh=inds[i][1]/max*(H-labelPad-12),x=50+i*barW,y=H-labelPad-bh;
   ctx.fillStyle=colors[i];ctx.fillRect(x+2,y,barW-4,bh);
   ctx.fillStyle="#e6e8eb";ctx.font="11px sans-serif";ctx.textAlign="center";
   ctx.fillText(inds[i][1],x+barW/2,y-4);
-  ctx.save();ctx.translate(x+barW/2,H-3);ctx.rotate(-0.5);
+  ctx.save();ctx.translate(x+barW/2,H-labelPad+42);ctx.rotate(-0.5);
   ctx.fillStyle="#6b7380";ctx.font="10px sans-serif";ctx.fillText(inds[i][0],0,0);ctx.restore();
  }
 }
@@ -767,12 +771,12 @@ document.getElementById("refreshBtn").addEventListener("click",function(){
    toast.classList.add("show");
    setTimeout(function(){toast.classList.remove("show")},4000);
   }
-  btn.textContent="🔄 刷新数据";btn.disabled=false;
+  btn.textContent="🔄 刷新指标";btn.disabled=false;
  }).catch(function(e){
   toast.textContent="⚠️ 无法连接本地服务，请通过 ./run.sh 打开 HTTP 页面";
   toast.classList.add("show");
   setTimeout(function(){toast.classList.remove("show")},4000);
-  btn.textContent="🔄 刷新数据";btn.disabled=false;
+  btn.textContent="🔄 刷新指标";btn.disabled=false;
  });
 });
 
@@ -838,12 +842,16 @@ function rowHTML(r){
  var cells=COLS.map(function(c){var k=c[0],v=r[k];
   if(k==="tier")return '<td>'+tierBadge(v)+'</td>';
   if(k==="code"){
-   var dv = r.deep ? '<a href="deep_dives/report.html?code='+v+'" class="code" title="查看深度研报">'+v+'</a>' : '<span class="code">'+v+'</span>';
+   var dv = r.deep
+    ? '<a href="deep_dives/report.html?code='+v+'" class="code" title="查看深度研报">'+v+'</a>'
+    : '<a href="deep_dives/report.html?code='+v+'" class="code pending" title="生成深度研报">'+v+'</a>';
    return '<td class="l">'+dv+'</td>';
   }
   if(k==="name"){
    var nm = (r.warn?"⚠":"")+v;
-   var dv2 = r.deep ? '<a href="deep_dives/report.html?code='+r.code+'" style="color:inherit;text-decoration:none" title="查看深度研报">'+nm+'</a>' : nm;
+   var dv2 = r.deep
+    ? '<a href="deep_dives/report.html?code='+r.code+'" style="color:inherit;text-decoration:none" title="查看深度研报">'+nm+'</a>'
+    : '<a href="deep_dives/report.html?code='+r.code+'" style="color:#8b93a1;text-decoration:none" title="生成深度研报">'+nm+'</a>';
    return '<td class="l">'+dv2+'</td>';
   }
   if(k==="ind")return '<td class="l">'+fmt(v)+'</td>';
@@ -893,10 +901,6 @@ def write_html(records, path, year, total_eval, tierN):
     if os.path.isdir(deep_data_dir):
         for f in os.listdir(deep_data_dir):
             if len(f) == 11 and f.endswith(".json") and f[:6].isdigit():
-                existing_deep.add(f[:6])
-    if os.path.isdir(deep_dir):
-        for f in os.listdir(deep_dir):
-            if len(f) == 11 and f.endswith(".html") and f[:6].isdigit():
                 existing_deep.add(f[:6])
     for i, r in enumerate(records, 1):
         data.append({

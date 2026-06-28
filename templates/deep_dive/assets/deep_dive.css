@@ -5,8 +5,10 @@ body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-ser
 header{padding:24px 0;border-bottom:1px solid #232936;margin-bottom:24px}
 header h1{margin:0;font-size:26px;color:#fff}
 header .sub{color:#8b93a1;font-size:14px;margin-top:6px}
-.back{color:#7fb3ff;text-decoration:none;font-size:13px}
-.back:hover{text-decoration:underline}
+.report-nav{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.back{display:inline-flex;align-items:center;min-height:32px;padding:5px 11px;border:1px solid #2a3140;border-radius:7px;background:#151b24;color:#7fb3ff;text-decoration:none;font-size:13px}
+.back.muted{color:#9aa4b2}
+.back:hover{border-color:#3a86ff;text-decoration:none}
 .status{background:#131820;border:1px solid #1e2634;border-radius:8px;padding:16px;color:#8b93a1}
 .status.error{border-color:#3d1f1f;color:#ff8a8a}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:28px}

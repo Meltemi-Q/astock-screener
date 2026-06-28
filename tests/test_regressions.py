@@ -201,6 +201,70 @@ class RegressionTests(unittest.TestCase):
         finally:
             astock_screener.OUT_DIR = old_out_dir
 
+    def test_screener_ignores_legacy_html_deep_dive_reports(self):
+        import astock_screener
+
+        record = {
+            "code": "002895",
+            "name": "川恒股份",
+            "price": 30.46,
+            "industry": "农化制品",
+            "tier": "-",
+            "score": 32.75,
+            "deepest": 0,
+            "roe": 18.2,
+            "gross_margin": 30.3,
+            "net_margin": 15.1,
+            "yoy": 31.8,
+            "cagr": 18.4,
+            "pe_ttm": 14.8,
+            "peg": 0.8,
+            "exp_ret": 25.2,
+            "discount": 0.197,
+            "ocf_to_profit": 0.48,
+            "deduct_ratio": 0.99,
+            "debt_ratio": 36.0,
+            "goodwill_ratio": 0.0,
+            "mktcap": 18460000000,
+            "notes": [],
+            "fails": [],
+        }
+        old_out_dir = astock_screener.OUT_DIR
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                results_dir = Path(td) / "results"
+                legacy_dir = results_dir / "deep_dives"
+                legacy_dir.mkdir(parents=True)
+                (legacy_dir / "002895.html").write_text("<html></html>", encoding="utf-8")
+                out = results_dir / "astock_screen_20260627.html"
+                astock_screener.OUT_DIR = str(results_dir)
+
+                astock_screener.write_html([record], str(out), 2025, 1, (0, 0, 0))
+
+                html = out.read_text(encoding="utf-8")
+                self.assertIn('"deepCount": 0', html)
+                self.assertIn('"deep": 0', html)
+        finally:
+            astock_screener.OUT_DIR = old_out_dir
+
+    def test_deep_dive_shell_generates_missing_report_instead_of_dead_error(self):
+        source = (ROOT / "templates" / "deep_dive" / "assets" / "deep_dive.js").read_text(encoding="utf-8")
+
+        self.assertIn("generateMissingReport(code)", source)
+        self.assertIn('fetch(API+"/api/deep?code="+code)', source)
+
+    def test_industry_chart_reserves_bottom_space_for_rotated_labels(self):
+        source = (ROOT / "astock_screener.py").read_text(encoding="utf-8")
+
+        self.assertIn("labelPad=54", source)
+        self.assertIn("ctx.translate(x+barW/2,H-labelPad+42)", source)
+
+    def test_industry_chart_limits_labels_on_narrow_viewports(self):
+        source = (ROOT / "astock_screener.py").read_text(encoding="utf-8")
+
+        self.assertIn("visibleCount=W<420?6:8", source)
+        self.assertIn("META.topInds.slice(0,visibleCount)", source)
+
     def test_fetch_stock_full_uses_shared_spot_cache_without_refetching_market_data(self):
         import stock_deep_dive
 
