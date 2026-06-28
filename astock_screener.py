@@ -560,66 +560,66 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 <title>A股五层选股结果</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#0f1115;color:#e6e8eb;font-size:13px}
-header{padding:16px 20px;background:linear-gradient(135deg,#161a22,#0f1115);border-bottom:1px solid #232936}
+body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#f6f8fb;color:#172033;font-size:13px}
+header{padding:16px 20px;background:linear-gradient(135deg,#ffffff,#eef4ff);border-bottom:1px solid #dbe4f0}
 h1{margin:0 0 4px;font-size:18px}
-.sub{color:#8b93a1;font-size:12px}
+.sub{color:#64748b;font-size:12px}
 /* Dashboard */
-.dash{padding:16px 20px;background:#0d1117;border-bottom:1px solid #232936;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
-.dash-card{background:#131820;border:1px solid #1e2634;border-radius:10px;padding:14px;overflow:hidden}
-.dash-card h3{margin:0 0 10px;font-size:13px;color:#8b93a1;font-weight:500}
-.dash-card canvas{width:100%;height:170px}
+.dash{padding:16px 20px;background:#eef4f8;border-bottom:1px solid #dbe4f0;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.dash-card{background:#fff;border:1px solid #dbe4f0;border-radius:8px;padding:14px;overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.dash-card h3{margin:0 0 10px;font-size:13px;color:#475569;font-weight:600}
+.dash-card canvas{width:100%;height:210px}
 .kpi-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
-.kpi{background:#1a1f29;border:1px solid #232936;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;flex:1}
+.kpi{background:#f8fafc;border:1px solid #dbe4f0;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;flex:1}
 .kpi .val{font-size:22px;font-weight:700;line-height:1.2}
-.kpi .lbl{font-size:10px;color:#6b7380;margin-top:2px}
-.kpi.A .val{color:#3ddc84}.kpi.B .val{color:#ffd166}.kpi.C .val{color:#9aa4b2}.kpi.X .val{color:#5a6270}
+.kpi .lbl{font-size:10px;color:#64748b;margin-top:2px}
+.kpi.A .val{color:#16a34a}.kpi.B .val{color:#b45309}.kpi.C .val{color:#475569}.kpi.X .val{color:#94a3b8}
 .leaderboard{display:flex;flex-direction:column;gap:4px;font-size:11px;max-height:170px;overflow-y:auto}
 .lb-row{display:flex;align-items:center;gap:8px;padding:3px 6px;border-radius:4px}
-.lb-row:hover{background:#1a1f29}
-.lb-rank{width:20px;text-align:center;font-weight:700;color:#6b7380}
-.lb-rank.r1{color:#ffd166}.lb-rank.r2{color:#c7cdd6}.lb-rank.r3{color:#c79a4a}
+.lb-row:hover{background:#f1f5f9}
+.lb-rank{width:20px;text-align:center;font-weight:700;color:#64748b}
+.lb-rank.r1{color:#b45309}.lb-rank.r2{color:#64748b}.lb-rank.r3{color:#92400e}
 .lb-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lb-code{color:#7fb3ff;font-variant-numeric:tabular-nums;width:64px}
-.lb-score{font-weight:700;color:#3ddc84;width:40px;text-align:right}
+.lb-code{color:#2563eb;font-variant-numeric:tabular-nums;width:64px}
+.lb-score{font-weight:700;color:#16a34a;width:40px;text-align:right}
 .lb-tag{font-size:10px;padding:1px 5px;border-radius:3px;font-weight:700}
-.lb-tag.a{background:#143524;color:#3ddc84}.lb-tag.b{background:#332a10;color:#ffd166}
-.funnel{display:flex;gap:0;height:140px;align-items:flex-end;padding:0 6px}
+.lb-tag.a{background:#dcfce7;color:#166534}.lb-tag.b{background:#fef3c7;color:#92400e}
+.funnel{display:flex;gap:0;height:170px;align-items:flex-end;padding:18px 6px 40px}
 .funnel-bar{flex:1;border-radius:5px 5px 0 0;position:relative;min-width:36px;margin:0 2px;transition:all .3s}
 .funnel-bar:hover{filter:brightness(1.3)}
 .funnel-val{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:700;white-space:nowrap}
-.funnel-lbl{position:absolute;bottom:-22px;left:50%;transform:translateX(-50%);font-size:10px;color:#6b7380;text-align:center;white-space:nowrap}
+.funnel-lbl{position:absolute;bottom:-22px;left:50%;transform:translateX(-50%);font-size:10px;color:#64748b;text-align:center;white-space:nowrap}
 /* Controls */
-.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 20px;background:#12151c;border-bottom:1px solid #232936;position:sticky;top:0;z-index:20}
-input,select{background:#1a1f29;border:1px solid #2a3140;color:#e6e8eb;border-radius:7px;padding:7px 10px;font-size:13px;outline:none}
-input:focus,select:focus{border-color:#3a86ff}
-.btn{cursor:pointer;background:#1a1f29;border:1px solid #2a3140;color:#c7cdd6;border-radius:7px;padding:7px 12px;font-size:12px}
-.btn.on{background:#3a86ff;border-color:#3a86ff;color:#fff}
-.btn.refresh{background:#1d3320;border-color:#1e3e1e;color:#3ddc84}
-.chk{display:flex;align-items:center;gap:5px;color:#c7cdd6;cursor:pointer;user-select:none}
-.toast{position:fixed;bottom:20px;right:20px;background:#1a2a1a;border:1px solid #3ddc84;border-radius:8px;padding:10px 16px;color:#3ddc84;font-size:12px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 20px;background:#fff;border-bottom:1px solid #dbe4f0;position:sticky;top:0;z-index:20;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+input,select{background:#fff;border:1px solid #cbd5e1;color:#172033;border-radius:7px;padding:7px 10px;font-size:13px;outline:none}
+input:focus,select:focus{border-color:#2563eb}
+.btn{cursor:pointer;background:#f8fafc;border:1px solid #cbd5e1;color:#334155;border-radius:7px;padding:7px 12px;font-size:12px}
+.btn.on{background:#2563eb;border-color:#2563eb;color:#fff}
+.btn.refresh{background:#ecfdf5;border-color:#bbf7d0;color:#15803d}
+.chk{display:flex;align-items:center;gap:5px;color:#475569;cursor:pointer;user-select:none}
+.toast{position:fixed;bottom:20px;right:20px;background:#ecfdf5;border:1px solid #86efac;border-radius:8px;padding:10px 16px;color:#15803d;font-size:12px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none}
 .toast.show{opacity:1}
 .wrap{overflow:auto;height:calc(100vh - 52px)}
 table{border-collapse:collapse;width:100%;white-space:nowrap}
-th{position:sticky;top:0;background:#1a1f29;color:#c7cdd6;font-weight:600;padding:8px 10px;text-align:right;cursor:pointer;border-bottom:2px solid #2a3140;font-size:12px}
+th{position:sticky;top:0;background:#eef2f7;color:#334155;font-weight:600;padding:8px 10px;text-align:right;cursor:pointer;border-bottom:2px solid #cbd5e1;font-size:12px}
 th.l,td.l{text-align:left}
-th:hover{color:#fff}
-td{padding:6px 10px;text-align:right;border-bottom:1px solid #1c212b}
-tr:hover td{background:#161b24}
-tr.warn td{background:#1f1a12}
-tr.warn:hover td{background:#26200f}
+th:hover{color:#0f172a}
+td{padding:6px 10px;text-align:right;border-bottom:1px solid #e2e8f0}
+tr:hover td{background:#f8fbff}
+tr.warn td{background:#fff7ed}
+tr.warn:hover td{background:#ffedd5}
 .badge{display:inline-block;min-width:18px;text-align:center;border-radius:5px;padding:1px 6px;font-weight:700;font-size:11px}
-.bA{background:#143524;color:#3ddc84}.bB{background:#332a10;color:#ffd166}.bC{background:#23282f;color:#9aa4b2}.b-{background:#1c1f26;color:#5a6270}
-.pos{color:#3ddc84}.neg{color:#ff6b6b}
-.code{color:#7fb3ff;font-variant-numeric:tabular-nums}
-.code.pending{color:#8b93a1}
-.note{color:#c79a4a;font-size:11px;text-align:left;max-width:320px;white-space:normal}
-.cnt{color:#8b93a1;font-size:12px;margin-left:auto}
-footer{padding:10px 20px;color:#5a6270;font-size:11px;border-top:1px solid #232936}
+.bA{background:#dcfce7;color:#166534}.bB{background:#fef3c7;color:#92400e}.bC{background:#e2e8f0;color:#475569}.b-{background:#f1f5f9;color:#94a3b8}
+.pos{color:#16a34a}.neg{color:#dc2626}
+.code{color:#2563eb;font-variant-numeric:tabular-nums}
+.code.pending{color:#64748b}
+.note{color:#b45309;font-size:11px;text-align:left;max-width:320px;white-space:normal}
+.cnt{color:#64748b;font-size:12px;margin-left:auto}
+footer{padding:10px 20px;color:#64748b;font-size:11px;border-top:1px solid #dbe4f0}
 @media(max-width:768px){.dash{grid-template-columns:1fr}}
 </style></head><body>
 <header>
-<h1>A股「五层选股流水线」结果 <span id="svrStatus" style="font-size:11px;color:#5a6270"></span></h1>
+<h1>A股「五层选股流水线」结果 <span id="svrStatus" style="font-size:11px;color:#64748b"></span></h1>
 <div class="sub" id="sub"></div>
 </header>
 <!-- Dashboard -->
@@ -653,7 +653,7 @@ footer{padding:10px 20px;color:#5a6270;font-size:11px;border-top:1px solid #2329
 <label class="chk"><input type="checkbox" id="warn">仅看⚠风险</label>
 <label class="chk"><input type="checkbox" id="pass">仅通过排雷(第0层)</label>
 <button class="btn refresh" id="refreshBtn" title="重新运行选股脚本，刷新价格、估值、财务和筛选评分">🔄 刷新指标</button>
-<button class="btn refresh" id="layer4Btn" title="对 Tier A 标的运行 DeepSeek AI 定性分析" style="background:#1d2033;border-color:#1e2340;color:#7fb3ff">🧠 定性分析</button>
+<button class="btn refresh" id="layer4Btn" title="对 Tier A 标的运行 DeepSeek AI 定性分析" style="background:#eff6ff;border-color:#bfdbfe;color:#2563eb">🧠 定性分析</button>
 <span class="cnt" id="cnt"></span>
 </div>
 <div class="toast" id="toast"></div>
@@ -670,7 +670,7 @@ var state={t:"all",q:"",ind:"",warn:false,pass:false,sk:"sc",sd:-1};
 var API=window.location.protocol==="file:"?"http://localhost:8899":window.location.origin;
 function fmt(v){return v===null||v===undefined?"":v}
 document.getElementById("sub").innerHTML=META.year+"年报口径 · 生成于 "+META.ts+" · 全市场评估 "+META.total+" 只"
-  +(META.hasDeep?' · <a href="deep_dives/index.html" style="color:#3ddc84">🔬 深度研报 ('+META.deepCount+'只)</a>':'');
+  +(META.hasDeep?' · <a href="deep_dives/index.html" style="color:#2563eb">🔬 深度研报 ('+META.deepCount+'只)</a>':'');
 
 // ---- Dashboard rendering ----
 function drawScoreChart(){
@@ -680,39 +680,39 @@ function drawScoreChart(){
  var ctx=cv.getContext("2d");ctx.scale(2,2);
  var bins=META.scoreBins,keys=Object.keys(bins),vals=Object.values(bins);
  var max=Math.max.apply(null,vals),barW=(W-40)/keys.length;
- var colors=["#3a3f4b","#4a5160","#5a6270","#7fb3ff","#3a86ff","#3ddc84","#ffd166","#ff9f1c"];
+ var colors=["#cbd5e1","#94a3b8","#64748b","#93c5fd","#2563eb","#16a34a","#facc15","#f97316"];
  ctx.clearRect(0,0,W,H);
  for(var i=0;i<vals.length;i++){
   var bh=vals[i]/max*(H-30),x=20+i*barW,y=H-15-bh;
   ctx.fillStyle=colors[i];ctx.fillRect(x+2,y,barW-4,bh);
-  ctx.fillStyle="#6b7380";ctx.font="10px sans-serif";ctx.textAlign="center";
+  ctx.fillStyle="#64748b";ctx.font="10px sans-serif";ctx.textAlign="center";
   ctx.fillText(vals[i],x+barW/2,y-4);
   ctx.fillText(keys[i],x+barW/2,H-2);
  }
 }
 function drawIndChart(){
  var cv=document.getElementById("cvInd");if(!cv)return;
- var W=cv.parentElement.clientWidth-28,H=170,labelPad=54;
+ var W=cv.parentElement.clientWidth-28,H=210,labelPad=76;
  cv.width=W*2;cv.height=H*2;cv.style.width=W+"px";cv.style.height=H+"px";
  var ctx=cv.getContext("2d");ctx.scale(2,2);
  var visibleCount=W<420?6:8;
  var inds=META.topInds.slice(0,visibleCount);
- if(!inds.length){ctx.fillStyle="#6b7380";ctx.font="12px sans-serif";ctx.textAlign="center";ctx.fillText("暂无 A+B 行业分布",W/2,H/2);return}
+ if(!inds.length){ctx.fillStyle="#64748b";ctx.font="12px sans-serif";ctx.textAlign="center";ctx.fillText("暂无 A+B 行业分布",W/2,H/2);return}
  var max=inds[0][1],barW=(W-70)/inds.length;
- var colors=["#3ddc84","#3a86ff","#ffd166","#7fb3ff","#ff9f1c","#c79a4a","#8b93a1","#5a6270"];
+ var colors=["#22c55e","#3b82f6","#facc15","#60a5fa","#f97316","#c084fc","#94a3b8","#64748b"];
  ctx.clearRect(0,0,W,H);
  for(var i=0;i<inds.length;i++){
   var bh=inds[i][1]/max*(H-labelPad-12),x=50+i*barW,y=H-labelPad-bh;
   ctx.fillStyle=colors[i];ctx.fillRect(x+2,y,barW-4,bh);
-  ctx.fillStyle="#e6e8eb";ctx.font="11px sans-serif";ctx.textAlign="center";
+  ctx.fillStyle="#172033";ctx.font="11px sans-serif";ctx.textAlign="center";
   ctx.fillText(inds[i][1],x+barW/2,y-4);
-  ctx.save();ctx.translate(x+barW/2,H-labelPad+42);ctx.rotate(-0.5);
-  ctx.fillStyle="#6b7380";ctx.font="10px sans-serif";ctx.fillText(inds[i][0],0,0);ctx.restore();
+  ctx.save();ctx.translate(x+barW/2,H-labelPad+58);ctx.rotate(-0.58);
+  ctx.fillStyle="#64748b";ctx.font="10px sans-serif";ctx.fillText(inds[i][0],0,0);ctx.restore();
  }
 }
 function renderFunnel(){
  var layers=["第0排雷","第1质量","第2估值","第3安全","第4定性"],values=[META.funnel[0],META.funnel[1],META.funnel[2],META.funnel[3],META.funnel[4]],
-  colors=["#5a6270","#3a86ff","#7fb3ff","#ffd166","#3ddc84"],
+  colors=["#94a3b8","#2563eb","#60a5fa","#facc15","#22c55e"],
   max=META.total,html="";
  document.getElementById("dtotal").textContent=META.total;
  for(var i=0;i<layers.length;i++){
@@ -734,7 +734,7 @@ function renderLB(){
     +'<span class="lb-code">'+r.code+'</span><span class="lb-name">'+r.name+'</span>'
     +'<span class="lb-tag a">A</span><span class="lb-score">'+r.sc+'</span></div>';
  });
- document.getElementById("lbA").innerHTML=html1||'<div style="color:#6b7380;font-size:12px;padding:20px;text-align:center">本期无A级标的</div>';
+ document.getElementById("lbA").innerHTML=html1||'<div style="color:#64748b;font-size:12px;padding:20px;text-align:center">本期无A级标的</div>';
 }
 // init dashboard
 renderFunnel();renderLB();drawScoreChart();drawIndChart();
@@ -744,12 +744,12 @@ window.addEventListener("resize",function(){drawScoreChart();drawIndChart()});
 fetch(API+"/api/status").then(function(r){return r.json()}).then(function(d){
  var el=document.getElementById("svrStatus");
  if(d.latest_ts){
-  el.innerHTML='<span style="color:#3ddc84">●</span> 已连接 ('+d.deep_count+'只研报)';
+  el.innerHTML='<span style="color:#16a34a">●</span> 已连接 ('+d.deep_count+'只研报)';
  }else{
-  el.innerHTML='<span style="color:#ff6b6b">●</span> 离线';
+  el.innerHTML='<span style="color:#dc2626">●</span> 离线';
  }
 }).catch(function(){
- document.getElementById("svrStatus").innerHTML='<span style="color:#ff6b6b">●</span> 离线';
+ document.getElementById("svrStatus").innerHTML='<span style="color:#dc2626">●</span> 离线';
 });
 
 // ---- Refresh button ----
@@ -851,7 +851,7 @@ function rowHTML(r){
    var nm = (r.warn?"⚠":"")+v;
    var dv2 = r.deep
     ? '<a href="deep_dives/report.html?code='+r.code+'" style="color:inherit;text-decoration:none" title="查看深度研报">'+nm+'</a>'
-    : '<a href="deep_dives/report.html?code='+r.code+'" style="color:#8b93a1;text-decoration:none" title="生成深度研报">'+nm+'</a>';
+    : '<a href="deep_dives/report.html?code='+r.code+'" style="color:#64748b;text-decoration:none" title="生成深度研报">'+nm+'</a>';
    return '<td class="l">'+dv2+'</td>';
   }
   if(k==="ind")return '<td class="l">'+fmt(v)+'</td>';
@@ -958,6 +958,37 @@ def write_html(records, path, year, total_eval, tierN):
         f.write(html)
 
 
+def write_stale_screen_redirects(latest_ts):
+    """把旧的 astock_screen_*.html 改为跳转最新页，避免旧 deepCount/旧图表再次暴露。"""
+    latest_name = f"astock_screen_{latest_ts}.html"
+    if not os.path.isdir(OUT_DIR):
+        return
+    for name in os.listdir(OUT_DIR):
+        if not (name.startswith("astock_screen_") and name.endswith(".html")):
+            continue
+        if name == latest_name:
+            continue
+        path = os.path.join(OUT_DIR, name)
+        redirect = f"""<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="0; url={latest_name}">
+<title>旧版选股页已更新</title>
+<style>
+body{{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#f6f8fb;color:#172033}}
+.box{{max-width:560px;margin:14vh auto;padding:24px;background:#fff;border:1px solid #dbe4f0;border-radius:8px}}
+a{{color:#2563eb}}
+</style></head><body>
+<div class="box">
+<h1>旧版选股页已更新</h1>
+<p>正在跳转到最新总表：<a href="{latest_name}">{latest_name}</a></p>
+</div>
+<script>location.replace("{latest_name}")</script>
+</body></html>"""
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(redirect)
+
+
 def write_md(tierA, tierB, tierC, path, year, total_eval):
     from datetime import datetime
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -1042,6 +1073,7 @@ def main():
     write_csv(records, csv_path)
     write_md(tierA, tierB, tierC, md_path, args.year, len(records))
     write_html(records, html_path, args.year, len(records), (len(tierA), len(tierB), len(tierC)))
+    write_stale_screen_redirects(ts)
 
     # 终端摘要
     print("=" * 70)

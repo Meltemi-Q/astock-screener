@@ -1,29 +1,38 @@
 <!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>个股深度研报索引 | 五层选股</title>
-<style>
-*{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#0f1115;color:#e6e8eb;font-size:13px}
-.container{max-width:1000px;margin:0 auto;padding:20px}
-h1{font-size:20px;margin:0 0 4px}
-.sub{color:#8b93a1;font-size:12px;margin-bottom:20px}
-table{width:100%;border-collapse:collapse}
-th{background:#1a1f29;color:#8b93a1;padding:8px 12px;text-align:left;border-bottom:2px solid #2a3140;position:sticky;top:0;font-size:12px}
-td{padding:6px 12px;border-bottom:1px solid #1c212b}
-tr:hover td{background:#161b24}
-a{color:#7fb3ff;text-decoration:none}
-a:hover{text-decoration:underline}
-.code{color:#7fb3ff;font-variant-numeric:tabular-nums}
-.badge{display:inline-block;min-width:20px;text-align:center;border-radius:4px;padding:1px 6px;font-weight:700;font-size:11px}
-.bA{background:#143524;color:#3ddc84}.bB{background:#332a10;color:#ffd166}.bC{background:#23282f;color:#9aa4b2}
-footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936;padding-top:12px}
-</style></head><body>
-<div class="container">
-<h1>🔬 个股深度研报</h1>
-<div class="sub">共 301 只 · 🤖 = DeepSeek AI 定性分析 · 点击名称查看详情</div>
-<div style="overflow:auto">
-<table>
+	<title>个股深度研报索引 | 五层选股</title>
+	<style>
+	*{box-sizing:border-box}
+	body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#f6f8fb;color:#172033;font-size:13px}
+	.container{max-width:1120px;margin:0 auto;padding:24px 20px}
+	.topbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:22px}
+	.nav-link{display:inline-flex;align-items:center;min-height:34px;padding:6px 12px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;color:#2563eb;text-decoration:none;font-weight:600}
+	.nav-link.muted{color:#64748b}
+	.nav-link:hover{background:#eff6ff;border-color:#2563eb;text-decoration:none}
+	h1{font-size:24px;margin:0 0 4px;color:#0f172a}
+	.sub{color:#64748b;font-size:12px;margin-bottom:20px}
+	.table-wrap{overflow:auto;background:#fff;border:1px solid #dbe4f0;border-radius:8px}
+	table{width:100%;border-collapse:collapse}
+	th{background:#eef2f7;color:#475569;padding:9px 12px;text-align:left;border-bottom:2px solid #cbd5e1;position:sticky;top:0;font-size:12px}
+	td{padding:7px 12px;border-bottom:1px solid #e2e8f0}
+	tr:hover td{background:#f8fbff}
+	a{color:#2563eb;text-decoration:none}
+	a:hover{text-decoration:underline}
+	.code{color:#2563eb;font-variant-numeric:tabular-nums}
+	.badge{display:inline-block;min-width:20px;text-align:center;border-radius:4px;padding:1px 6px;font-weight:700;font-size:11px}
+	.bA{background:#dcfce7;color:#166534}.bB{background:#fef3c7;color:#92400e}.bC{background:#e2e8f0;color:#475569}
+	footer{margin-top:30px;color:#64748b;font-size:11px;border-top:1px solid #dbe4f0;padding-top:12px}
+	</style></head><body>
+	<div class="container">
+	<nav class="topbar">
+	    <a id="backLink" href="../astock_screen_20260628.html" class="nav-link">← 选股总表</a>
+	    <a href="report.html?code=688336" class="nav-link muted">首只研报</a>
+	</nav>
+	<h1>🔬 个股深度研报</h1>
+	<div class="sub">共 301 只 · 🤖 = DeepSeek AI 定性分析 · 点击名称查看详情</div>
+	<div class="table-wrap">
+	<table>
 <thead><tr>
     <th>#</th><th>评级</th><th>代码</th><th>名称</th><th>现价</th><th>ROE%</th><th>PE</th><th>毛利%</th><th>市值(亿)</th><th>行业</th>
 </tr></thead>
@@ -49,7 +58,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>38.5%</td>
             <td>18.24</td>
             <td>81.2%</td>
-            <td>138.0亿</td>
+            <td>138亿</td>
             <td>化学制药</td>
         </tr>
         <tr>
@@ -81,8 +90,8 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">601899</td>
             <td><a href="report.html?code=601899">XD紫金矿</a></td>
-            <td>25.10</td>
-            <td>33.0%</td>
+            <td>25.1</td>
+            <td>33%</td>
             <td>10.82</td>
             <td>27.7%</td>
             <td>6674.3亿</td>
@@ -117,7 +126,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bA">A</span></td>
             <td class="code">688330</td>
             <td><a href="report.html?code=688330">宏力达 🤖</a></td>
-            <td>34.40</td>
+            <td>34.4</td>
             <td>15.6%</td>
             <td>7.63</td>
             <td>52.2%</td>
@@ -205,7 +214,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>18.3%</td>
             <td>10.63</td>
             <td>18.3%</td>
-            <td>53.0亿</td>
+            <td>53亿</td>
             <td>白色家电</td>
         </tr>
         <tr>
@@ -213,7 +222,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bA">A</span></td>
             <td class="code">605499</td>
             <td><a href="report.html?code=605499">东鹏饮料 🤖</a></td>
-            <td>110.90</td>
+            <td>110.9</td>
             <td>51.6%</td>
             <td>17.35</td>
             <td>44.9%</td>
@@ -226,7 +235,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td class="code">000612</td>
             <td><a href="report.html?code=000612">焦作万方</a></td>
             <td>10.87</td>
-            <td>16.0%</td>
+            <td>16%</td>
             <td>9.12</td>
             <td>22.4%</td>
             <td>129.6亿</td>
@@ -251,7 +260,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><a href="report.html?code=600989">宝丰能源 🤖</a></td>
             <td>20.74</td>
             <td>24.8%</td>
-            <td>12.10</td>
+            <td>12.1</td>
             <td>35.9%</td>
             <td>1520.9亿</td>
             <td>化学原料</td>
@@ -313,7 +322,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>10.5%</td>
             <td>12.39</td>
             <td>30.3%</td>
-            <td>77.0亿</td>
+            <td>77亿</td>
             <td>轨交设备Ⅱ</td>
         </tr>
         <tr>
@@ -333,7 +342,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">600351</td>
             <td><a href="report.html?code=600351">亚宝药业</a></td>
-            <td>5.70</td>
+            <td>5.7</td>
             <td>11.2%</td>
             <td>12.35</td>
             <td>52.5%</td>
@@ -357,10 +366,10 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bB">B</span></td>
             <td class="code">601020</td>
             <td><a href="report.html?code=601020">华钰矿业</a></td>
-            <td>23.60</td>
+            <td>23.6</td>
             <td>17.6%</td>
             <td>22.62</td>
-            <td>49.0%</td>
+            <td>49%</td>
             <td>193.5亿</td>
             <td>工业金属</td>
         </tr>
@@ -369,11 +378,11 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bA">A</span></td>
             <td class="code">603558</td>
             <td><a href="report.html?code=603558">健盛集团 🤖</a></td>
-            <td>11.10</td>
+            <td>11.1</td>
             <td>16.5%</td>
             <td>8.72</td>
             <td>30.2%</td>
-            <td>38.0亿</td>
+            <td>38亿</td>
             <td>纺织制造</td>
         </tr>
         <tr>
@@ -406,7 +415,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td class="code">301061</td>
             <td><a href="report.html?code=301061">匠心家居 🤖</a></td>
             <td>33.79</td>
-            <td>22.0%</td>
+            <td>22%</td>
             <td>11.58</td>
             <td>39.3%</td>
             <td>96.1亿</td>
@@ -417,7 +426,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bB">B</span></td>
             <td class="code">300502</td>
             <td><a href="report.html?code=300502">新易盛</a></td>
-            <td>566.00</td>
+            <td>566</td>
             <td>72.8%</td>
             <td>73.48</td>
             <td>47.8%</td>
@@ -444,7 +453,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>22.19</td>
             <td>13.4%</td>
             <td>15.64</td>
-            <td>31.0%</td>
+            <td>31%</td>
             <td>44.8亿</td>
             <td>动物保健Ⅱ</td>
         </tr>
@@ -455,9 +464,9 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><a href="report.html?code=000791">甘肃能源</a></td>
             <td>7.49</td>
             <td>14.4%</td>
-            <td>11.80</td>
+            <td>11.8</td>
             <td>41.7%</td>
-            <td>243.0亿</td>
+            <td>243亿</td>
             <td>电力</td>
         </tr>
         <tr>
@@ -465,7 +474,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">300750</td>
             <td><a href="report.html?code=300750">宁德时代</a></td>
-            <td>381.00</td>
+            <td>381</td>
             <td>24.9%</td>
             <td>22.32</td>
             <td>26.3%</td>
@@ -489,7 +498,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bB">B</span></td>
             <td class="code">300033</td>
             <td><a href="report.html?code=300033">同花顺</a></td>
-            <td>242.00</td>
+            <td>242</td>
             <td>38.5%</td>
             <td>54.52</td>
             <td>91.5%</td>
@@ -517,7 +526,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>24.1%</td>
             <td>18.54</td>
             <td>55.6%</td>
-            <td>12.0亿</td>
+            <td>12亿</td>
             <td>计算机设备</td>
         </tr>
         <tr>
@@ -528,7 +537,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>1253.89</td>
             <td>43.8%</td>
             <td>93.54</td>
-            <td>42.0%</td>
+            <td>42%</td>
             <td>13983.8亿</td>
             <td>通信设备</td>
         </tr>
@@ -541,7 +550,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>33.3%</td>
             <td>12.47</td>
             <td>93.9%</td>
-            <td>253.0亿</td>
+            <td>253亿</td>
             <td>游戏Ⅱ</td>
         </tr>
         <tr>
@@ -552,7 +561,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>20.45</td>
             <td>22.4%</td>
             <td>27.54</td>
-            <td>59.0%</td>
+            <td>59%</td>
             <td>23.2亿</td>
             <td>专业服务</td>
         </tr>
@@ -600,7 +609,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>7.18</td>
             <td>15.6%</td>
             <td>20.75</td>
-            <td>50.0%</td>
+            <td>50%</td>
             <td>23.4亿</td>
             <td>小家电</td>
         </tr>
@@ -635,7 +644,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><a href="report.html?code=688002">睿创微纳</a></td>
             <td>143.28</td>
             <td>18.7%</td>
-            <td>46.20</td>
+            <td>46.2</td>
             <td>52.5%</td>
             <td>673.3亿</td>
             <td>军工电子Ⅱ</td>
@@ -660,7 +669,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>40.38</td>
             <td>28.5%</td>
             <td>24.47</td>
-            <td>39.0%</td>
+            <td>39%</td>
             <td>51.7亿</td>
             <td>电网设备</td>
         </tr>
@@ -717,7 +726,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">688049</td>
             <td><a href="report.html?code=688049">炬芯科技</a></td>
-            <td>43.00</td>
+            <td>43</td>
             <td>10.5%</td>
             <td>35.56</td>
             <td>51.2%</td>
@@ -730,7 +739,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td class="code">301345</td>
             <td><a href="report.html?code=301345">涛涛车业</a></td>
             <td>227.83</td>
-            <td>24.0%</td>
+            <td>24%</td>
             <td>27.41</td>
             <td>41.5%</td>
             <td>248.4亿</td>
@@ -741,7 +750,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bB">B</span></td>
             <td class="code">002517</td>
             <td><a href="report.html?code=002517">恺英网络</a></td>
-            <td>15.60</td>
+            <td>15.6</td>
             <td>23.1%</td>
             <td>15.39</td>
             <td>80.8%</td>
@@ -756,7 +765,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>27.44</td>
             <td>12.4%</td>
             <td>20.97</td>
-            <td>91.0%</td>
+            <td>91%</td>
             <td>521.5亿</td>
             <td>游戏Ⅱ</td>
         </tr>
@@ -790,7 +799,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td class="code">605098</td>
             <td><a href="report.html?code=605098">行动教育</a></td>
             <td>54.26</td>
-            <td>31.0%</td>
+            <td>31%</td>
             <td>19.56</td>
             <td>78.9%</td>
             <td>64.7亿</td>
@@ -801,7 +810,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bA">A</span></td>
             <td class="code">000682</td>
             <td><a href="report.html?code=000682">东方电子 🤖</a></td>
-            <td>12.60</td>
+            <td>12.6</td>
             <td>16.5%</td>
             <td>16.45</td>
             <td>32.2%</td>
@@ -825,7 +834,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bB">B</span></td>
             <td class="code">603893</td>
             <td><a href="report.html?code=603893">瑞芯微</a></td>
-            <td>182.00</td>
+            <td>182</td>
             <td>25.8%</td>
             <td>66.37</td>
             <td>41.9%</td>
@@ -837,10 +846,10 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bB">B</span></td>
             <td class="code">300394</td>
             <td><a href="report.html?code=300394">天孚通信</a></td>
-            <td>318.00</td>
+            <td>318</td>
             <td>41.9%</td>
             <td>159.72</td>
-            <td>54.0%</td>
+            <td>54%</td>
             <td>3468.8亿</td>
             <td>通信设备</td>
         </tr>
@@ -849,7 +858,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bB">B</span></td>
             <td class="code">688183</td>
             <td><a href="report.html?code=688183">生益电子</a></td>
-            <td>131.90</td>
+            <td>131.9</td>
             <td>29.7%</td>
             <td>64.32</td>
             <td>31.2%</td>
@@ -861,7 +870,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bA">A</span></td>
             <td class="code">920029</td>
             <td><a href="report.html?code=920029">开发科技 🤖</a></td>
-            <td>36.00</td>
+            <td>36</td>
             <td>22.3%</td>
             <td>13.37</td>
             <td>39.3%</td>
@@ -959,7 +968,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><a href="report.html?code=603929">亚翔集成</a></td>
             <td>260.85</td>
             <td>43.5%</td>
-            <td>52.60</td>
+            <td>52.6</td>
             <td>24.6%</td>
             <td>556.5亿</td>
             <td>专业工程</td>
@@ -1006,10 +1015,10 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td class="code">688117</td>
             <td><a href="report.html?code=688117">圣诺生物</a></td>
             <td>23.59</td>
-            <td>16.0%</td>
+            <td>16%</td>
             <td>29.34</td>
             <td>57.7%</td>
-            <td>52.0亿</td>
+            <td>52亿</td>
             <td>生物制品</td>
         </tr>
         <tr>
@@ -1019,7 +1028,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><a href="report.html?code=002039">黔源电力</a></td>
             <td>18.78</td>
             <td>14.3%</td>
-            <td>12.60</td>
+            <td>12.6</td>
             <td>56.2%</td>
             <td>80.3亿</td>
             <td>电力</td>
@@ -1032,7 +1041,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>64.01</td>
             <td>11.9%</td>
             <td>126.11</td>
-            <td>73.0%</td>
+            <td>73%</td>
             <td>257.6亿</td>
             <td>电子化学品Ⅱ</td>
         </tr>
@@ -1068,7 +1077,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>9.65</td>
             <td>4.6%</td>
             <td>48.72</td>
-            <td>47.0%</td>
+            <td>47%</td>
             <td>13.6亿</td>
             <td>软件开发</td>
         </tr>
@@ -1105,7 +1114,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>26.4%</td>
             <td>125.86</td>
             <td>26.4%</td>
-            <td>699.0亿</td>
+            <td>699亿</td>
             <td>元件</td>
         </tr>
         <tr>
@@ -1126,9 +1135,9 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td class="code">301696</td>
             <td><a href="report.html?code=301696">三瑞智能</a></td>
             <td>103.77</td>
-            <td>44.0%</td>
+            <td>44%</td>
             <td>88.52</td>
-            <td>60.0%</td>
+            <td>60%</td>
             <td>415.1亿</td>
             <td>航空装备Ⅱ</td>
         </tr>
@@ -1159,18 +1168,6 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
         <tr>
             <td>95</td>
             <td><span class="badge bC">C</span></td>
-            <td class="code">920200</td>
-            <td><a href="report.html?code=920200">振宏股份</a></td>
-            <td>34.61</td>
-            <td>22.6%</td>
-            <td>24.16</td>
-            <td>19.6%</td>
-            <td>35.1亿</td>
-            <td>风电设备</td>
-        </tr>
-        <tr>
-            <td>96</td>
-            <td><span class="badge bC">C</span></td>
             <td class="code">300018</td>
             <td><a href="report.html?code=300018">中元股份</a></td>
             <td>12.15</td>
@@ -1179,6 +1176,18 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>48.5%</td>
             <td>59.4亿</td>
             <td>电网设备</td>
+        </tr>
+        <tr>
+            <td>96</td>
+            <td><span class="badge bC">C</span></td>
+            <td class="code">920200</td>
+            <td><a href="report.html?code=920200">振宏股份</a></td>
+            <td>34.61</td>
+            <td>22.6%</td>
+            <td>24.16</td>
+            <td>19.6%</td>
+            <td>35.1亿</td>
+            <td>风电设备</td>
         </tr>
         <tr>
             <td>97</td>
@@ -1209,8 +1218,8 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">600211</td>
             <td><a href="report.html?code=600211">西藏药业</a></td>
-            <td>35.60</td>
-            <td>27.0%</td>
+            <td>35.6</td>
+            <td>27%</td>
             <td>11.86</td>
             <td>94.2%</td>
             <td>114.7亿</td>
@@ -1233,7 +1242,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">688222</td>
             <td><a href="report.html?code=688222">成都先导</a></td>
-            <td>30.50</td>
+            <td>30.5</td>
             <td>7.6%</td>
             <td>99.58</td>
             <td>54.2%</td>
@@ -1243,18 +1252,6 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
         <tr>
             <td>102</td>
             <td><span class="badge bC">C</span></td>
-            <td class="code">688013</td>
-            <td><a href="report.html?code=688013">XD天臣医</a></td>
-            <td>24.52</td>
-            <td>14.7%</td>
-            <td>24.36</td>
-            <td>63.9%</td>
-            <td>19.9亿</td>
-            <td>医疗器械</td>
-        </tr>
-        <tr>
-            <td>103</td>
-            <td><span class="badge bC">C</span></td>
             <td class="code">000792</td>
             <td><a href="report.html?code=000792">盐湖股份</a></td>
             <td>28.91</td>
@@ -1263,6 +1260,18 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>57.9%</td>
             <td>1529.8亿</td>
             <td>农化制品</td>
+        </tr>
+        <tr>
+            <td>103</td>
+            <td><span class="badge bC">C</span></td>
+            <td class="code">688013</td>
+            <td><a href="report.html?code=688013">XD天臣医</a></td>
+            <td>24.52</td>
+            <td>14.7%</td>
+            <td>24.36</td>
+            <td>63.9%</td>
+            <td>19.9亿</td>
+            <td>医疗器械</td>
         </tr>
         <tr>
             <td>104</td>
@@ -1281,7 +1290,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">002826</td>
             <td><a href="report.html?code=002826">易明医药</a></td>
-            <td>15.30</td>
+            <td>15.3</td>
             <td>11.9%</td>
             <td>31.22</td>
             <td>82.1%</td>
@@ -1309,7 +1318,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>17.8%</td>
             <td>27.76</td>
             <td>60.6%</td>
-            <td>44.0亿</td>
+            <td>44亿</td>
             <td>专业连锁Ⅱ</td>
         </tr>
         <tr>
@@ -1318,7 +1327,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td class="code">000688</td>
             <td><a href="report.html?code=000688">国城矿业</a></td>
             <td>32.26</td>
-            <td>23.0%</td>
+            <td>23%</td>
             <td>55.68</td>
             <td>40.2%</td>
             <td>382.3亿</td>
@@ -1343,8 +1352,8 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><a href="report.html?code=300236">上海新阳</a></td>
             <td>116.76</td>
             <td>6.2%</td>
-            <td>103.60</td>
-            <td>41.0%</td>
+            <td>103.6</td>
+            <td>41%</td>
             <td>365.9亿</td>
             <td>电子化学品Ⅱ</td>
         </tr>
@@ -1377,11 +1386,11 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">688758</td>
             <td><a href="report.html?code=688758">赛分科技</a></td>
-            <td>19.20</td>
+            <td>19.2</td>
             <td>9.8%</td>
             <td>57.81</td>
             <td>71.4%</td>
-            <td>80.0亿</td>
+            <td>80亿</td>
             <td>化学制药</td>
         </tr>
         <tr>
@@ -1389,7 +1398,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">605319</td>
             <td><a href="report.html?code=605319">无锡振华</a></td>
-            <td>22.70</td>
+            <td>22.7</td>
             <td>17.8%</td>
             <td>16.86</td>
             <td>28.4%</td>
@@ -1411,26 +1420,26 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
         <tr>
             <td>116</td>
             <td><span class="badge bC">C</span></td>
-            <td class="code">688380</td>
-            <td><a href="report.html?code=688380">中微半导</a></td>
-            <td>62.50</td>
-            <td>9.2%</td>
-            <td>83.13</td>
-            <td>34.3%</td>
-            <td>250.2亿</td>
-            <td>半导体</td>
-        </tr>
-        <tr>
-            <td>117</td>
-            <td><span class="badge bC">C</span></td>
             <td class="code">600236</td>
             <td><a href="report.html?code=600236">桂冠电力</a></td>
             <td>8.84</td>
             <td>18.4%</td>
             <td>19.38</td>
-            <td>54.0%</td>
+            <td>54%</td>
             <td>696.8亿</td>
             <td>电力</td>
+        </tr>
+        <tr>
+            <td>117</td>
+            <td><span class="badge bC">C</span></td>
+            <td class="code">688380</td>
+            <td><a href="report.html?code=688380">中微半导</a></td>
+            <td>62.5</td>
+            <td>9.2%</td>
+            <td>83.13</td>
+            <td>34.3%</td>
+            <td>250.2亿</td>
+            <td>半导体</td>
         </tr>
         <tr>
             <td>118</td>
@@ -1439,7 +1448,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><a href="report.html?code=688797">C臻宝</a></td>
             <td>545.07</td>
             <td>20.7%</td>
-            <td>342.20</td>
+            <td>342.2</td>
             <td>49.8%</td>
             <td>846.4亿</td>
             <td>半导体</td>
@@ -1461,10 +1470,10 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">603132</td>
             <td><a href="report.html?code=603132">金徽股份</a></td>
-            <td>16.10</td>
+            <td>16.1</td>
             <td>16.4%</td>
-            <td>24.10</td>
-            <td>65.0%</td>
+            <td>24.1</td>
+            <td>65%</td>
             <td>157.5亿</td>
             <td>工业金属</td>
         </tr>
@@ -1473,7 +1482,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bB">B</span></td>
             <td class="code">688018</td>
             <td><a href="report.html?code=688018">乐鑫科技</a></td>
-            <td>118.00</td>
+            <td>118</td>
             <td>17.3%</td>
             <td>51.24</td>
             <td>46.6%</td>
@@ -1500,7 +1509,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>8.85</td>
             <td>18.2%</td>
             <td>12.68</td>
-            <td>72.0%</td>
+            <td>72%</td>
             <td>38.9亿</td>
             <td>中药Ⅱ</td>
         </tr>
@@ -1524,7 +1533,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>33.88</td>
             <td>16.1%</td>
             <td>18.43</td>
-            <td>52.0%</td>
+            <td>52%</td>
             <td>17.9亿</td>
             <td>医疗器械</td>
         </tr>
@@ -1537,7 +1546,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>18.2%</td>
             <td>125.11</td>
             <td>62.2%</td>
-            <td>3200.0亿</td>
+            <td>3200亿</td>
             <td>半导体</td>
         </tr>
         <tr>
@@ -1548,8 +1557,8 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>62.33</td>
             <td>18.7%</td>
             <td>46.22</td>
-            <td>54.0%</td>
-            <td>123.0亿</td>
+            <td>54%</td>
+            <td>123亿</td>
             <td>汽车零部件</td>
         </tr>
         <tr>
@@ -1557,8 +1566,8 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bB">B</span></td>
             <td class="code">688198</td>
             <td><a href="report.html?code=688198">佰仁医疗</a></td>
-            <td>75.60</td>
-            <td>15.0%</td>
+            <td>75.6</td>
+            <td>15%</td>
             <td>51.44</td>
             <td>89.2%</td>
             <td>104.1亿</td>
@@ -1606,7 +1615,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td class="code">002545</td>
             <td><a href="report.html?code=002545">东方铁塔</a></td>
             <td>17.09</td>
-            <td>13.0%</td>
+            <td>13%</td>
             <td>15.16</td>
             <td>40.3%</td>
             <td>212.6亿</td>
@@ -1653,7 +1662,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bB">B</span></td>
             <td class="code">605118</td>
             <td><a href="report.html?code=605118">力鼎光电</a></td>
-            <td>32.50</td>
+            <td>32.5</td>
             <td>16.9%</td>
             <td>48.85</td>
             <td>48.9%</td>
@@ -1668,7 +1677,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>31.49</td>
             <td>16.4%</td>
             <td>32.19</td>
-            <td>66.0%</td>
+            <td>66%</td>
             <td>43.6亿</td>
             <td>通用设备</td>
         </tr>
@@ -1701,7 +1710,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">688580</td>
             <td><a href="report.html?code=688580">伟思医疗</a></td>
-            <td>53.90</td>
+            <td>53.9</td>
             <td>8.3%</td>
             <td>31.02</td>
             <td>66.2%</td>
@@ -1715,7 +1724,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><a href="report.html?code=920055">隆源股份</a></td>
             <td>28.15</td>
             <td>19.3%</td>
-            <td>12.80</td>
+            <td>12.8</td>
             <td>27.1%</td>
             <td>19.1亿</td>
             <td>汽车零部件</td>
@@ -1737,23 +1746,23 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bB">B</span></td>
             <td class="code">688072</td>
             <td><a href="report.html?code=688072">拓荆科技</a></td>
-            <td>832.00</td>
+            <td>832</td>
             <td>15.8%</td>
             <td>143.04</td>
-            <td>35.0%</td>
-            <td>2352.0亿</td>
+            <td>35%</td>
+            <td>2352亿</td>
             <td>半导体</td>
         </tr>
         <tr>
             <td>144</td>
-            <td><span class="badge bC">C</span></td>
-            <td class="code">920166</td>
-            <td><a href="report.html?code=920166">海圣医疗</a></td>
-            <td>21.36</td>
-            <td>18.9%</td>
-            <td>18.68</td>
-            <td>52.0%</td>
-            <td>16.1亿</td>
+            <td><span class="badge bB">B</span></td>
+            <td class="code">300453</td>
+            <td><a href="report.html?code=300453">三鑫医疗</a></td>
+            <td>8.91</td>
+            <td>19.2%</td>
+            <td>16.64</td>
+            <td>36%</td>
+            <td>46.5亿</td>
             <td>医疗器械</td>
         </tr>
         <tr>
@@ -1761,7 +1770,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bB">B</span></td>
             <td class="code">688615</td>
             <td><a href="report.html?code=688615">合合信息</a></td>
-            <td>108.00</td>
+            <td>108</td>
             <td>16.4%</td>
             <td>42.92</td>
             <td>86.7%</td>
@@ -1770,14 +1779,14 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
         </tr>
         <tr>
             <td>146</td>
-            <td><span class="badge bB">B</span></td>
-            <td class="code">300453</td>
-            <td><a href="report.html?code=300453">三鑫医疗</a></td>
-            <td>8.91</td>
-            <td>19.2%</td>
-            <td>16.64</td>
-            <td>36.0%</td>
-            <td>46.5亿</td>
+            <td><span class="badge bC">C</span></td>
+            <td class="code">920166</td>
+            <td><a href="report.html?code=920166">海圣医疗</a></td>
+            <td>21.36</td>
+            <td>18.9%</td>
+            <td>18.68</td>
+            <td>52%</td>
+            <td>16.1亿</td>
             <td>医疗器械</td>
         </tr>
         <tr>
@@ -1785,7 +1794,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">603605</td>
             <td><a href="report.html?code=603605">珀莱雅</a></td>
-            <td>56.70</td>
+            <td>56.7</td>
             <td>25.8%</td>
             <td>15.23</td>
             <td>73.3%</td>
@@ -1797,7 +1806,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">300357</td>
             <td><a href="report.html?code=300357">我武生物</a></td>
-            <td>21.30</td>
+            <td>21.3</td>
             <td>15.2%</td>
             <td>26.19</td>
             <td>95.2%</td>
@@ -1857,11 +1866,11 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">600183</td>
             <td><a href="report.html?code=600183">生益科技</a></td>
-            <td>178.50</td>
+            <td>178.5</td>
             <td>21.2%</td>
             <td>110.37</td>
             <td>26.5%</td>
-            <td>4336.0亿</td>
+            <td>4336亿</td>
             <td>元件</td>
         </tr>
         <tr>
@@ -1897,7 +1906,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>8.1%</td>
             <td>35.62</td>
             <td>57.9%</td>
-            <td>35.0亿</td>
+            <td>35亿</td>
             <td>电网设备</td>
         </tr>
         <tr>
@@ -1907,25 +1916,13 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><a href="report.html?code=000603">盛达资源</a></td>
             <td>21.17</td>
             <td>16.3%</td>
-            <td>24.20</td>
+            <td>24.2</td>
             <td>57.6%</td>
             <td>146.1亿</td>
             <td>贵金属</td>
         </tr>
         <tr>
             <td>158</td>
-            <td><span class="badge bC">C</span></td>
-            <td class="code">688016</td>
-            <td><a href="report.html?code=688016">心脉医疗</a></td>
-            <td>86.08</td>
-            <td>14.3%</td>
-            <td>18.03</td>
-            <td>71.1%</td>
-            <td>106.1亿</td>
-            <td>医疗器械</td>
-        </tr>
-        <tr>
-            <td>159</td>
             <td><span class="badge bB">B</span></td>
             <td class="code">300274</td>
             <td><a href="report.html?code=300274">阳光电源</a></td>
@@ -1935,6 +1932,18 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>31.8%</td>
             <td>3131.6亿</td>
             <td>光伏设备</td>
+        </tr>
+        <tr>
+            <td>159</td>
+            <td><span class="badge bC">C</span></td>
+            <td class="code">688016</td>
+            <td><a href="report.html?code=688016">心脉医疗</a></td>
+            <td>86.08</td>
+            <td>14.3%</td>
+            <td>18.03</td>
+            <td>71.1%</td>
+            <td>106.1亿</td>
+            <td>医疗器械</td>
         </tr>
         <tr>
             <td>160</td>
@@ -1978,7 +1987,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td class="code">300705</td>
             <td><a href="report.html?code=300705">九典制药</a></td>
             <td>9.51</td>
-            <td>18.0%</td>
+            <td>18%</td>
             <td>11.78</td>
             <td>72.9%</td>
             <td>47.6亿</td>
@@ -2039,7 +2048,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><a href="report.html?code=688267">中触媒</a></td>
             <td>19.31</td>
             <td>7.3%</td>
-            <td>22.50</td>
+            <td>22.5</td>
             <td>44.1%</td>
             <td>44.1亿</td>
             <td>化学制品</td>
@@ -2073,7 +2082,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">603202</td>
             <td><a href="report.html?code=603202">天有为</a></td>
-            <td>49.60</td>
+            <td>49.6</td>
             <td>16.2%</td>
             <td>9.82</td>
             <td>34.5%</td>
@@ -2097,7 +2106,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">603868</td>
             <td><a href="report.html?code=603868">飞科电器</a></td>
-            <td>29.80</td>
+            <td>29.8</td>
             <td>16.2%</td>
             <td>24.98</td>
             <td>56.7%</td>
@@ -2121,8 +2130,8 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">603256</td>
             <td><a href="report.html?code=603256">宏和科技</a></td>
-            <td>297.00</td>
-            <td>13.0%</td>
+            <td>297</td>
+            <td>13%</td>
             <td>863.11</td>
             <td>35.6%</td>
             <td>2686.6亿</td>
@@ -2135,7 +2144,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><a href="report.html?code=300867">圣元环保</a></td>
             <td>17.69</td>
             <td>6.5%</td>
-            <td>16.20</td>
+            <td>16.2</td>
             <td>43.3%</td>
             <td>48.1亿</td>
             <td>环境治理</td>
@@ -2149,7 +2158,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>15.8%</td>
             <td>17.35</td>
             <td>34.2%</td>
-            <td>94.0亿</td>
+            <td>94亿</td>
             <td>专用设备</td>
         </tr>
         <tr>
@@ -2173,7 +2182,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>16.7%</td>
             <td>15.83</td>
             <td>73.5%</td>
-            <td>280.0亿</td>
+            <td>280亿</td>
             <td>中药Ⅱ</td>
         </tr>
         <tr>
@@ -2185,7 +2194,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>15.1%</td>
             <td>102.06</td>
             <td>57.3%</td>
-            <td>301.0亿</td>
+            <td>301亿</td>
             <td>半导体</td>
         </tr>
         <tr>
@@ -2229,7 +2238,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">300641</td>
             <td><a href="report.html?code=300641">正丹股份</a></td>
-            <td>16.00</td>
+            <td>16</td>
             <td>23.5%</td>
             <td>21.41</td>
             <td>38.1%</td>
@@ -2241,7 +2250,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">002916</td>
             <td><a href="report.html?code=002916">深南电路</a></td>
-            <td>433.50</td>
+            <td>433.5</td>
             <td>20.8%</td>
             <td>81.24</td>
             <td>28.3%</td>
@@ -2277,7 +2286,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">300711</td>
             <td><a href="report.html?code=300711">广哈通信</a></td>
-            <td>16.00</td>
+            <td>16</td>
             <td>12.4%</td>
             <td>57.16</td>
             <td>54.8%</td>
@@ -2304,7 +2313,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>27.78</td>
             <td>17.7%</td>
             <td>32.95</td>
-            <td>61.0%</td>
+            <td>61%</td>
             <td>220.2亿</td>
             <td>通信设备</td>
         </tr>
@@ -2316,7 +2325,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>22.16</td>
             <td>16.1%</td>
             <td>11.43</td>
-            <td>54.0%</td>
+            <td>54%</td>
             <td>368.8亿</td>
             <td>中药Ⅱ</td>
         </tr>
@@ -2350,10 +2359,10 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td class="code">002270</td>
             <td><a href="report.html?code=002270">华明装备</a></td>
             <td>18.86</td>
-            <td>22.0%</td>
-            <td>24.10</td>
+            <td>22%</td>
+            <td>24.1</td>
             <td>54.5%</td>
-            <td>169.0亿</td>
+            <td>169亿</td>
             <td>电网设备</td>
         </tr>
         <tr>
@@ -2373,11 +2382,11 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">300631</td>
             <td><a href="report.html?code=300631">久吾高科</a></td>
-            <td>23.20</td>
+            <td>23.2</td>
             <td>5.7%</td>
             <td>40.38</td>
             <td>42.3%</td>
-            <td>29.0亿</td>
+            <td>29亿</td>
             <td>环保设备Ⅱ</td>
         </tr>
         <tr>
@@ -2389,7 +2398,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>7.5%</td>
             <td>36.15</td>
             <td>51.1%</td>
-            <td>43.0亿</td>
+            <td>43亿</td>
             <td>化学制药</td>
         </tr>
         <tr>
@@ -2410,7 +2419,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td class="code">301004</td>
             <td><a href="report.html?code=301004">嘉益股份</a></td>
             <td>31.88</td>
-            <td>23.0%</td>
+            <td>23%</td>
             <td>13.41</td>
             <td>30.2%</td>
             <td>46.5亿</td>
@@ -2423,8 +2432,8 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><a href="report.html?code=920523">德瑞锂电</a></td>
             <td>16.69</td>
             <td>22.4%</td>
-            <td>12.40</td>
-            <td>43.0%</td>
+            <td>12.4</td>
+            <td>43%</td>
             <td>16.9亿</td>
             <td>电池</td>
         </tr>
@@ -2460,7 +2469,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>39.89</td>
             <td>6.6%</td>
             <td>150.23</td>
-            <td>40.0%</td>
+            <td>40%</td>
             <td>74.9亿</td>
             <td>半导体</td>
         </tr>
@@ -2485,7 +2494,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>12.2%</td>
             <td>26.34</td>
             <td>46.8%</td>
-            <td>115.0亿</td>
+            <td>115亿</td>
             <td>专业服务</td>
         </tr>
         <tr>
@@ -2493,7 +2502,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bB">B</span></td>
             <td class="code">300452</td>
             <td><a href="report.html?code=300452">山河药辅</a></td>
-            <td>11.40</td>
+            <td>11.4</td>
             <td>18.6%</td>
             <td>15.15</td>
             <td>31.8%</td>
@@ -2508,7 +2517,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>16.28</td>
             <td>7.3%</td>
             <td>28.87</td>
-            <td>35.0%</td>
+            <td>35%</td>
             <td>20.2亿</td>
             <td>通用设备</td>
         </tr>
@@ -2567,7 +2576,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><a href="report.html?code=002550">千红制药</a></td>
             <td>5.98</td>
             <td>15.2%</td>
-            <td>23.70</td>
+            <td>23.7</td>
             <td>58.4%</td>
             <td>76.5亿</td>
             <td>化学制药</td>
@@ -2577,7 +2586,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">920011</td>
             <td><a href="report.html?code=920011">晨光电机</a></td>
-            <td>21.50</td>
+            <td>21.5</td>
             <td>18.4%</td>
             <td>19.65</td>
             <td>19.3%</td>
@@ -2614,7 +2623,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td class="code">688089</td>
             <td><a href="report.html?code=688089">嘉必优</a></td>
             <td>10.87</td>
-            <td>9.0%</td>
+            <td>9%</td>
             <td>33.17</td>
             <td>47.7%</td>
             <td>18.3亿</td>
@@ -2628,7 +2637,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>18.57</td>
             <td>18.4%</td>
             <td>57.94</td>
-            <td>32.0%</td>
+            <td>32%</td>
             <td>187.4亿</td>
             <td>工程机械</td>
         </tr>
@@ -2637,8 +2646,8 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">603888</td>
             <td><a href="report.html?code=603888">新华网</a></td>
-            <td>17.20</td>
-            <td>9.0%</td>
+            <td>17.2</td>
+            <td>9%</td>
             <td>35.17</td>
             <td>38.5%</td>
             <td>116.1亿</td>
@@ -2685,7 +2694,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">603500</td>
             <td><a href="report.html?code=603500">祥和实业</a></td>
-            <td>12.60</td>
+            <td>12.6</td>
             <td>13.4%</td>
             <td>30.32</td>
             <td>32.1%</td>
@@ -2695,18 +2704,6 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
         <tr>
             <td>223</td>
             <td><span class="badge bB">B</span></td>
-            <td class="code">300684</td>
-            <td><a href="report.html?code=300684">中石科技</a></td>
-            <td>57.41</td>
-            <td>16.2%</td>
-            <td>50.33</td>
-            <td>36.3%</td>
-            <td>171.9亿</td>
-            <td>电子化学品Ⅱ</td>
-        </tr>
-        <tr>
-            <td>224</td>
-            <td><span class="badge bB">B</span></td>
             <td class="code">300548</td>
             <td><a href="report.html?code=300548">长芯博创</a></td>
             <td>262.65</td>
@@ -2715,6 +2712,18 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>40.6%</td>
             <td>773.9亿</td>
             <td>通信设备</td>
+        </tr>
+        <tr>
+            <td>224</td>
+            <td><span class="badge bB">B</span></td>
+            <td class="code">300684</td>
+            <td><a href="report.html?code=300684">中石科技</a></td>
+            <td>57.41</td>
+            <td>16.2%</td>
+            <td>50.33</td>
+            <td>36.3%</td>
+            <td>171.9亿</td>
+            <td>电子化学品Ⅱ</td>
         </tr>
         <tr>
             <td>225</td>
@@ -2735,7 +2744,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><a href="report.html?code=000833">粤桂股份</a></td>
             <td>23.96</td>
             <td>12.8%</td>
-            <td>33.20</td>
+            <td>33.2</td>
             <td>35.5%</td>
             <td>192.2亿</td>
             <td>综合Ⅱ</td>
@@ -2757,8 +2766,8 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">920751</td>
             <td><a href="report.html?code=920751">惠同新材</a></td>
-            <td>21.40</td>
-            <td>12.0%</td>
+            <td>21.4</td>
+            <td>12%</td>
             <td>39.17</td>
             <td>40.2%</td>
             <td>18.6亿</td>
@@ -2817,8 +2826,8 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">688012</td>
             <td><a href="report.html?code=688012">中微公司</a></td>
-            <td>413.00</td>
-            <td>10.0%</td>
+            <td>413</td>
+            <td>10%</td>
             <td>144.18</td>
             <td>39.2%</td>
             <td>3934.6亿</td>
@@ -2826,6 +2835,18 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
         </tr>
         <tr>
             <td>234</td>
+            <td><span class="badge bB">B</span></td>
+            <td class="code">920112</td>
+            <td><a href="report.html?code=920112">巴兰仕</a></td>
+            <td>16.65</td>
+            <td>22.1%</td>
+            <td>13.43</td>
+            <td>30%</td>
+            <td>19.8亿</td>
+            <td>专用设备</td>
+        </tr>
+        <tr>
+            <td>235</td>
             <td><span class="badge bC">C</span></td>
             <td class="code">920178</td>
             <td><a href="report.html?code=920178">锐翔智能</a></td>
@@ -2835,18 +2856,6 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>46.6%</td>
             <td>96.9亿</td>
             <td>自动化设备</td>
-        </tr>
-        <tr>
-            <td>235</td>
-            <td><span class="badge bB">B</span></td>
-            <td class="code">920112</td>
-            <td><a href="report.html?code=920112">巴兰仕</a></td>
-            <td>16.65</td>
-            <td>22.1%</td>
-            <td>13.43</td>
-            <td>30.0%</td>
-            <td>19.8亿</td>
-            <td>专用设备</td>
         </tr>
         <tr>
             <td>236</td>
@@ -2878,7 +2887,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td class="code">600573</td>
             <td><a href="report.html?code=600573">XD惠泉啤</a></td>
             <td>9.09</td>
-            <td>6.0%</td>
+            <td>6%</td>
             <td>27.75</td>
             <td>34.9%</td>
             <td>22.7亿</td>
@@ -2917,7 +2926,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>6.5%</td>
             <td>39.66</td>
             <td>31.6%</td>
-            <td>25.0亿</td>
+            <td>25亿</td>
             <td>文娱用品</td>
         </tr>
         <tr>
@@ -2926,7 +2935,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td class="code">300971</td>
             <td><a href="report.html?code=300971">博亚精工</a></td>
             <td>18.52</td>
-            <td>8.0%</td>
+            <td>8%</td>
             <td>23.18</td>
             <td>44.2%</td>
             <td>21.8亿</td>
@@ -2937,7 +2946,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">688333</td>
             <td><a href="report.html?code=688333">铂力特</a></td>
-            <td>100.80</td>
+            <td>100.8</td>
             <td>4.2%</td>
             <td>117.41</td>
             <td>37.7%</td>
@@ -2951,7 +2960,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><a href="report.html?code=688312">燕麦科技</a></td>
             <td>90.18</td>
             <td>9.2%</td>
-            <td>97.00</td>
+            <td>97</td>
             <td>50.3%</td>
             <td>132.3亿</td>
             <td>专用设备</td>
@@ -2973,7 +2982,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">000715</td>
             <td><a href="report.html?code=000715">中兴商业</a></td>
-            <td>4.60</td>
+            <td>4.6</td>
             <td>5.8%</td>
             <td>21.72</td>
             <td>56.6%</td>
@@ -2989,23 +2998,11 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>17.5%</td>
             <td>70.34</td>
             <td>22.1%</td>
-            <td>174.0亿</td>
+            <td>174亿</td>
             <td>通信设备</td>
         </tr>
         <tr>
             <td>248</td>
-            <td><span class="badge bC">C</span></td>
-            <td class="code">920188</td>
-            <td><a href="report.html?code=920188">悦龙科技</a></td>
-            <td>27.01</td>
-            <td>19.8%</td>
-            <td>22.97</td>
-            <td>58.0%</td>
-            <td>22.4亿</td>
-            <td>橡胶</td>
-        </tr>
-        <tr>
-            <td>249</td>
             <td><span class="badge bC">C</span></td>
             <td class="code">301186</td>
             <td><a href="report.html?code=301186">超达装备</a></td>
@@ -3017,15 +3014,27 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>汽车零部件</td>
         </tr>
         <tr>
+            <td>249</td>
+            <td><span class="badge bC">C</span></td>
+            <td class="code">920188</td>
+            <td><a href="report.html?code=920188">悦龙科技</a></td>
+            <td>27.01</td>
+            <td>19.8%</td>
+            <td>22.97</td>
+            <td>58%</td>
+            <td>22.4亿</td>
+            <td>橡胶</td>
+        </tr>
+        <tr>
             <td>250</td>
             <td><span class="badge bB">B</span></td>
             <td class="code">300743</td>
             <td><a href="report.html?code=300743">天地数码</a></td>
             <td>15.22</td>
             <td>17.2%</td>
-            <td>19.90</td>
-            <td>32.0%</td>
-            <td>23.0亿</td>
+            <td>19.9</td>
+            <td>32%</td>
+            <td>23亿</td>
             <td>计算机设备</td>
         </tr>
         <tr>
@@ -3033,7 +3042,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">002461</td>
             <td><a href="report.html?code=002461">珠江啤酒</a></td>
-            <td>7.70</td>
+            <td>7.7</td>
             <td>8.4%</td>
             <td>18.41</td>
             <td>48.3%</td>
@@ -3109,7 +3118,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>13.5%</td>
             <td>20.56</td>
             <td>49.2%</td>
-            <td>28.0亿</td>
+            <td>28亿</td>
             <td>通信设备</td>
         </tr>
         <tr>
@@ -3117,7 +3126,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">301286</td>
             <td><a href="report.html?code=301286">侨源股份</a></td>
-            <td>56.00</td>
+            <td>56</td>
             <td>12.5%</td>
             <td>94.16</td>
             <td>36.8%</td>
@@ -3142,10 +3151,10 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td class="code">001257</td>
             <td><a href="report.html?code=001257">盛龙股份</a></td>
             <td>28.65</td>
-            <td>17.0%</td>
+            <td>17%</td>
             <td>58.59</td>
             <td>48.2%</td>
-            <td>526.0亿</td>
+            <td>526亿</td>
             <td>小金属</td>
         </tr>
         <tr>
@@ -3153,7 +3162,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">002050</td>
             <td><a href="report.html?code=002050">三花智控</a></td>
-            <td>41.50</td>
+            <td>41.5</td>
             <td>15.8%</td>
             <td>42.73</td>
             <td>28.8%</td>
@@ -3165,7 +3174,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">688041</td>
             <td><a href="report.html?code=688041">海光信息</a></td>
-            <td>344.90</td>
+            <td>344.9</td>
             <td>11.9%</td>
             <td>294.07</td>
             <td>57.8%</td>
@@ -3213,27 +3222,15 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">002729</td>
             <td><a href="report.html?code=002729">好利科技</a></td>
-            <td>17.80</td>
+            <td>17.8</td>
             <td>8.9%</td>
-            <td>80.40</td>
+            <td>80.4</td>
             <td>35.3%</td>
             <td>32.6亿</td>
             <td>其他电子Ⅱ</td>
         </tr>
         <tr>
             <td>267</td>
-            <td><span class="badge bC">C</span></td>
-            <td class="code">920839</td>
-            <td><a href="report.html?code=920839">万通液压</a></td>
-            <td>27.46</td>
-            <td>20.6%</td>
-            <td>27.59</td>
-            <td>29.9%</td>
-            <td>32.5亿</td>
-            <td>工程机械</td>
-        </tr>
-        <tr>
-            <td>268</td>
             <td><span class="badge bB">B</span></td>
             <td class="code">688300</td>
             <td><a href="report.html?code=688300">联瑞新材</a></td>
@@ -3245,15 +3242,27 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>非金属材料Ⅱ</td>
         </tr>
         <tr>
+            <td>268</td>
+            <td><span class="badge bC">C</span></td>
+            <td class="code">920839</td>
+            <td><a href="report.html?code=920839">万通液压</a></td>
+            <td>27.46</td>
+            <td>20.6%</td>
+            <td>27.59</td>
+            <td>29.9%</td>
+            <td>32.5亿</td>
+            <td>工程机械</td>
+        </tr>
+        <tr>
             <td>269</td>
             <td><span class="badge bC">C</span></td>
             <td class="code">600885</td>
             <td><a href="report.html?code=600885">宏发股份</a></td>
             <td>32.89</td>
             <td>17.2%</td>
-            <td>27.80</td>
+            <td>27.8</td>
             <td>34.3%</td>
-            <td>509.0亿</td>
+            <td>509亿</td>
             <td>电网设备</td>
         </tr>
         <tr>
@@ -3262,9 +3271,9 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td class="code">002947</td>
             <td><a href="report.html?code=002947">恒铭达</a></td>
             <td>81.44</td>
-            <td>17.0%</td>
+            <td>17%</td>
             <td>36.28</td>
-            <td>32.0%</td>
+            <td>32%</td>
             <td>208.7亿</td>
             <td>消费电子</td>
         </tr>
@@ -3286,7 +3295,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td class="code">002029</td>
             <td><a href="report.html?code=002029">七 匹 狼</a></td>
             <td>7.73</td>
-            <td>5.0%</td>
+            <td>5%</td>
             <td>23.39</td>
             <td>54.4%</td>
             <td>54.5亿</td>
@@ -3325,7 +3334,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>21.8%</td>
             <td>19.48</td>
             <td>40.8%</td>
-            <td>17.0亿</td>
+            <td>17亿</td>
             <td>汽车零部件</td>
         </tr>
         <tr>
@@ -3345,27 +3354,15 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bB">B</span></td>
             <td class="code">688625</td>
             <td><a href="report.html?code=688625">呈和科技</a></td>
-            <td>92.00</td>
+            <td>92</td>
             <td>19.4%</td>
-            <td>82.00</td>
-            <td>45.0%</td>
+            <td>82</td>
+            <td>45%</td>
             <td>241.5亿</td>
             <td>化学制品</td>
         </tr>
         <tr>
             <td>278</td>
-            <td><span class="badge bC">C</span></td>
-            <td class="code">920690</td>
-            <td><a href="report.html?code=920690">捷众科技</a></td>
-            <td>16.39</td>
-            <td>12.5%</td>
-            <td>19.37</td>
-            <td>35.8%</td>
-            <td>14.1亿</td>
-            <td>汽车零部件</td>
-        </tr>
-        <tr>
-            <td>279</td>
             <td><span class="badge bB">B</span></td>
             <td class="code">603501</td>
             <td><a href="report.html?code=603501">豪威集团</a></td>
@@ -3375,6 +3372,18 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>30.6%</td>
             <td>1093.9亿</td>
             <td>半导体</td>
+        </tr>
+        <tr>
+            <td>279</td>
+            <td><span class="badge bC">C</span></td>
+            <td class="code">920690</td>
+            <td><a href="report.html?code=920690">捷众科技</a></td>
+            <td>16.39</td>
+            <td>12.5%</td>
+            <td>19.37</td>
+            <td>35.8%</td>
+            <td>14.1亿</td>
+            <td>汽车零部件</td>
         </tr>
         <tr>
             <td>280</td>
@@ -3432,7 +3441,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>56.66</td>
             <td>15.1%</td>
             <td>84.27</td>
-            <td>60.0%</td>
+            <td>60%</td>
             <td>56.7亿</td>
             <td>自动化设备</td>
         </tr>
@@ -3443,7 +3452,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><a href="report.html?code=300620">光库科技</a></td>
             <td>362.43</td>
             <td>8.7%</td>
-            <td>428.90</td>
+            <td>428.9</td>
             <td>34.7%</td>
             <td>903.1亿</td>
             <td>通信设备</td>
@@ -3469,7 +3478,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>12.4%</td>
             <td>87.73</td>
             <td>60.2%</td>
-            <td>179.0亿</td>
+            <td>179亿</td>
             <td>专业服务</td>
         </tr>
         <tr>
@@ -3489,9 +3498,9 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">688531</td>
             <td><a href="report.html?code=688531">日联科技</a></td>
-            <td>170.70</td>
+            <td>170.7</td>
             <td>5.3%</td>
-            <td>152.90</td>
+            <td>152.9</td>
             <td>44.3%</td>
             <td>282.7亿</td>
             <td>专用设备</td>
@@ -3503,7 +3512,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><a href="report.html?code=603119">浙江荣泰</a></td>
             <td>64.42</td>
             <td>14.4%</td>
-            <td>104.80</td>
+            <td>104.8</td>
             <td>34.9%</td>
             <td>304.6亿</td>
             <td>汽车零部件</td>
@@ -3515,7 +3524,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><a href="report.html?code=301479">弘景光电</a></td>
             <td>57.08</td>
             <td>17.9%</td>
-            <td>38.70</td>
+            <td>38.7</td>
             <td>23.8%</td>
             <td>71.1亿</td>
             <td>光学光电子</td>
@@ -3525,10 +3534,10 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><span class="badge bC">C</span></td>
             <td class="code">002409</td>
             <td><a href="report.html?code=002409">雅克科技</a></td>
-            <td>188.60</td>
+            <td>188.6</td>
             <td>12.6%</td>
             <td>89.16</td>
-            <td>31.0%</td>
+            <td>31%</td>
             <td>897.6亿</td>
             <td>半导体</td>
         </tr>
@@ -3539,7 +3548,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><a href="report.html?code=301338">凯格精机</a></td>
             <td>156.66</td>
             <td>12.1%</td>
-            <td>106.80</td>
+            <td>106.8</td>
             <td>41.3%</td>
             <td>233.4亿</td>
             <td>专用设备</td>
@@ -3551,8 +3560,8 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><a href="report.html?code=301609">山大电力</a></td>
             <td>32.62</td>
             <td>15.2%</td>
-            <td>39.40</td>
-            <td>43.0%</td>
+            <td>39.4</td>
+            <td>43%</td>
             <td>53.1亿</td>
             <td>电网设备</td>
         </tr>
@@ -3565,7 +3574,7 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>15.1%</td>
             <td>89.17</td>
             <td>42.1%</td>
-            <td>386.0亿</td>
+            <td>386亿</td>
             <td>金属新材料</td>
         </tr>
         <tr>
@@ -3587,9 +3596,9 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td><a href="report.html?code=301611">珂玛科技</a></td>
             <td>167.66</td>
             <td>17.3%</td>
-            <td>294.90</td>
+            <td>294.9</td>
             <td>51.6%</td>
-            <td>731.0亿</td>
+            <td>731亿</td>
             <td>半导体</td>
         </tr>
         <tr>
@@ -3598,9 +3607,9 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td class="code">300718</td>
             <td><a href="report.html?code=300718">长盛轴承</a></td>
             <td>58.15</td>
-            <td>15.0%</td>
+            <td>15%</td>
             <td>66.48</td>
-            <td>35.0%</td>
+            <td>35%</td>
             <td>173.7亿</td>
             <td>通用设备</td>
         </tr>
@@ -3641,6 +3650,14 @@ footer{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936
             <td>软件开发</td>
         </tr></tbody>
 </table></div>
-<footer>数据来源：东方财富公开接口 · AI分析由 DeepSeek V4 Pro 生成 · 仅供参考不构成投资建议 · <a href="../astock_screen_20260627.html">← 回到选股总表</a></footer>
-</div>
-</body></html>
+	<footer>数据来源：东方财富公开接口 · AI分析由 DeepSeek 生成 · 仅供参考不构成投资建议</footer>
+	</div>
+	<script>
+	var API=window.location.protocol==="file:"?"http://localhost:8899":window.location.origin;
+	if(window.location.protocol!=="file:"){
+	  fetch(API+"/api/status").then(function(r){return r.json()}).then(function(d){
+	    if(d.latest_ts)document.getElementById("backLink").href="../astock_screen_"+d.latest_ts+".html";
+	  }).catch(function(){});
+	}
+	</script>
+	</body></html>

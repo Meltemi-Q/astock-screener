@@ -154,6 +154,45 @@ class RegressionTests(unittest.TestCase):
             html = Path(idx_path).read_text(encoding="utf-8")
             self.assertIn("report.html?code=000001", html)
             self.assertNotIn('href="000001.html"', html)
+            self.assertIn('id="backLink"', html)
+            self.assertIn('fetch(API+"/api/status")', html)
+
+    def test_deep_dive_index_accepts_csv_metric_field_names(self):
+        import stock_deep_dive
+
+        with tempfile.TemporaryDirectory() as td:
+            idx_path = stock_deep_dive.generate_index(
+                [
+                    {
+                        "code": "688336",
+                        "name": "三生国健",
+                        "tier": "A_可买入",
+                        "price": "41.46",
+                        "roe": "41.32",
+                        "pe_ttm": "12.49",
+                        "gross_margin": "92.0708953302",
+                        "mktcap_yi": "371.575",
+                        "industry": "生物制品",
+                        "score": "86.24",
+                    }
+                ],
+                td,
+                "20260628",
+            )
+
+            html = Path(idx_path).read_text(encoding="utf-8")
+            self.assertIn("<td>12.49</td>", html)
+            self.assertIn("<td>92.1%</td>", html)
+            self.assertIn("<td>371.6亿</td>", html)
+            self.assertNotIn("<td>%</td>", html)
+            self.assertNotIn("<td>亿</td>", html)
+
+    def test_deep_dive_shell_does_not_overwrite_latest_back_link_with_old_payload_ts(self):
+        source = (ROOT / "templates" / "deep_dive" / "assets" / "deep_dive.js").read_text(encoding="utf-8")
+
+        self.assertIn('fetch(API+"/api/status")', source)
+        self.assertNotIn('meta.screen_ts||"20260627"', source)
+        self.assertNotIn('backLink").href="../astock_screen_"+(meta.screen_ts', source)
 
     def test_screener_marks_json_deep_dive_reports_and_links_shared_shell(self):
         import astock_screener
@@ -256,14 +295,49 @@ class RegressionTests(unittest.TestCase):
     def test_industry_chart_reserves_bottom_space_for_rotated_labels(self):
         source = (ROOT / "astock_screener.py").read_text(encoding="utf-8")
 
-        self.assertIn("labelPad=54", source)
-        self.assertIn("ctx.translate(x+barW/2,H-labelPad+42)", source)
+        self.assertIn("H=210,labelPad=76", source)
+        self.assertIn("ctx.translate(x+barW/2,H-labelPad+58)", source)
 
     def test_industry_chart_limits_labels_on_narrow_viewports(self):
         source = (ROOT / "astock_screener.py").read_text(encoding="utf-8")
 
         self.assertIn("visibleCount=W<420?6:8", source)
         self.assertIn("META.topInds.slice(0,visibleCount)", source)
+
+    def test_funnel_chart_reserves_bottom_label_space(self):
+        source = (ROOT / "astock_screener.py").read_text(encoding="utf-8")
+
+        self.assertIn(".funnel{display:flex;gap:0;height:170px;", source)
+        self.assertIn("padding:18px 6px 40px", source)
+
+    def test_stale_screen_html_redirects_to_latest_report(self):
+        import astock_screener
+
+        old_out_dir = astock_screener.OUT_DIR
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                results_dir = Path(td) / "results"
+                results_dir.mkdir()
+                old = results_dir / "astock_screen_20260627.html"
+                latest = results_dir / "astock_screen_20260628.html"
+                old.write_text("<html>old 352</html>", encoding="utf-8")
+                latest.write_text("<html>latest 301</html>", encoding="utf-8")
+                astock_screener.OUT_DIR = str(results_dir)
+
+                astock_screener.write_stale_screen_redirects("20260628")
+
+                html = old.read_text(encoding="utf-8")
+                self.assertIn("astock_screen_20260628.html", html)
+                self.assertIn("旧版选股页已更新", html)
+        finally:
+            astock_screener.OUT_DIR = old_out_dir
+
+    def test_light_theme_tokens_are_used_for_main_and_deep_pages(self):
+        main_source = (ROOT / "astock_screener.py").read_text(encoding="utf-8")
+        deep_css = (ROOT / "templates" / "deep_dive" / "assets" / "deep_dive.css").read_text(encoding="utf-8")
+
+        self.assertIn("background:#f6f8fb;color:#172033", main_source)
+        self.assertIn("background:#f6f8fb;color:#172033", deep_css)
 
     def test_fetch_stock_full_uses_shared_spot_cache_without_refetching_market_data(self):
         import stock_deep_dive

@@ -19,7 +19,7 @@
   python3 stock_deep_dive.py --no-llm           # 跳过 LLM，仅出量化页
 """
 
-import os, sys, json, time, csv, ssl, argparse, re
+import os, sys, json, time, csv, ssl, argparse, re, html as html_lib
 from urllib import request, parse, error
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
@@ -1182,6 +1182,19 @@ def _write_text_if_changed(path, content):
         f.write(content)
 
 
+def latest_screen_ts(results_dir=None):
+    """返回当前 results 目录里最新的选股总表日期。"""
+    results_dir = results_dir or os.path.join(WORKDIR, "results")
+    screens = sorted(
+        [
+            f for f in os.listdir(results_dir)
+            if f.startswith("astock_screen_") and f.endswith(".html")
+        ],
+        reverse=True,
+    ) if os.path.isdir(results_dir) else []
+    return screens[0].replace("astock_screen_", "").replace(".html", "") if screens else time.strftime("%Y%m%d")
+
+
 def ensure_deep_dive_app(base_dir):
     """把共享 report shell 和静态 assets 写入 deep_dives 目录。"""
     os.makedirs(os.path.join(base_dir, DATA_DIR_NAME), exist_ok=True)
@@ -1191,9 +1204,11 @@ def ensure_deep_dive_app(base_dir):
         os.path.join("assets", "deep_dive.css"): os.path.join(TEMPLATE_DIR, "assets", "deep_dive.css"),
         os.path.join("assets", "deep_dive.js"): os.path.join(TEMPLATE_DIR, "assets", "deep_dive.js"),
     }
+    screen_href = f"astock_screen_{latest_screen_ts(os.path.dirname(base_dir))}.html"
     for rel, src in files.items():
         with open(src, encoding="utf-8") as f:
-            _write_text_if_changed(os.path.join(base_dir, rel), f.read())
+            content = f.read().replace("__SCREEN_HREF__", screen_href)
+            _write_text_if_changed(os.path.join(base_dir, rel), content)
 
 
 def _existing_report_codes(base_dir, include_legacy=False):
@@ -1331,6 +1346,50 @@ def generate_index(stocks_done, base_dir, screen_ts=None):
                            if f.startswith("astock_screen_") and f.endswith(".html")],
                           reverse=True)
         screen_ts = screen_ts[0].replace("astock_screen_", "").replace(".html", "") if screen_ts else time.strftime("%Y%m%d")
+
+    def first_value(stock, *keys):
+        for key in keys:
+            value = stock.get(key)
+            if value not in (None, "", "None", "nan"):
+                return value
+        return ""
+
+    def fmt_plain(value):
+        if value in (None, "", "None", "nan"):
+            return ""
+        return html_lib.escape(str(value))
+
+    def fmt_number(value, digits=None):
+        if value in (None, "", "None", "nan"):
+            return ""
+        try:
+            num = float(value)
+            if digits is None:
+                text = f"{num:g}"
+            else:
+                text = f"{num:.{digits}f}".rstrip("0").rstrip(".")
+        except (TypeError, ValueError):
+            text = str(value)
+        return html_lib.escape(text)
+
+    def fmt_unit(value, unit, digits=None):
+        if value in (None, "", "None", "nan"):
+            return ""
+        return f"{fmt_number(value, digits)}{unit}"
+
+    def fmt_market_cap(stock):
+        value = first_value(stock, "mktcap", "mktcap_yi", "market_cap_yi")
+        if value in (None, "", "None", "nan"):
+            return ""
+        try:
+            num = float(value)
+            if abs(num) > 1_000_000:
+                num = num / 1e8
+            text = f"{num:.1f}".rstrip("0").rstrip(".")
+        except (TypeError, ValueError):
+            text = str(value)
+        return f"{html_lib.escape(text)}亿"
+
     rows_html = ""
     for i, s in enumerate(stocks_done):
         tier_label = {"A_可买入": "A", "B_优质待跌": "B", "C_接近合格": "C"}.get(s.get("tier", ""), "")
@@ -1340,50 +1399,67 @@ def generate_index(stocks_done, base_dir, screen_ts=None):
         <tr>
             <td>{i+1}</td>
             <td><span class="badge {badge_class}">{tier_label}</span></td>
-            <td class="code">{s['code']}</td>
-            <td><a href="report.html?code={s['code']}">{s['name']}{llm_tag}</a></td>
-            <td>{s.get('price', '')}</td>
-            <td>{s.get('roe', '')}%</td>
-            <td>{s.get('pe', '')}</td>
-            <td>{s.get('gm', '')}%</td>
-            <td>{s.get('mktcap', '')}亿</td>
-            <td>{s.get('industry', '')}</td>
+            <td class="code">{fmt_plain(s['code'])}</td>
+            <td><a href="report.html?code={fmt_plain(s['code'])}">{fmt_plain(s['name'])}{llm_tag}</a></td>
+            <td>{fmt_number(first_value(s, 'price'), 2)}</td>
+            <td>{fmt_unit(first_value(s, 'roe'), '%', 1)}</td>
+            <td>{fmt_number(first_value(s, 'pe', 'pe_ttm'), 2)}</td>
+            <td>{fmt_unit(first_value(s, 'gm', 'gross_margin'), '%', 1)}</td>
+            <td>{fmt_market_cap(s)}</td>
+            <td>{fmt_plain(first_value(s, 'industry'))}</td>
         </tr>"""
 
     html = f"""<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>个股深度研报索引 | 五层选股</title>
-<style>
-*{{box-sizing:border-box}}
-body{{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#0f1115;color:#e6e8eb;font-size:13px}}
-.container{{max-width:1000px;margin:0 auto;padding:20px}}
-h1{{font-size:20px;margin:0 0 4px}}
-.sub{{color:#8b93a1;font-size:12px;margin-bottom:20px}}
-table{{width:100%;border-collapse:collapse}}
-th{{background:#1a1f29;color:#8b93a1;padding:8px 12px;text-align:left;border-bottom:2px solid #2a3140;position:sticky;top:0;font-size:12px}}
-td{{padding:6px 12px;border-bottom:1px solid #1c212b}}
-tr:hover td{{background:#161b24}}
-a{{color:#7fb3ff;text-decoration:none}}
-a:hover{{text-decoration:underline}}
-.code{{color:#7fb3ff;font-variant-numeric:tabular-nums}}
-.badge{{display:inline-block;min-width:20px;text-align:center;border-radius:4px;padding:1px 6px;font-weight:700;font-size:11px}}
-.bA{{background:#143524;color:#3ddc84}}.bB{{background:#332a10;color:#ffd166}}.bC{{background:#23282f;color:#9aa4b2}}
-footer{{margin-top:30px;color:#5a6270;font-size:11px;border-top:1px solid #232936;padding-top:12px}}
-</style></head><body>
-<div class="container">
-<h1>🔬 个股深度研报</h1>
-<div class="sub">共 {len(stocks_done)} 只 · 🤖 = DeepSeek AI 定性分析 · 点击名称查看详情</div>
-<div style="overflow:auto">
-<table>
+	<title>个股深度研报索引 | 五层选股</title>
+	<style>
+	*{{box-sizing:border-box}}
+	body{{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#f6f8fb;color:#172033;font-size:13px}}
+	.container{{max-width:1120px;margin:0 auto;padding:24px 20px}}
+	.topbar{{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:22px}}
+	.nav-link{{display:inline-flex;align-items:center;min-height:34px;padding:6px 12px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;color:#2563eb;text-decoration:none;font-weight:600}}
+	.nav-link.muted{{color:#64748b}}
+	.nav-link:hover{{background:#eff6ff;border-color:#2563eb;text-decoration:none}}
+	h1{{font-size:24px;margin:0 0 4px;color:#0f172a}}
+	.sub{{color:#64748b;font-size:12px;margin-bottom:20px}}
+	.table-wrap{{overflow:auto;background:#fff;border:1px solid #dbe4f0;border-radius:8px}}
+	table{{width:100%;border-collapse:collapse}}
+	th{{background:#eef2f7;color:#475569;padding:9px 12px;text-align:left;border-bottom:2px solid #cbd5e1;position:sticky;top:0;font-size:12px}}
+	td{{padding:7px 12px;border-bottom:1px solid #e2e8f0}}
+	tr:hover td{{background:#f8fbff}}
+	a{{color:#2563eb;text-decoration:none}}
+	a:hover{{text-decoration:underline}}
+	.code{{color:#2563eb;font-variant-numeric:tabular-nums}}
+	.badge{{display:inline-block;min-width:20px;text-align:center;border-radius:4px;padding:1px 6px;font-weight:700;font-size:11px}}
+	.bA{{background:#dcfce7;color:#166534}}.bB{{background:#fef3c7;color:#92400e}}.bC{{background:#e2e8f0;color:#475569}}
+	footer{{margin-top:30px;color:#64748b;font-size:11px;border-top:1px solid #dbe4f0;padding-top:12px}}
+	</style></head><body>
+	<div class="container">
+	<nav class="topbar">
+	    <a id="backLink" href="../astock_screen_{screen_ts}.html" class="nav-link">← 选股总表</a>
+	    <a href="report.html?code={stocks_done[0]['code'] if stocks_done else ''}" class="nav-link muted">首只研报</a>
+	</nav>
+	<h1>🔬 个股深度研报</h1>
+	<div class="sub">共 {len(stocks_done)} 只 · 🤖 = DeepSeek AI 定性分析 · 点击名称查看详情</div>
+	<div class="table-wrap">
+	<table>
 <thead><tr>
     <th>#</th><th>评级</th><th>代码</th><th>名称</th><th>现价</th><th>ROE%</th><th>PE</th><th>毛利%</th><th>市值(亿)</th><th>行业</th>
 </tr></thead>
 <tbody>{rows_html}</tbody>
 </table></div>
-<footer>数据来源：东方财富公开接口 · AI分析由 DeepSeek 生成 · 仅供参考不构成投资建议 · <a href="../astock_screen_{screen_ts}.html">← 回到选股总表</a></footer>
-</div>
-</body></html>"""
+	<footer>数据来源：东方财富公开接口 · AI分析由 DeepSeek 生成 · 仅供参考不构成投资建议</footer>
+	</div>
+	<script>
+	var API=window.location.protocol==="file:"?"http://localhost:8899":window.location.origin;
+	if(window.location.protocol!=="file:"){{
+	  fetch(API+"/api/status").then(function(r){{return r.json()}}).then(function(d){{
+	    if(d.latest_ts)document.getElementById("backLink").href="../astock_screen_"+d.latest_ts+".html";
+	  }}).catch(function(){{}});
+	}}
+	</script>
+	</body></html>"""
     idx_path = os.path.join(base_dir, "index.html")
     with open(idx_path, "w", encoding="utf-8") as f:
         f.write(html)

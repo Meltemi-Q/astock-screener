@@ -21,7 +21,7 @@ function rmb(v){
   return v.toFixed(0);
 }
 function judge(v,thresholds,labels){
-  if(!isNum(v))return ["数据不足","#5a6270"];
+  if(!isNum(v))return ["数据不足","#64748b"];
   v=Number(v);
   for(var i=0;i<thresholds.length;i++){
     if(v>=thresholds[i])return labels[i];
@@ -94,8 +94,7 @@ function renderReport(data){
   var meta=data.meta||{}, quote=data.quote||{}, financials=data.financials||[];
   var name=meta.name||"", code=meta.code||"", ind=meta.industry||"";
   document.title=name+"("+code+") 深度研报 | 五层选股";
-  $("backLink").href="../astock_screen_"+(meta.screen_ts||"20260627")+".html";
-  $("title").innerHTML=esc(name)+' <span style="font-size:16px;color:#8b93a1">'+esc(code)+"</span>";
+  $("title").innerHTML=esc(name)+' <span style="font-size:16px;color:#64748b">'+esc(code)+"</span>";
   $("subtitle").textContent=ind+" · "+financials.slice(-3).map(function(d){return d.year}).join("  |  ")+"年";
   $("status").hidden=true;
   $("content").hidden=false;
@@ -132,10 +131,10 @@ function renderKpis(quote, financials){
 
 function renderQuantSummary(financials){
   var fy=financials.length?financials[financials.length-1]:{};
-  var roe=judge(fy.roe,[25,20,15],[["卓越","#3ddc84"],["优秀","#7fb3ff"],["良好","#ffd166"],["一般","#9aa4b2"]]);
-  var gm=judge(fy.gm,[60,40,30],[["强定价权","#3ddc84"],["较强","#7fb3ff"],["合理","#ffd166"],["偏低","#9aa4b2"]]);
-  var debt=isNum(fy.debt)?judge(100-Number(fy.debt),[70,50,30],[["极稳健","#3ddc84"],["稳健","#7fb3ff"],["适中","#ffd166"],["偏高","#ff6b6b"]]):["数据不足","#5a6270"];
-  var ocf=judge(fy.ocf_ratio,[1.5,1.0,0.8],[["现金流充沛","#3ddc84"],["健康","#7fb3ff"],["合格","#ffd166"],["需关注","#ff6b6b"]]);
+  var roe=judge(fy.roe,[25,20,15],[["卓越","#16a34a"],["优秀","#2563eb"],["良好","#b45309"],["一般","#64748b"]]);
+  var gm=judge(fy.gm,[60,40,30],[["强定价权","#16a34a"],["较强","#2563eb"],["合理","#b45309"],["偏低","#64748b"]]);
+  var debt=isNum(fy.debt)?judge(100-Number(fy.debt),[70,50,30],[["极稳健","#16a34a"],["稳健","#2563eb"],["适中","#b45309"],["偏高","#dc2626"]]):["数据不足","#64748b"];
+  var ocf=judge(fy.ocf_ratio,[1.5,1.0,0.8],[["现金流充沛","#16a34a"],["健康","#2563eb"],["合格","#b45309"],["需关注","#dc2626"]]);
   var yoy=isNum(fy.netp_yoy)?Number(fy.netp_yoy):0;
   var cagr=isNum(fy.cagr_netp)?Number(fy.cagr_netp):0;
   var items=[
@@ -143,8 +142,8 @@ function renderQuantSummary(financials){
     ["毛利率",r(fy.gm,1)+"%",gm],
     ["负债率",r(fy.debt,1)+"%",debt],
     ["现金流",r(fy.ocf_ratio,2)+"x",ocf],
-    ["净利增速",r(fy.netp_yoy,1)+"%",[yoy>=30?"高增长":(yoy>=10?"稳健":"平缓"),yoy>=20?"#3ddc84":(yoy>=10?"#ffd166":"#9aa4b2")]],
-    ["3年CAGR",r(fy.cagr_netp,1)+"%",[cagr>=25?"高成长":(cagr>=10?"稳定":"低速"),"#9aa4b2"]]
+    ["净利增速",r(fy.netp_yoy,1)+"%",[yoy>=30?"高增长":(yoy>=10?"稳健":"平缓"),yoy>=20?"#16a34a":(yoy>=10?"#b45309":"#64748b")]],
+    ["3年CAGR",r(fy.cagr_netp,1)+"%",[cagr>=25?"高成长":(cagr>=10?"稳定":"低速"),"#64748b"]]
   ];
   $("quantSummary").innerHTML=items.map(function(x){
     return '<div class="qs-item"><span class="qs-label">'+esc(x[0])+'</span>'
@@ -178,7 +177,7 @@ function renderPeers(data){
     var label={"A_可买入":"A","B_优质待跌":"B","C_接近合格":"C"}[p.tier]||"";
     var nameCell=p.has_deep
       ? '<a href="report.html?code='+esc(p.code)+'" class="code">'+esc(p.code)+'</a> <a href="report.html?code='+esc(p.code)+'">'+esc(p.name)+'</a>'
-      : '<a href="#" class="code deep-gen" data-code="'+esc(p.code)+'">'+esc(p.code)+'</a> <a href="#" class="deep-gen" data-code="'+esc(p.code)+'">'+esc(p.name)+'</a> <span style="font-size:10px;color:#5a6270">一键</span>';
+      : '<a href="#" class="code deep-gen" data-code="'+esc(p.code)+'">'+esc(p.code)+'</a> <a href="#" class="deep-gen" data-code="'+esc(p.code)+'">'+esc(p.name)+'</a> <span style="font-size:10px;color:#64748b">一键</span>';
     return "<tr><td>"+(i+1)+"</td><td>"+nameCell+"</td><td>"+esc(r(p.pe,1))+"</td><td>"+esc(r(p.roe,1))+"%</td><td>"+esc(r(p.gm,1))+"%</td><td>"+esc(r(p.mktcap,0))+"亿</td><td>"+esc(label)+"</td></tr>";
   }).join("");
   document.querySelectorAll(".deep-gen").forEach(function(el){
@@ -199,9 +198,9 @@ function renderAnalysis(data){
     $("aiAnalyzeBtn").addEventListener("click",function(){runAiAnalysis(code)});
     return;
   }
-  var moatColor=Number(analysis.moat_score||0)>=7?"#3ddc84":(Number(analysis.moat_score||0)>=5?"#ffd166":"#ff6b6b");
-  var trapColor={"低":"#3ddc84","中":"#ffd166","高":"#ff6b6b"}[analysis.value_trap_risk]||"#ffd166";
-  var confColor={"高":"#3ddc84","中":"#ffd166","低":"#ff6b6b"}[analysis.confidence]||"#ffd166";
+  var moatColor=Number(analysis.moat_score||0)>=7?"#16a34a":(Number(analysis.moat_score||0)>=5?"#b45309":"#dc2626");
+  var trapColor={"低":"#16a34a","中":"#b45309","高":"#dc2626"}[analysis.value_trap_risk]||"#b45309";
+  var confColor={"高":"#16a34a","中":"#b45309","低":"#dc2626"}[analysis.confidence]||"#b45309";
   var cards=[
     ["生意模式",analysis.business_model],
     ["护城河",analysis.moat],
@@ -212,7 +211,7 @@ function renderAnalysis(data){
   ];
   $("analysisBlock").innerHTML='<div class="section"><h2>AI 定性分析 (DeepSeek)</h2>'
     +'<div class="ai-meta"><span>护城河评分: <b style="color:'+moatColor+'">'+esc(analysis.moat_score||"?")+'/10</b></span>'
-    +'<span>综合定性分: <b style="color:#3a86ff">'+esc(analysis.qual_score||"?")+'/100</b></span>'
+    +'<span>综合定性分: <b style="color:#2563eb">'+esc(analysis.qual_score||"?")+'/100</b></span>'
     +'<span>价值陷阱风险: <b style="color:'+trapColor+'">'+esc(analysis.value_trap_risk||"?")+'</b></span>'
     +'<span>分析信心: <b style="color:'+confColor+'">'+esc(analysis.confidence||"?")+'</b></span></div>'
     +'<div class="ai-grid">'+cards.map(function(c){return '<div class="ai-card '+(c[2]||"")+'"><h4>'+esc(c[0])+'</h4><p>'+esc(c[1]||"暂无")+'</p></div>'}).join("")+'</div>'
@@ -283,7 +282,7 @@ function prepareCanvas(cv,h){
 function drawEmptyCanvas(cv,text,h){
   var box=prepareCanvas(cv,h),ctx=box[0],W=box[1],H=box[2];
   ctx.clearRect(0,0,W,H);
-  ctx.fillStyle="#6b7380";ctx.font="13px sans-serif";ctx.textAlign="center";
+  ctx.fillStyle="#64748b";ctx.font="13px sans-serif";ctx.textAlign="center";
   ctx.fillText(text,W/2,H/2);
 }
 function drawKline(){
@@ -300,18 +299,18 @@ function drawKline(){
   maxH*=1.02;minL*=0.98;
   var priceRange=maxH-minL||1,gap=(W-padL-padR)/n,candleW=Math.max(1,gap*0.42);
   ctx.clearRect(0,0,W,H);
-  ctx.strokeStyle="#1a1f29";ctx.lineWidth=0.5;
+  ctx.strokeStyle="#e2e8f0";ctx.lineWidth=0.5;
   for(i=0;i<=4;i++){
     var y=padT+chartH*i/4,p=maxH-priceRange*i/4;
     ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(W-padR,y);ctx.stroke();
-    ctx.fillStyle="#5a6270";ctx.font="9px sans-serif";ctx.textAlign="right";ctx.fillText(p.toFixed(2),padL-4,y+3);
+    ctx.fillStyle="#64748b";ctx.font="9px sans-serif";ctx.textAlign="right";ctx.fillText(p.toFixed(2),padL-4,y+3);
   }
   for(i=0;i<n;i++){
     var x=padL+i*gap,vh=maxV?Number(data[i].volume||0)/maxV*volH:0,vy=padT+chartH+10+volH-vh;
-    ctx.fillStyle=Number(data[i].close)>=Number(data[i].open)?"rgba(61,220,132,0.35)":"rgba(255,107,107,0.35)";
+    ctx.fillStyle=Number(data[i].close)>=Number(data[i].open)?"rgba(22,163,74,0.28)":"rgba(220,38,38,0.24)";
     ctx.fillRect(x-candleW/2,vy,candleW,vh);
   }
-  ctx.fillStyle="#5a6270";ctx.font="9px sans-serif";ctx.textAlign="right";ctx.fillText("VOL",padL-4,padT+chartH+20);
+  ctx.fillStyle="#64748b";ctx.font="9px sans-serif";ctx.textAlign="right";ctx.fillText("VOL",padL-4,padT+chartH+20);
   for(i=0;i<n;i++){
     x=padL+i*gap;
     var oy=padT+(maxH-Number(data[i].open))/priceRange*chartH;
@@ -319,7 +318,7 @@ function drawKline(){
     var hy=padT+(maxH-Number(data[i].high))/priceRange*chartH;
     var ly=padT+(maxH-Number(data[i].low))/priceRange*chartH;
     var up=Number(data[i].close)>=Number(data[i].open);
-    ctx.strokeStyle=up?"#3ddc84":"#ff6b6b";ctx.fillStyle=ctx.strokeStyle;
+    ctx.strokeStyle=up?"#16a34a":"#dc2626";ctx.fillStyle=ctx.strokeStyle;
     ctx.beginPath();ctx.moveTo(x,hy);ctx.lineTo(x,ly);ctx.stroke();
     ctx.fillRect(x-candleW/2,Math.min(oy,cy),candleW,Math.max(1,Math.abs(cy-oy)));
   }
@@ -333,9 +332,9 @@ function drawKline(){
     }
     ctx.stroke();
   }
-  drawMA(calcMA(data,5),"#ffe066");drawMA(calcMA(data,10),"#ff9f1c");drawMA(calcMA(data,20),"#e15554");drawMA(calcMA(data,60),"#4e9f3d");
+  drawMA(calcMA(data,5),"#ca8a04");drawMA(calcMA(data,10),"#ea580c");drawMA(calcMA(data,20),"#dc2626");drawMA(calcMA(data,60),"#15803d");
   var skip=Math.max(1,Math.floor(n/8));
-  ctx.fillStyle="#6b7380";ctx.font="9px sans-serif";ctx.textAlign="center";
+  ctx.fillStyle="#64748b";ctx.font="9px sans-serif";ctx.textAlign="center";
   for(i=0;i<n;i+=skip)ctx.fillText(String(data[i].date||"").slice(5),padL+i*gap,padT+chartH+volH+22);
   drawPinnedCrosshair();
 }
@@ -369,12 +368,12 @@ function showTip(idx,pinned){
   var data=KDATA[curPeriod]||[];
   if(idx<0||!data[idx]){tipK.innerHTML="在K线上点击查看详情";return}
   var d=data[idx],up=Number(d.close)>=Number(d.open),chg=((Number(d.close)-Number(d.open))/Number(d.open)*100).toFixed(2);
-  tipK.innerHTML='<b style="color:#fff">'+esc(d.date)+'</b>'
-    +" 开<b>"+r(d.open,2)+"</b> 收<b style=\"color:"+(up?"#3ddc84":"#ff6b6b")+"\">"+r(d.close,2)+"</b>"
+  tipK.innerHTML='<b style="color:#172033">'+esc(d.date)+'</b>'
+    +" 开<b>"+r(d.open,2)+"</b> 收<b style=\"color:"+(up?"#16a34a":"#dc2626")+"\">"+r(d.close,2)+"</b>"
     +" 高"+r(d.high,2)+" 低"+r(d.low,2)
-    +' <span style="color:'+(up?"#3ddc84":"#ff6b6b")+'">'+(up?"+":"")+chg+"%</span>"
+    +' <span style="color:'+(up?"#16a34a":"#dc2626")+'">'+(up?"+":"")+chg+"%</span>"
     +" 量"+(Number(d.volume||0)/10000).toFixed(0)+"万手"
-    +(pinned?' <span style="color:#6b7380;font-size:10px">·已固定·点击取消</span>':"");
+    +(pinned?' <span style="color:#64748b;font-size:10px">·已固定·点击取消</span>':"");
 }
 function drawPinnedCrosshair(){
   var data=KDATA[curPeriod]||[];
@@ -407,10 +406,10 @@ function drawTrend(financials){
   for(var i=0;i<n;i++){
     var x=60+i*groupW,bh=revs[i]/maxRev*(H-80),y=H-40-bh;
     ctx.fillStyle="rgba(58,134,255,0.7)";ctx.fillRect(x-barW,y,barW,bh);
-    ctx.fillStyle="#7fb3ff";ctx.font="9px sans-serif";ctx.textAlign="center";ctx.fillText(revs[i].toFixed(1),x-barW/2,y-4);
+    ctx.fillStyle="#2563eb";ctx.font="9px sans-serif";ctx.textAlign="center";ctx.fillText(revs[i].toFixed(1),x-barW/2,y-4);
     bh=netps[i]/maxRev*(H-80);y=H-40-bh;
-    ctx.fillStyle="rgba(61,220,132,0.7)";ctx.fillRect(x,y,barW,bh);
-    ctx.fillStyle="#3ddc84";ctx.fillText(netps[i].toFixed(1),x+barW/2,y-4);
+    ctx.fillStyle="rgba(22,163,74,0.65)";ctx.fillRect(x,y,barW,bh);
+    ctx.fillStyle="#16a34a";ctx.fillText(netps[i].toFixed(1),x+barW/2,y-4);
   }
   function drawLine(vals,color,dashed){
     ctx.strokeStyle=color;ctx.lineWidth=2;if(dashed)ctx.setLineDash([4,3]);else ctx.setLineDash([]);
@@ -421,18 +420,18 @@ function drawTrend(financials){
     }
     ctx.stroke();ctx.setLineDash([]);
   }
-  drawLine(roes,"#ffd166",false);drawLine(gms,"#9aa4b2",true);
+  drawLine(roes,"#b45309",false);drawLine(gms,"#64748b",true);
   for(i=0;i<n;i++){
     x=60+i*groupW;var ry=H-40-(roes[i]/maxPct*(H-80));
-    ctx.fillStyle="#ffd166";ctx.beginPath();ctx.arc(x,ry,3,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle="#b45309";ctx.beginPath();ctx.arc(x,ry,3,0,Math.PI*2);ctx.fill();
     ctx.font="10px sans-serif";ctx.textAlign="center";ctx.fillText(roes[i]+"%",x,ry-8);
-    ctx.fillStyle="#6b7380";ctx.fillText(years[i],x,H-4);
+    ctx.fillStyle="#64748b";ctx.fillText(years[i],x,H-4);
   }
-  ctx.fillStyle="#7fb3ff";ctx.fillRect(60,H-20,10,10);
-  ctx.fillStyle="#8b93a1";ctx.font="10px sans-serif";ctx.textAlign="left";ctx.fillText("营收(亿)",74,H-11);
-  ctx.fillStyle="#3ddc84";ctx.fillRect(130,H-20,10,10);ctx.fillText("净利(亿)",144,H-11);
-  ctx.strokeStyle="#ffd166";ctx.beginPath();ctx.moveTo(210,H-15);ctx.lineTo(230,H-15);ctx.stroke();ctx.fillText("ROE%",234,H-11);
-  ctx.strokeStyle="#9aa4b2";ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(290,H-15);ctx.lineTo(310,H-15);ctx.stroke();ctx.setLineDash([]);ctx.fillText("毛利率%",314,H-11);
+  ctx.fillStyle="#2563eb";ctx.fillRect(60,H-20,10,10);
+  ctx.fillStyle="#64748b";ctx.font="10px sans-serif";ctx.textAlign="left";ctx.fillText("营收(亿)",74,H-11);
+  ctx.fillStyle="#16a34a";ctx.fillRect(130,H-20,10,10);ctx.fillText("净利(亿)",144,H-11);
+  ctx.strokeStyle="#b45309";ctx.beginPath();ctx.moveTo(210,H-15);ctx.lineTo(230,H-15);ctx.stroke();ctx.fillText("ROE%",234,H-11);
+  ctx.strokeStyle="#64748b";ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(290,H-15);ctx.lineTo(310,H-15);ctx.stroke();ctx.setLineDash([]);ctx.fillText("毛利率%",314,H-11);
 }
 
 window.addEventListener("resize",function(){
