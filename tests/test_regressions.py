@@ -243,6 +243,11 @@ class RegressionTests(unittest.TestCase):
         self.assertTrue(stock_deep_dive.should_prefetch_financials("always", 1, True))
         self.assertFalse(stock_deep_dive.should_prefetch_financials("never", 200, False))
 
+    def test_deepseek_defaults_to_pro_model(self):
+        import stock_deep_dive
+
+        self.assertEqual(stock_deep_dive.DEEPSEEK_MODEL, "deepseek-v4-pro")
+
     def test_deepseek_limiter_caps_concurrent_ai_calls(self):
         import stock_deep_dive
 

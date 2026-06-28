@@ -27,7 +27,7 @@ python3 astock_screener.py --year 2024 --top 60
 
 - 全市场筛选：财报/资产负债/商誉/历史净利使用 6 路并行，行情按 5 个板块并行抓取，并带 6 小时本地 cache。
 - 个股研报：默认 `--parallel 20` 按股票并发；全市场行情只抓一次并在线程间共享，避免每只股票重复开行情线程池。
-- DeepSeek：默认 `DEEPSEEK_MODEL=deepseek-v4-flash`，可改为 `deepseek-v4-pro`；`--ai-concurrency` 单独控制 AI 并发，默认 20。
+- DeepSeek：默认 `DEEPSEEK_MODEL=deepseek-v4-pro`；如需省成本/提速，可临时改为 `deepseek-v4-flash`。`--ai-concurrency` 单独控制 AI 并发，默认 20。
 - 快速补 AI：已有 `results/deep_dives/data/XXXXXX.json` 时可用 `--ai-only`，只调用 DeepSeek，不重抓财务、行情、K 线。
 - 跳过 AI：`--no-llm` 只生成量化数据；批量只看基本面时优先用这个。
 

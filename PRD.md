@@ -169,7 +169,7 @@ economy/
 
 ## 五、已知限制
 
-1. **AI 分析依赖 DeepSeek API Key**：需在 `~/.config/deepseek/api_key` 配置，无 key 时自动跳过；默认模型 `deepseek-v4-flash`，可用 `DEEPSEEK_MODEL=deepseek-v4-pro` 切换
+1. **AI 分析依赖 DeepSeek API Key**：需在 `~/.config/deepseek/api_key` 配置，无 key 时自动跳过；默认模型 `deepseek-v4-pro`，需要省成本/提速时可用 `DEEPSEEK_MODEL=deepseek-v4-flash` 临时切换
 2. **K线数据来自腾讯财经**：腾讯接口不稳定时 K 线图为空
 3. **金融股自然过滤**：银行/保险/券商被毛利≥30%+负债率<70% 自动排除，此选股框架不适用于金融股
 4. **5 年财务数据**：当前取最近 5 年年报，如需更长可修改 `annual_inc[-5:]` 参数
