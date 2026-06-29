@@ -28,6 +28,30 @@ function esc(v){
     .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
     .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
+function miniProgressMarkup(message){
+  return '<span>'+esc(message)+'</span><span class="mini-progress" aria-hidden="true"><span></span></span>';
+}
+function setInlineProgress(el,message){
+  if(!el)return;
+  el.classList.add("active");
+  el.innerHTML=miniProgressMarkup(message);
+}
+function clearInlineProgress(el,message){
+  if(!el)return;
+  el.classList.remove("active");
+  el.textContent=message||"";
+}
+function setLinkLoading(el,loading,label){
+  if(!el)return;
+  if(loading){
+    el.dataset.oldText=el.textContent;
+    el.classList.add("loading");
+    el.innerHTML=esc(label)+'<span class="mini-progress" aria-hidden="true"><span></span></span>';
+  }else{
+    el.classList.remove("loading");
+    el.textContent=el.dataset.oldText||label||el.textContent;
+  }
+}
 function isNum(v){return v!==null&&v!==undefined&&v!==""&&isFinite(Number(v))}
 function r(v,d){return isNum(v)?Number(v).toFixed(d===undefined?1:d):""}
 function rmb(v){
@@ -59,9 +83,10 @@ function showError(message){
   $("status").textContent=message;
   $("content").hidden=true;
 }
-function showStatus(message){
-  $("status").className="status";
-  $("status").textContent=message;
+function showStatus(message, working){
+  $("status").className=working?"status working":"status";
+  if(working)$("status").innerHTML=miniProgressMarkup(message);
+  else $("status").textContent=message;
   $("status").hidden=false;
   $("content").hidden=true;
 }
@@ -89,12 +114,12 @@ function generateMissingReport(code){
     showError("无法加载 data/"+code+".json。请通过 ./run.sh 启动本地 HTTP 服务后访问该页面。");
     return;
   }
-  showStatus("本地还没有这只股票的深度研报，正在生成 "+code+" …");
+  showStatus("本地还没有这只股票的深度研报，正在生成 "+code+" …",true);
   fetch(API+"/api/deep?code="+code)
     .then(function(r){return r.json()})
     .then(function(d){
       if(d.done){
-        showStatus("研报已生成，正在加载…");
+        showStatus("研报已生成，正在加载…",true);
         setTimeout(function(){location.reload()},600);
       }else{
         showError("生成 "+code+" 研报失败: "+(d.error||d.stderr||"未知错误"));
@@ -236,30 +261,30 @@ function renderAnalysis(data){
 function runAiAnalysis(code){
   var btn=$("aiAnalyzeBtn"), prog=$("aiProgress");
   if(!btn)return;
-  btn.disabled=true;btn.textContent="分析中…";prog.style.display="block";
+  btn.disabled=true;btn.textContent="分析中…";setInlineProgress(prog,"DeepSeek 分析中…");
   fetch(API+"/api/deep?code="+code)
     .then(function(r){return r.json()})
     .then(function(d){
-      if(d.done){prog.textContent="完成，正在刷新…";setTimeout(function(){location.reload()},600)}
-      else{prog.textContent="失败: "+(d.error||"未知");btn.disabled=false;btn.textContent="重试"}
+      if(d.done){setInlineProgress(prog,"完成，正在刷新…");setTimeout(function(){location.reload()},600)}
+      else{clearInlineProgress(prog,"失败: "+(d.error||"未知"));btn.disabled=false;btn.textContent="重试"}
     })
     .catch(function(){
-      prog.textContent="无法连接服务，请通过 ./run.sh 打开 HTTP 页面";
+      clearInlineProgress(prog,"无法连接服务，请通过 ./run.sh 打开 HTTP 页面");
       btn.disabled=false;btn.textContent="重试";
     });
 }
 
 function generatePeerReport(code, el){
-  el.textContent="...";
+  setLinkLoading(el,true,"生成中…");
   el.style.pointerEvents="none";
   fetch(API+"/api/deep?code="+code)
     .then(function(r){return r.json()})
     .then(function(d){
       if(d.done){location.href="report.html?code="+code}
-      else{el.textContent=code;el.style.pointerEvents="auto";alert("生成失败: "+(d.error||"未知"))}
+      else{setLinkLoading(el,false,code);el.style.pointerEvents="auto";alert("生成失败: "+(d.error||"未知"))}
     })
     .catch(function(){
-      el.textContent=code;el.style.pointerEvents="auto";
+      setLinkLoading(el,false,code);el.style.pointerEvents="auto";
       alert("无法连接本地服务，请通过 ./run.sh 打开 HTTP 页面");
     });
 }

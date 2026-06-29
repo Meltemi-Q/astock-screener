@@ -13,6 +13,7 @@ button.back{font:inherit;cursor:pointer}
 .back.muted{color:var(--muted)}
 .back:hover{border-color:var(--link);background:var(--surface-soft);text-decoration:none}
 .status{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;color:var(--muted)}
+.status.working{color:var(--text)}
 .status.error{border-color:var(--risk-border);background:var(--risk-bg);color:var(--red)}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr));gap:10px;margin-bottom:28px}
 .kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center;min-height:86px;box-shadow:var(--shadow)}
@@ -59,6 +60,11 @@ a:hover{text-decoration:underline}
 .ai-placeholder p{margin:0 0 10px}
 .ai-placeholder button{background:var(--surface-soft);border:1px solid var(--link);color:var(--link);padding:8px 20px;border-radius:7px;cursor:pointer;font-size:14px;font-weight:600}
 .ai-progress{margin-top:10px;display:none;color:var(--link);font-size:12px}
+.ai-progress.active{display:block}
+.mini-progress{display:block;height:6px;margin-top:8px;background:var(--surface-soft);border:1px solid var(--border);border-radius:999px;overflow:hidden}
+.mini-progress span{display:block;width:38%;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--link),var(--green));animation:miniProgressSlide 1.2s ease-in-out infinite}
+.deep-gen.loading{opacity:.72;text-decoration:none;pointer-events:none}
+@keyframes miniProgressSlide{0%{transform:translateX(-120%)}50%{transform:translateX(70%)}100%{transform:translateX(260%)}}
 .tip-k{margin-top:4px;padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:11px;color:var(--muted);text-align:center;line-height:1.5;min-height:20px}
 footer{margin-top:40px;padding:16px 0;border-top:1px solid var(--border);color:var(--muted);font-size:11px}
 @media(max-width:768px){

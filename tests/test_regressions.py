@@ -433,6 +433,36 @@ class RegressionTests(unittest.TestCase):
         self.assertIn('window.location.href="astock_screen.html"', main_source)
         self.assertNotIn("window.location.reload()},800", main_source)
 
+    def test_main_long_running_actions_show_progress_panel(self):
+        main_source = (ROOT / "astock_screener.py").read_text(encoding="utf-8")
+
+        self.assertIn('id="progressPanel"', main_source)
+        self.assertIn('role="progressbar"', main_source)
+        self.assertIn(".progress-panel", main_source)
+        self.assertIn("@keyframes progressSlide", main_source)
+        self.assertIn("function startProgress", main_source)
+        self.assertIn("function setProgress", main_source)
+        self.assertIn("function finishProgress", main_source)
+        self.assertIn('startProgress(loadingText', main_source)
+        self.assertIn('setProgress(pct,"Tier "+p.tier+" 定性分析"', main_source)
+        self.assertIn('progressTrack").setAttribute("aria-valuenow"', main_source)
+        self.assertIn("progressMetaBase", main_source)
+        self.assertIn("progressElapsedText()", main_source)
+
+    def test_deep_dive_long_running_actions_show_inline_progress(self):
+        report_js = (ROOT / "templates" / "deep_dive" / "assets" / "deep_dive.js").read_text(encoding="utf-8")
+        report_css = (ROOT / "templates" / "deep_dive" / "assets" / "deep_dive.css").read_text(encoding="utf-8")
+
+        self.assertIn(".status.working", report_css)
+        self.assertIn(".mini-progress", report_css)
+        self.assertIn(".deep-gen.loading", report_css)
+        self.assertIn("function miniProgressMarkup", report_js)
+        self.assertIn("function setInlineProgress", report_js)
+        self.assertIn("showStatus(message, working)", report_js)
+        self.assertIn('showStatus("本地还没有这只股票的深度研报，正在生成 "+code+" …",true)', report_js)
+        self.assertIn('setInlineProgress(prog,"DeepSeek 分析中…")', report_js)
+        self.assertIn('setLinkLoading(el,true,"生成中…")', report_js)
+
     def test_run_sh_opens_stable_screen_entrypoint(self):
         run_source = (ROOT / "run.sh").read_text(encoding="utf-8")
 

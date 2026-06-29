@@ -608,6 +608,14 @@ input:focus,select:focus{border-color:var(--link)}
 .chk{display:flex;align-items:center;gap:5px;color:var(--muted);cursor:pointer;user-select:none;min-height:34px}
 .toast{position:fixed;bottom:20px;right:20px;background:var(--toast-bg);border:1px solid var(--toast-border);border-radius:8px;padding:10px 16px;color:var(--green);font-size:12px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;max-width:min(520px,calc(100vw - 32px))}
 .toast.show{opacity:1}
+.progress-panel{margin:10px 20px 0;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;box-shadow:var(--shadow)}
+.progress-panel[hidden]{display:none}
+.progress-top{display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--muted);font-size:12px;margin-bottom:8px;flex-wrap:wrap}
+.progress-title{color:var(--text);font-weight:700}
+.progress-track{height:7px;background:var(--surface-soft);border:1px solid var(--border);border-radius:999px;overflow:hidden}
+.progress-bar{height:100%;width:0;background:linear-gradient(90deg,var(--link),var(--green));border-radius:999px;transition:width .25s ease}
+.progress-panel.indeterminate .progress-bar{width:38%;animation:progressSlide 1.2s ease-in-out infinite}
+@keyframes progressSlide{0%{transform:translateX(-120%)}50%{transform:translateX(70%)}100%{transform:translateX(260%)}}
 .wrap{overflow:auto;height:calc(100vh - 52px)}
 table{border-collapse:collapse;width:100%;white-space:nowrap}
 th{position:sticky;top:0;background:var(--head);color:var(--text);font-weight:600;padding:8px 10px;text-align:right;cursor:pointer;border-bottom:2px solid var(--border-strong);font-size:12px}
@@ -670,6 +678,10 @@ footer{padding:10px 20px;color:var(--muted);font-size:11px;border-top:1px solid 
 <button class="btn secondary" id="layer4Btn" title="对 Tier A 标的运行 DeepSeek AI 定性分析">🧠 定性分析</button>
 <span class="hint" id="refreshHint"></span>
 <span class="cnt" id="cnt"></span>
+</div>
+<div class="progress-panel" id="progressPanel" hidden>
+<div class="progress-top"><span class="progress-title" id="progressTitle">处理中…</span><span id="progressMeta">已用 0 秒</span></div>
+<div class="progress-track" id="progressTrack" role="progressbar" aria-label="任务进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="progress-bar" id="progressBar"></div></div>
 </div>
 <div class="toast" id="toast"></div>
 <div class="wrap"><table><thead><tr id="head"></tr></thead><tbody id="body"></tbody></table></div>
@@ -797,26 +809,69 @@ fetch(API+"/api/status").then(function(r){return r.json()}).then(function(d){
 function goStableEntry(){
  window.location.href="astock_screen.html";
 }
+var progressTimer=null,progressStartedAt=0,progressMetaBase="";
+function cleanProgressText(text){return String(text||"处理中…").replace(/^[⏳✅🧠↻⟳ ]+/,"")}
+function progressElapsedText(meta){
+ if(meta!==undefined)progressMetaBase=meta||"处理中";
+ var elapsed=Math.max(0,Math.floor((Date.now()-progressStartedAt)/1000));
+ return (progressMetaBase||"处理中")+" · 已用 "+elapsed+" 秒";
+}
+function startProgress(title,meta,indeterminate){
+ var panel=document.getElementById("progressPanel"),bar=document.getElementById("progressBar");
+ var track=document.getElementById("progressTrack");
+ progressStartedAt=Date.now();
+ panel.hidden=false;panel.classList.toggle("indeterminate",!!indeterminate);
+ document.getElementById("progressTitle").textContent=cleanProgressText(title);
+ document.getElementById("progressMeta").textContent=progressElapsedText(meta);
+ bar.style.width=indeterminate?"38%":"0%";
+ if(indeterminate){track.removeAttribute("aria-valuenow")}else{track.setAttribute("aria-valuenow","0")}
+ if(progressTimer)clearInterval(progressTimer);
+ progressTimer=setInterval(function(){
+  document.getElementById("progressMeta").textContent=progressElapsedText();
+ },1000);
+}
+function setProgress(pct,title,meta){
+ var panel=document.getElementById("progressPanel"),bar=document.getElementById("progressBar");
+ panel.hidden=false;panel.classList.remove("indeterminate");
+ pct=Math.max(0,Math.min(100,Math.round(pct||0)));
+ if(title)document.getElementById("progressTitle").textContent=cleanProgressText(title);
+ document.getElementById("progressMeta").textContent=progressElapsedText(meta);
+ bar.style.width=pct+"%";
+ document.getElementById("progressTrack").setAttribute("aria-valuenow",String(pct));
+}
+function finishProgress(title,meta){
+ if(progressTimer){clearInterval(progressTimer);progressTimer=null}
+ setProgress(100,title,meta||"完成");
+}
+function stopProgress(){
+ if(progressTimer){clearInterval(progressTimer);progressTimer=null}
+ document.getElementById("progressPanel").hidden=true;
+}
 function runRefresh(btnId,request,loadingText,doneText,resetText){
  var btn=document.getElementById(btnId);
  var toast=document.getElementById("toast");
  btn.textContent=loadingText;btn.disabled=true;
+ startProgress(loadingText,"等待本地服务返回",true);
  request().then(function(r){return r.json()}).then(function(d){
   if(d.done){
+   finishProgress(doneText,"即将打开最新总表");
    toast.textContent=doneText+"，正在打开最新总表…";
    toast.classList.add("show");
    setTimeout(goStableEntry,800);
   }else if(d.cached){
+   stopProgress();
    toast.textContent="⏳ "+(d.msg||"冷却中，稍后再试");
    toast.classList.add("show");
    setTimeout(function(){toast.classList.remove("show")},3000);
   }else{
+   stopProgress();
    toast.textContent="⚠️ 刷新失败: "+(d.error||"未知错误");
    toast.classList.add("show");
    setTimeout(function(){toast.classList.remove("show")},4000);
   }
-  btn.textContent=resetText;btn.disabled=false;
+ btn.textContent=resetText;btn.disabled=false;
  }).catch(function(e){
+  stopProgress();
   toast.textContent="⚠️ 无法连接本地服务，请通过 ./run.sh 打开 HTTP 页面";
   toast.classList.add("show");
   setTimeout(function(){toast.classList.remove("show")},4000);
@@ -836,21 +891,25 @@ document.getElementById("layer4Btn").addEventListener("click",function(){
  var toast=document.getElementById("toast");
  var tier=state.t==="all"?"A":(state.t==="x"?"A":state.t); // 全表/未通过默认跑 A
  btn.textContent="⏳ 启动中…";btn.disabled=true;
+ startProgress("Tier "+tier+" 定性分析","正在启动",true);
  toast.textContent="🧠 正在启动 Tier "+tier+" 定性分析…";
  toast.classList.add("show");
  fetch(API+"/api/layer4?tier="+tier).then(function(r){return r.json()}).then(function(d){
   if(d.msg){
    toast.textContent=d.msg+" 开始轮询进度…";
-   pollProgress();
+  pollProgress();
   }else if(d.done){
+   finishProgress("Tier "+tier+" 定性分析","即将打开最新总表");
    toast.textContent="✅ 分析完成！正在打开最新总表…";
    setTimeout(goStableEntry,1000);
   }else{
+   stopProgress();
    toast.textContent="⚠️ "+(d.msg||d.error||"未知错误");
    setTimeout(function(){toast.classList.remove("show")},4000);
   }
-  btn.textContent="🧠 定性分析";btn.disabled=false;
+ btn.textContent="🧠 定性分析";btn.disabled=false;
  }).catch(function(e){
+  stopProgress();
   toast.textContent="⚠️ 无法连接本地服务，请通过 ./run.sh 打开 HTTP 页面";
   setTimeout(function(){toast.classList.remove("show")},4000);
   btn.textContent="🧠 定性分析";btn.disabled=false;
@@ -866,15 +925,24 @@ function pollProgress(){
  pollTimer=setInterval(function(){
   fetch(API+"/api/status").then(function(r){return r.json()}).then(function(d){
    var p=d.progress;
-   if(!p){clearInterval(pollTimer);btn.textContent="🧠 定性分析";btn.disabled=false;return}
+   if(!p){clearInterval(pollTimer);stopProgress();btn.textContent="🧠 定性分析";btn.disabled=false;return}
+   if(p.failed){
+    clearInterval(pollTimer);stopProgress();
+    toast.textContent="⚠️ 定性分析失败，请重试";
+    toast.classList.add("show");
+    btn.textContent="🧠 定性分析";btn.disabled=false;
+    return;
+   }
    if(p.done===true){
     clearInterval(pollTimer);
+    finishProgress("Tier "+p.tier+" 定性分析","即将打开最新总表");
     toast.textContent="✅ 定性分析完成！正在打开最新总表…";
     toast.classList.add("show");
     btn.textContent="🧠 定性分析";btn.disabled=false;
-    setTimeout(goStableEntry,1000);
+   setTimeout(goStableEntry,1000);
    }else{
     var pct=p.target>0?Math.round(p.done/p.target*100):0;
+    setProgress(pct,"Tier "+p.tier+" 定性分析",p.done+"/"+p.target+" · "+p.eta);
     toast.textContent="🧠 Tier "+p.tier+" 分析中: "+p.done+"/"+p.target+" ("+pct+"%) · 已用"+p.elapsed+"秒 · "+p.eta;
     toast.classList.add("show");
    }
