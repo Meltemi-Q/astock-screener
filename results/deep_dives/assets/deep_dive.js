@@ -6,6 +6,23 @@ var crossIdx=-1;
 var tipK=null;
 
 function $(id){return document.getElementById(id)}
+function cssVar(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim()}
+function setTheme(theme){
+  document.documentElement.setAttribute("data-theme",theme);
+  localStorage.setItem("theme",theme);
+  var btn=$("themeToggle");
+  if(btn)btn.textContent=theme==="dark"?"☀️ 亮色":"🌙 暗色";
+  if(PAYLOAD){setTimeout(function(){drawKline();drawTrend(PAYLOAD.financials||[])},0)}
+}
+function initTheme(){
+  var saved=localStorage.getItem("theme");
+  if(!saved)saved=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";
+  setTheme(saved);
+  var btn=$("themeToggle");
+  if(btn)btn.addEventListener("click",function(){
+    setTheme(document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark");
+  });
+}
 function esc(v){
   return String(v===null||v===undefined?"":v)
     .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
@@ -438,6 +455,7 @@ window.addEventListener("resize",function(){
   if(PAYLOAD){drawKline();drawTrend(PAYLOAD.financials||[])}
 });
 document.addEventListener("DOMContentLoaded",function(){
+  initTheme();
   updateBackLinkFromStatus();
   loadReport();
 });

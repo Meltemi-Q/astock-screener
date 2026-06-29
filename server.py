@@ -86,7 +86,10 @@ class ScreenerHandler(SimpleHTTPRequestHandler):
 
         try:
             if path == "/api/refresh":
-                self._api_refresh(qs.get("fresh") == "1")
+                mode = qs.get("mode", "quotes")
+                if qs.get("fresh") == "1":
+                    mode = "full"
+                self._api_refresh(mode)
             elif path == "/api/deep":
                 self._api_deep(qs.get("code", ""))
             elif path == "/api/layer4":
@@ -111,22 +114,29 @@ class ScreenerHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         return True
 
-    def _api_refresh(self, fresh):
+    def _api_refresh(self, mode):
         global _last_run
         now = time.time()
         if now - _last_run < 5:
             self.send_json({"done": False, "cached": True, "msg": "冷却中，5秒后再试"})
             return
-        _last_run = now
         args = [sys.executable, os.path.join(WORKDIR, "astock_screener.py")]
-        if fresh:
+        if mode == "quotes":
+            args.append("--quotes-fresh")
+            label = "刷新行情"
+        elif mode == "full":
             args.append("--fresh")
+            label = "更新五层筛选"
+        else:
+            self.send_json({"error": "无效刷新模式"}, status=400)
+            return
+        _last_run = now
         try:
             result = subprocess.run(args, capture_output=True, text=True,
                                     timeout=120, cwd=WORKDIR)
-            self._send_process_result(result, "刷新数据")
+            self._send_process_result(result, label, {"mode": mode})
         except subprocess.TimeoutExpired:
-            self.send_json({"error": "刷新超时(>120s)"}, status=504)
+            self.send_json({"error": f"{label}超时(>120s)", "mode": mode}, status=504)
 
     def _api_deep(self, code):
         if not code or len(code) != 6 or not code.isdigit():

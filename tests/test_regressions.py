@@ -336,8 +336,83 @@ class RegressionTests(unittest.TestCase):
         main_source = (ROOT / "astock_screener.py").read_text(encoding="utf-8")
         deep_css = (ROOT / "templates" / "deep_dive" / "assets" / "deep_dive.css").read_text(encoding="utf-8")
 
-        self.assertIn("background:#f6f8fb;color:#172033", main_source)
-        self.assertIn("background:#f6f8fb;color:#172033", deep_css)
+        self.assertIn("--bg:#f6f8fb;--text:#172033", main_source)
+        self.assertIn("--bg:#f6f8fb;--text:#172033", deep_css)
+
+    def test_theme_toggle_exists_on_main_and_deep_pages(self):
+        main_source = (ROOT / "astock_screener.py").read_text(encoding="utf-8")
+        report_html = (ROOT / "templates" / "deep_dive" / "report.html").read_text(encoding="utf-8")
+        report_js = (ROOT / "templates" / "deep_dive" / "assets" / "deep_dive.js").read_text(encoding="utf-8")
+        report_css = (ROOT / "templates" / "deep_dive" / "assets" / "deep_dive.css").read_text(encoding="utf-8")
+        index_source = (ROOT / "stock_deep_dive.py").read_text(encoding="utf-8")
+
+        self.assertIn('id="themeToggle"', main_source)
+        self.assertIn('localStorage.setItem("theme"', main_source)
+        self.assertIn(':root[data-theme="dark"]', main_source)
+        self.assertIn('id="themeToggle"', report_html)
+        self.assertIn('localStorage.setItem("theme"', report_js)
+        self.assertIn(':root[data-theme="dark"]', report_css)
+        self.assertIn('id="themeToggle"', index_source)
+
+    def test_dashboard_controls_and_leaderboard_are_responsive(self):
+        source = (ROOT / "astock_screener.py").read_text(encoding="utf-8")
+
+        self.assertIn(".leaderboard{display:flex;flex-direction:column;gap:6px;font-size:12px;overflow:visible}", source)
+        self.assertNotIn("max-height:170px;overflow-y:auto", source)
+        self.assertIn(".controls input#q{flex:1 1 160px;min-width:140px;max-width:220px}", source)
+        self.assertIn("input[type=checkbox]{min-height:auto;width:auto;padding:0}", source)
+        self.assertIn("@media(max-width:720px)", source)
+
+    def test_refresh_actions_distinguish_quotes_and_full_screening(self):
+        main_source = (ROOT / "astock_screener.py").read_text(encoding="utf-8")
+        server_source = (ROOT / "server.py").read_text(encoding="utf-8")
+
+        self.assertIn('id="quotesRefreshBtn"', main_source)
+        self.assertIn('id="fullRefreshBtn"', main_source)
+        self.assertIn('fetch(API+"/api/refresh?mode=quotes")', main_source)
+        self.assertIn('fetch(API+"/api/refresh?mode=full")', main_source)
+        self.assertIn('--quotes-fresh', server_source)
+        self.assertIn('qs.get("mode", "quotes")', server_source)
+        self.assertIn('id="refreshHint"', main_source)
+        self.assertIn('盘后适合更新五层筛选', main_source)
+        self.assertIn('盘后：适合更新五层筛选', main_source)
+
+    def test_server_refresh_mode_maps_to_expected_screener_args(self):
+        import server
+
+        handler = server.ScreenerHandler.__new__(server.ScreenerHandler)
+        captured = []
+
+        def send_json(data, status=200):
+            captured.append((data, status))
+
+        def fake_run(args, **kwargs):
+            captured.append(("args", args))
+            return subprocess.CompletedProcess(args=args, returncode=0, stdout="ok", stderr="")
+
+        handler.send_json = send_json
+        old_last_run = server._last_run
+        try:
+            with patch.object(server.subprocess, "run", side_effect=fake_run):
+                server._last_run = 0
+                handler._api_refresh("quotes")
+                server._last_run = 0
+                handler._api_refresh("full")
+
+            quote_args = captured[0][1]
+            full_args = captured[2][1]
+            self.assertIn("--quotes-fresh", quote_args)
+            self.assertNotIn("--fresh", quote_args)
+            self.assertIn("--fresh", full_args)
+        finally:
+            server._last_run = old_last_run
+
+    def test_quotes_fresh_bypasses_only_spot_cache(self):
+        source = (ROOT / "astock_screener.py").read_text(encoding="utf-8")
+
+        self.assertIn('ap.add_argument("--quotes-fresh"', source)
+        self.assertIn("FORCE_SPOT_REFRESH = True", source)
+        self.assertIn("ttl_hours=0 if FORCE_SPOT_REFRESH else CONFIG", source)
 
     def test_fetch_stock_full_uses_shared_spot_cache_without_refetching_market_data(self):
         import stock_deep_dive

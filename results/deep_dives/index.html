@@ -4,30 +4,33 @@
 	<title>个股深度研报索引 | 五层选股</title>
 	<style>
 	*{box-sizing:border-box}
-	body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#f6f8fb;color:#172033;font-size:13px}
+	:root{color-scheme:light;--bg:#f6f8fb;--text:#172033;--heading:#0f172a;--muted:#64748b;--surface:#fff;--surface-soft:#f8fafc;--border:#dbe4f0;--border-strong:#cbd5e1;--head:#eef2f7;--link:#2563eb;--hover:#f8fbff}
+	:root[data-theme="dark"]{color-scheme:dark;--bg:#0f1115;--text:#e6e8eb;--heading:#f8fafc;--muted:#9aa4b2;--surface:#131820;--surface-soft:#1a1f29;--border:#232936;--border-strong:#2a3140;--head:#1a1f29;--link:#7fb3ff;--hover:#161b24}
+	body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);font-size:13px}
 	.container{max-width:1120px;margin:0 auto;padding:24px 20px}
 	.topbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:22px}
-	.nav-link{display:inline-flex;align-items:center;min-height:34px;padding:6px 12px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;color:#2563eb;text-decoration:none;font-weight:600}
-	.nav-link.muted{color:#64748b}
-	.nav-link:hover{background:#eff6ff;border-color:#2563eb;text-decoration:none}
-	h1{font-size:24px;margin:0 0 4px;color:#0f172a}
-	.sub{color:#64748b;font-size:12px;margin-bottom:20px}
-	.table-wrap{overflow:auto;background:#fff;border:1px solid #dbe4f0;border-radius:8px}
+	.nav-link{display:inline-flex;align-items:center;min-height:34px;padding:6px 12px;border:1px solid var(--border-strong);border-radius:7px;background:var(--surface);color:var(--link);text-decoration:none;font-weight:600;font:inherit;cursor:pointer}
+	.nav-link.muted{color:var(--muted)}
+	.nav-link:hover{background:var(--surface-soft);border-color:var(--link);text-decoration:none}
+	h1{font-size:24px;margin:0 0 4px;color:var(--heading)}
+	.sub{color:var(--muted);font-size:12px;margin-bottom:20px}
+	.table-wrap{overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:8px}
 	table{width:100%;border-collapse:collapse}
-	th{background:#eef2f7;color:#475569;padding:9px 12px;text-align:left;border-bottom:2px solid #cbd5e1;position:sticky;top:0;font-size:12px}
-	td{padding:7px 12px;border-bottom:1px solid #e2e8f0}
-	tr:hover td{background:#f8fbff}
-	a{color:#2563eb;text-decoration:none}
+	th{background:var(--head);color:var(--muted);padding:9px 12px;text-align:left;border-bottom:2px solid var(--border-strong);position:sticky;top:0;font-size:12px}
+	td{padding:7px 12px;border-bottom:1px solid var(--border)}
+	tr:hover td{background:var(--hover)}
+	a{color:var(--link);text-decoration:none}
 	a:hover{text-decoration:underline}
-	.code{color:#2563eb;font-variant-numeric:tabular-nums}
+	.code{color:var(--link);font-variant-numeric:tabular-nums}
 	.badge{display:inline-block;min-width:20px;text-align:center;border-radius:4px;padding:1px 6px;font-weight:700;font-size:11px}
 	.bA{background:#dcfce7;color:#166534}.bB{background:#fef3c7;color:#92400e}.bC{background:#e2e8f0;color:#475569}
-	footer{margin-top:30px;color:#64748b;font-size:11px;border-top:1px solid #dbe4f0;padding-top:12px}
+	footer{margin-top:30px;color:var(--muted);font-size:11px;border-top:1px solid var(--border);padding-top:12px}
 	</style></head><body>
 	<div class="container">
 	<nav class="topbar">
 	    <a id="backLink" href="../astock_screen_20260628.html" class="nav-link">← 选股总表</a>
 	    <a href="report.html?code=688336" class="nav-link muted">首只研报</a>
+	    <button id="themeToggle" type="button" class="nav-link muted" title="切换暗色/亮色主题">🌙 暗色</button>
 	</nav>
 	<h1>🔬 个股深度研报</h1>
 	<div class="sub">共 301 只 · 🤖 = DeepSeek AI 定性分析 · 点击名称查看详情</div>
@@ -3654,6 +3657,20 @@
 	</div>
 	<script>
 	var API=window.location.protocol==="file:"?"http://localhost:8899":window.location.origin;
+	function setTheme(theme){
+	  document.documentElement.setAttribute("data-theme",theme);
+	  localStorage.setItem("theme",theme);
+	  var btn=document.getElementById("themeToggle");
+	  if(btn)btn.textContent=theme==="dark"?"☀️ 亮色":"🌙 暗色";
+	}
+	(function(){
+	  var saved=localStorage.getItem("theme");
+	  if(!saved)saved=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";
+	  setTheme(saved);
+	  document.getElementById("themeToggle").addEventListener("click",function(){
+	    setTheme(document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark");
+	  });
+	})();
 	if(window.location.protocol!=="file:"){
 	  fetch(API+"/api/status").then(function(r){return r.json()}).then(function(d){
 	    if(d.latest_ts)document.getElementById("backLink").href="../astock_screen_"+d.latest_ts+".html";

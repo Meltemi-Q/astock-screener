@@ -82,6 +82,7 @@ SSL_CTX.check_hostname = False
 SSL_CTX.verify_mode = ssl.CERT_NONE  # 公开只读行情数据，免证书校验以规避 macOS 自带 python 证书问题
 
 USE_CACHE = True  # 由命令行 --fresh 控制
+FORCE_SPOT_REFRESH = False  # --quotes-fresh 只强制刷新行情缓存，财报缓存继续复用
 
 # ============================================================
 # 二、网络层（urllib + 重试 + 本地缓存）
@@ -166,7 +167,7 @@ def fetch_spot():
         while True:
             url = (f"{host}?pn={pn}&pz={pz}&po=1&np=1&fltt=2&invt=2&fid=f12"
                    f"&fs={fs}&fields={SPOT_FIELDS}")
-            data = (get_json(url, ttl_hours=CONFIG["cache_hours"]).get("data")) or {}
+            data = (get_json(url, ttl_hours=0 if FORCE_SPOT_REFRESH else CONFIG["cache_hours"]).get("data")) or {}
             if total is None:
                 total = data.get("total") or 0
             diff = data.get("diff") or []
@@ -191,14 +192,13 @@ def fetch_spot_parallel():
     host = "https://push2delay.eastmoney.com/api/qt/clist/get"
     pz = 100
     all_out = {}
-
     def _fetch_board(fs, bname):
         out = {}
         pn, total = 1, None
         while True:
             url = (f"{host}?pn={pn}&pz={pz}&po=1&np=1&fltt=2&invt=2&fid=f12"
                    f"&fs={fs}&fields={SPOT_FIELDS}")
-            data = (get_json(url, ttl_hours=CONFIG["cache_hours"]).get("data")) or {}
+            data = (get_json(url, ttl_hours=0 if FORCE_SPOT_REFRESH else CONFIG["cache_hours"]).get("data")) or {}
             if total is None:
                 total = data.get("total") or 0
             diff = data.get("diff") or []
@@ -560,67 +560,79 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 <title>A股五层选股结果</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#f6f8fb;color:#172033;font-size:13px}
-header{padding:16px 20px;background:linear-gradient(135deg,#ffffff,#eef4ff);border-bottom:1px solid #dbe4f0}
+:root{color-scheme:light;--bg:#f6f8fb;--text:#172033;--heading:#0f172a;--muted:#64748b;--surface:#fff;--surface-soft:#f8fafc;--band:#eef4f8;--header-a:#ffffff;--header-b:#eef4ff;--border:#dbe4f0;--border-strong:#cbd5e1;--head:#eef2f7;--link:#2563eb;--green:#16a34a;--yellow:#b45309;--red:#dc2626;--hover:#f8fbff;--warn:#fff7ed;--warn-hover:#ffedd5;--tag:#f1f5f9;--toast-bg:#ecfdf5;--toast-border:#86efac;--shadow:0 1px 2px rgba(15,23,42,.04)}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#0f1115;--text:#e6e8eb;--heading:#f8fafc;--muted:#9aa4b2;--surface:#131820;--surface-soft:#1a1f29;--band:#0d1117;--header-a:#161a22;--header-b:#0f1115;--border:#232936;--border-strong:#2a3140;--head:#1a1f29;--link:#7fb3ff;--green:#3ddc84;--yellow:#ffd166;--red:#ff6b6b;--hover:#161b24;--warn:#1f1a12;--warn-hover:#26200f;--tag:#1c1f26;--toast-bg:#1a2a1a;--toast-border:#3ddc84;--shadow:none}
+body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);font-size:13px}
+header{padding:16px 20px;background:linear-gradient(135deg,var(--header-a),var(--header-b));border-bottom:1px solid var(--border)}
+.head-main{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
 h1{margin:0 0 4px;font-size:18px}
-.sub{color:#64748b;font-size:12px}
+.sub{color:var(--muted);font-size:12px}
 /* Dashboard */
-.dash{padding:16px 20px;background:#eef4f8;border-bottom:1px solid #dbe4f0;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
-.dash-card{background:#fff;border:1px solid #dbe4f0;border-radius:8px;padding:14px;overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,.04)}
-.dash-card h3{margin:0 0 10px;font-size:13px;color:#475569;font-weight:600}
+.dash{padding:16px 20px;background:var(--band);border-bottom:1px solid var(--border);display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;align-items:stretch}
+.dash-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;overflow:hidden;box-shadow:var(--shadow)}
+.dash-card h3{margin:0 0 10px;font-size:13px;color:var(--muted);font-weight:600}
 .dash-card canvas{width:100%;height:210px}
 .kpi-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
-.kpi{background:#f8fafc;border:1px solid #dbe4f0;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;flex:1}
+.kpi{background:var(--surface-soft);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;flex:1}
 .kpi .val{font-size:22px;font-weight:700;line-height:1.2}
-.kpi .lbl{font-size:10px;color:#64748b;margin-top:2px}
-.kpi.A .val{color:#16a34a}.kpi.B .val{color:#b45309}.kpi.C .val{color:#475569}.kpi.X .val{color:#94a3b8}
-.leaderboard{display:flex;flex-direction:column;gap:4px;font-size:11px;max-height:170px;overflow-y:auto}
+.kpi .lbl{font-size:10px;color:var(--muted);margin-top:2px}
+.kpi.A .val{color:var(--green)}.kpi.B .val{color:var(--yellow)}.kpi.C .val{color:var(--muted)}.kpi.X .val{color:var(--muted)}
+.leaderboard{display:flex;flex-direction:column;gap:6px;font-size:12px;overflow:visible}
 .lb-row{display:flex;align-items:center;gap:8px;padding:3px 6px;border-radius:4px}
-.lb-row:hover{background:#f1f5f9}
-.lb-rank{width:20px;text-align:center;font-weight:700;color:#64748b}
-.lb-rank.r1{color:#b45309}.lb-rank.r2{color:#64748b}.lb-rank.r3{color:#92400e}
+.lb-row:hover{background:var(--hover)}
+.lb-rank{width:20px;text-align:center;font-weight:700;color:var(--muted)}
+.lb-rank.r1{color:var(--yellow)}.lb-rank.r2{color:var(--muted)}.lb-rank.r3{color:#92400e}
 .lb-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lb-code{color:#2563eb;font-variant-numeric:tabular-nums;width:64px}
-.lb-score{font-weight:700;color:#16a34a;width:40px;text-align:right}
+.lb-code{color:var(--link);font-variant-numeric:tabular-nums;width:64px;flex:0 0 64px}
+.lb-score{font-weight:700;color:var(--green);width:42px;text-align:right;flex:0 0 42px}
 .lb-tag{font-size:10px;padding:1px 5px;border-radius:3px;font-weight:700}
 .lb-tag.a{background:#dcfce7;color:#166534}.lb-tag.b{background:#fef3c7;color:#92400e}
 .funnel{display:flex;gap:0;height:170px;align-items:flex-end;padding:18px 6px 40px}
 .funnel-bar{flex:1;border-radius:5px 5px 0 0;position:relative;min-width:36px;margin:0 2px;transition:all .3s}
 .funnel-bar:hover{filter:brightness(1.3)}
 .funnel-val{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:700;white-space:nowrap}
-.funnel-lbl{position:absolute;bottom:-22px;left:50%;transform:translateX(-50%);font-size:10px;color:#64748b;text-align:center;white-space:nowrap}
+.funnel-lbl{position:absolute;bottom:-22px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--muted);text-align:center;white-space:nowrap}
 /* Controls */
-.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 20px;background:#fff;border-bottom:1px solid #dbe4f0;position:sticky;top:0;z-index:20;box-shadow:0 1px 2px rgba(15,23,42,.04)}
-input,select{background:#fff;border:1px solid #cbd5e1;color:#172033;border-radius:7px;padding:7px 10px;font-size:13px;outline:none}
-input:focus,select:focus{border-color:#2563eb}
-.btn{cursor:pointer;background:#f8fafc;border:1px solid #cbd5e1;color:#334155;border-radius:7px;padding:7px 12px;font-size:12px}
-.btn.on{background:#2563eb;border-color:#2563eb;color:#fff}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 20px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20;box-shadow:var(--shadow)}
+.controls input#q{flex:1 1 160px;min-width:140px;max-width:220px}
+input,select{background:var(--surface);border:1px solid var(--border-strong);color:var(--text);border-radius:7px;padding:7px 10px;font-size:13px;outline:none;min-height:34px}
+input[type=checkbox]{min-height:auto;width:auto;padding:0}
+input:focus,select:focus{border-color:var(--link)}
+.btn{cursor:pointer;background:var(--surface-soft);border:1px solid var(--border-strong);color:var(--text);border-radius:7px;padding:7px 12px;font-size:12px;min-height:34px;white-space:nowrap}
+.btn.on{background:var(--link);border-color:var(--link);color:#fff}
 .btn.refresh{background:#ecfdf5;border-color:#bbf7d0;color:#15803d}
-.chk{display:flex;align-items:center;gap:5px;color:#475569;cursor:pointer;user-select:none}
-.toast{position:fixed;bottom:20px;right:20px;background:#ecfdf5;border:1px solid #86efac;border-radius:8px;padding:10px 16px;color:#15803d;font-size:12px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none}
+:root[data-theme="dark"] .btn.refresh{background:#1d3320;border-color:#1e3e1e;color:#3ddc84}
+.btn.secondary{background:#eff6ff;border-color:#bfdbfe;color:#2563eb}
+:root[data-theme="dark"] .btn.secondary{background:#1d2033;border-color:#1e2340;color:#7fb3ff}
+.chk{display:flex;align-items:center;gap:5px;color:var(--muted);cursor:pointer;user-select:none;min-height:34px}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--toast-bg);border:1px solid var(--toast-border);border-radius:8px;padding:10px 16px;color:var(--green);font-size:12px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;max-width:min(520px,calc(100vw - 32px))}
 .toast.show{opacity:1}
 .wrap{overflow:auto;height:calc(100vh - 52px)}
 table{border-collapse:collapse;width:100%;white-space:nowrap}
-th{position:sticky;top:0;background:#eef2f7;color:#334155;font-weight:600;padding:8px 10px;text-align:right;cursor:pointer;border-bottom:2px solid #cbd5e1;font-size:12px}
+th{position:sticky;top:0;background:var(--head);color:var(--text);font-weight:600;padding:8px 10px;text-align:right;cursor:pointer;border-bottom:2px solid var(--border-strong);font-size:12px}
 th.l,td.l{text-align:left}
-th:hover{color:#0f172a}
-td{padding:6px 10px;text-align:right;border-bottom:1px solid #e2e8f0}
-tr:hover td{background:#f8fbff}
-tr.warn td{background:#fff7ed}
-tr.warn:hover td{background:#ffedd5}
+th:hover{color:var(--heading)}
+td{padding:6px 10px;text-align:right;border-bottom:1px solid var(--border)}
+tr:hover td{background:var(--hover)}
+tr.warn td{background:var(--warn)}
+tr.warn:hover td{background:var(--warn-hover)}
 .badge{display:inline-block;min-width:18px;text-align:center;border-radius:5px;padding:1px 6px;font-weight:700;font-size:11px}
-.bA{background:#dcfce7;color:#166534}.bB{background:#fef3c7;color:#92400e}.bC{background:#e2e8f0;color:#475569}.b-{background:#f1f5f9;color:#94a3b8}
-.pos{color:#16a34a}.neg{color:#dc2626}
-.code{color:#2563eb;font-variant-numeric:tabular-nums}
-.code.pending{color:#64748b}
-.note{color:#b45309;font-size:11px;text-align:left;max-width:320px;white-space:normal}
-.cnt{color:#64748b;font-size:12px;margin-left:auto}
-footer{padding:10px 20px;color:#64748b;font-size:11px;border-top:1px solid #dbe4f0}
-@media(max-width:768px){.dash{grid-template-columns:1fr}}
+.bA{background:#dcfce7;color:#166534}.bB{background:#fef3c7;color:#92400e}.bC{background:#e2e8f0;color:#475569}.b-{background:var(--tag);color:var(--muted)}
+.pos{color:var(--green)}.neg{color:var(--red)}
+.code{color:var(--link);font-variant-numeric:tabular-nums}
+.code.pending{color:var(--muted)}
+.note{color:var(--yellow);font-size:11px;text-align:left;max-width:320px;white-space:normal}
+.cnt{color:var(--muted);font-size:12px;margin-left:auto}
+.hint{color:var(--muted);font-size:12px;white-space:nowrap}
+footer{padding:10px 20px;color:var(--muted);font-size:11px;border-top:1px solid var(--border)}
+@media(max-width:720px){.dash{grid-template-columns:1fr;padding:12px}.controls{align-items:stretch}.controls .btn,.controls select,.controls .chk{flex:1 1 auto}.controls input#q{max-width:none;flex-basis:100%}.cnt{flex-basis:100%;margin-left:0}.head-main{align-items:flex-start}.theme-btn{margin-left:0}}
 </style></head><body>
 <header>
-<h1>A股「五层选股流水线」结果 <span id="svrStatus" style="font-size:11px;color:#64748b"></span></h1>
-<div class="sub" id="sub"></div>
+<div class="head-main">
+<div><h1>A股「五层选股流水线」结果 <span id="svrStatus" style="font-size:11px;color:var(--muted)"></span></h1>
+<div class="sub" id="sub"></div></div>
+<button class="btn theme-btn" id="themeToggle" title="切换暗色/亮色主题">🌙 暗色</button>
+</div>
 </header>
 <!-- Dashboard -->
 <div class="dash" id="dash">
@@ -643,17 +655,19 @@ footer{padding:10px 20px;color:#64748b;font-size:11px;border-top:1px solid #dbe4
 </div>
 <!-- Controls -->
 <div class="controls">
-<input id="q" placeholder="搜索代码/名称…" style="width:160px">
-<button class="btn on" data-t="all">全部</button>
-<button class="btn" data-t="A">🟢A 可买入</button>
-<button class="btn" data-t="B">🟡B 优质待跌</button>
-<button class="btn" data-t="C">⚪C 接近</button>
-<button class="btn" data-t="x">未通过</button>
+<input id="q" placeholder="搜索代码/名称…">
+<button class="btn filter-btn on" data-t="all">全部</button>
+<button class="btn filter-btn" data-t="A">🟢A 可买入</button>
+<button class="btn filter-btn" data-t="B">🟡B 优质待跌</button>
+<button class="btn filter-btn" data-t="C">⚪C 接近</button>
+<button class="btn filter-btn" data-t="x">未通过</button>
 <select id="ind"></select>
 <label class="chk"><input type="checkbox" id="warn">仅看⚠风险</label>
 <label class="chk"><input type="checkbox" id="pass">仅通过排雷(第0层)</label>
-<button class="btn refresh" id="refreshBtn" title="重新运行选股脚本，刷新价格、估值、财务和筛选评分">🔄 刷新指标</button>
-<button class="btn refresh" id="layer4Btn" title="对 Tier A 标的运行 DeepSeek AI 定性分析" style="background:#eff6ff;border-color:#bfdbfe;color:#2563eb">🧠 定性分析</button>
+<button class="btn refresh" id="quotesRefreshBtn" title="只刷新全市场行情、价格与估值，财报基础数据继续使用缓存，适合盘中查看估值变化">↻ 刷新行情</button>
+<button class="btn secondary" id="fullRefreshBtn" title="重新抓取并计算全市场五层筛选；盘后适合更新五层筛选">⟳ 更新五层筛选</button>
+<button class="btn secondary" id="layer4Btn" title="对 Tier A 标的运行 DeepSeek AI 定性分析">🧠 定性分析</button>
+<span class="hint" id="refreshHint"></span>
 <span class="cnt" id="cnt"></span>
 </div>
 <div class="toast" id="toast"></div>
@@ -669,8 +683,34 @@ var COLS=[["rk","#","n"],["tier","档","s"],["code","代码","s"],["name","名�
 var state={t:"all",q:"",ind:"",warn:false,pass:false,sk:"sc",sd:-1};
 var API=window.location.protocol==="file:"?"http://localhost:8899":window.location.origin;
 function fmt(v){return v===null||v===undefined?"":v}
+function cssVar(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim()}
+function setTheme(theme){
+ document.documentElement.setAttribute("data-theme",theme);
+ localStorage.setItem("theme",theme);
+ var btn=document.getElementById("themeToggle");
+ if(btn)btn.textContent=theme==="dark"?"☀️ 亮色":"🌙 暗色";
+ setTimeout(function(){drawScoreChart();drawIndChart()},0);
+}
+function initTheme(){
+ var saved=localStorage.getItem("theme");
+ if(!saved)saved=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";
+ setTheme(saved);
+ document.getElementById("themeToggle").addEventListener("click",function(){
+  setTheme(document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark");
+ });
+}
+initTheme();
+function updateRefreshHint(){
+ var now=new Date(),day=now.getDay(),mins=now.getHours()*60+now.getMinutes();
+ var weekday=day>=1&&day<=5;
+ var inSession=weekday&&((mins>=9*60+30&&mins<=11*60+30)||(mins>=13*60&&mins<=15*60));
+ var afterClose=weekday&&mins>15*60;
+ var hint=inSession?"盘中：优先刷新行情":(afterClose?"盘后：适合更新五层筛选":"非交易时段：适合更新五层筛选");
+ var el=document.getElementById("refreshHint");if(el)el.textContent=hint;
+}
+updateRefreshHint();
 document.getElementById("sub").innerHTML=META.year+"年报口径 · 生成于 "+META.ts+" · 全市场评估 "+META.total+" 只"
-  +(META.hasDeep?' · <a href="deep_dives/index.html" style="color:#2563eb">🔬 深度研报 ('+META.deepCount+'只)</a>':'');
+  +(META.hasDeep?' · <a href="deep_dives/index.html" style="color:var(--link)">🔬 深度研报 ('+META.deepCount+'只)</a>':'');
 
 // ---- Dashboard rendering ----
 function drawScoreChart(){
@@ -680,12 +720,12 @@ function drawScoreChart(){
  var ctx=cv.getContext("2d");ctx.scale(2,2);
  var bins=META.scoreBins,keys=Object.keys(bins),vals=Object.values(bins);
  var max=Math.max.apply(null,vals),barW=(W-40)/keys.length;
- var colors=["#cbd5e1","#94a3b8","#64748b","#93c5fd","#2563eb","#16a34a","#facc15","#f97316"];
+ var colors=["#cbd5e1","#94a3b8","#64748b","#93c5fd",cssVar("--link"),cssVar("--green"),"#facc15","#f97316"];
  ctx.clearRect(0,0,W,H);
  for(var i=0;i<vals.length;i++){
   var bh=vals[i]/max*(H-30),x=20+i*barW,y=H-15-bh;
   ctx.fillStyle=colors[i];ctx.fillRect(x+2,y,barW-4,bh);
-  ctx.fillStyle="#64748b";ctx.font="10px sans-serif";ctx.textAlign="center";
+  ctx.fillStyle=cssVar("--muted");ctx.font="10px sans-serif";ctx.textAlign="center";
   ctx.fillText(vals[i],x+barW/2,y-4);
   ctx.fillText(keys[i],x+barW/2,H-2);
  }
@@ -697,22 +737,22 @@ function drawIndChart(){
  var ctx=cv.getContext("2d");ctx.scale(2,2);
  var visibleCount=W<420?6:8;
  var inds=META.topInds.slice(0,visibleCount);
- if(!inds.length){ctx.fillStyle="#64748b";ctx.font="12px sans-serif";ctx.textAlign="center";ctx.fillText("暂无 A+B 行业分布",W/2,H/2);return}
+ if(!inds.length){ctx.fillStyle=cssVar("--muted");ctx.font="12px sans-serif";ctx.textAlign="center";ctx.fillText("暂无 A+B 行业分布",W/2,H/2);return}
  var max=inds[0][1],barW=(W-70)/inds.length;
  var colors=["#22c55e","#3b82f6","#facc15","#60a5fa","#f97316","#c084fc","#94a3b8","#64748b"];
  ctx.clearRect(0,0,W,H);
  for(var i=0;i<inds.length;i++){
   var bh=inds[i][1]/max*(H-labelPad-12),x=50+i*barW,y=H-labelPad-bh;
   ctx.fillStyle=colors[i];ctx.fillRect(x+2,y,barW-4,bh);
-  ctx.fillStyle="#172033";ctx.font="11px sans-serif";ctx.textAlign="center";
+  ctx.fillStyle=cssVar("--text");ctx.font="11px sans-serif";ctx.textAlign="center";
   ctx.fillText(inds[i][1],x+barW/2,y-4);
   ctx.save();ctx.translate(x+barW/2,H-labelPad+58);ctx.rotate(-0.58);
-  ctx.fillStyle="#64748b";ctx.font="10px sans-serif";ctx.fillText(inds[i][0],0,0);ctx.restore();
+  ctx.fillStyle=cssVar("--muted");ctx.font="10px sans-serif";ctx.fillText(inds[i][0],0,0);ctx.restore();
  }
 }
 function renderFunnel(){
  var layers=["第0排雷","第1质量","第2估值","第3安全","第4定性"],values=[META.funnel[0],META.funnel[1],META.funnel[2],META.funnel[3],META.funnel[4]],
-  colors=["#94a3b8","#2563eb","#60a5fa","#facc15","#22c55e"],
+  colors=["#94a3b8",cssVar("--link"),"#60a5fa","#facc15","#22c55e"],
   max=META.total,html="";
  document.getElementById("dtotal").textContent=META.total;
  for(var i=0;i<layers.length;i++){
@@ -744,22 +784,22 @@ window.addEventListener("resize",function(){drawScoreChart();drawIndChart()});
 fetch(API+"/api/status").then(function(r){return r.json()}).then(function(d){
  var el=document.getElementById("svrStatus");
  if(d.latest_ts){
-  el.innerHTML='<span style="color:#16a34a">●</span> 已连接 ('+d.deep_count+'只研报)';
+  el.innerHTML='<span style="color:var(--green)">●</span> 已连接 ('+d.deep_count+'只研报)';
  }else{
-  el.innerHTML='<span style="color:#dc2626">●</span> 离线';
+  el.innerHTML='<span style="color:var(--red)">●</span> 离线';
  }
 }).catch(function(){
- document.getElementById("svrStatus").innerHTML='<span style="color:#dc2626">●</span> 离线';
+ document.getElementById("svrStatus").innerHTML='<span style="color:var(--red)">●</span> 离线';
 });
 
-// ---- Refresh button ----
-document.getElementById("refreshBtn").addEventListener("click",function(){
- var btn=document.getElementById("refreshBtn");
- btn.textContent="⏳ 刷新中...";btn.disabled=true;
+// ---- Refresh actions ----
+function runRefresh(btnId,request,loadingText,doneText,resetText){
+ var btn=document.getElementById(btnId);
  var toast=document.getElementById("toast");
- fetch(API+"/api/refresh?fresh=1").then(function(r){return r.json()}).then(function(d){
+ btn.textContent=loadingText;btn.disabled=true;
+ request().then(function(r){return r.json()}).then(function(d){
   if(d.done){
-   toast.textContent="✅ 数据已刷新，正在重载页面…";
+   toast.textContent=doneText+"，正在重载页面…";
    toast.classList.add("show");
    setTimeout(function(){window.location.reload()},800);
   }else if(d.cached){
@@ -771,13 +811,19 @@ document.getElementById("refreshBtn").addEventListener("click",function(){
    toast.classList.add("show");
    setTimeout(function(){toast.classList.remove("show")},4000);
   }
-  btn.textContent="🔄 刷新指标";btn.disabled=false;
+  btn.textContent=resetText;btn.disabled=false;
  }).catch(function(e){
   toast.textContent="⚠️ 无法连接本地服务，请通过 ./run.sh 打开 HTTP 页面";
   toast.classList.add("show");
   setTimeout(function(){toast.classList.remove("show")},4000);
-  btn.textContent="🔄 刷新指标";btn.disabled=false;
+  btn.textContent=resetText;btn.disabled=false;
  });
+}
+document.getElementById("quotesRefreshBtn").addEventListener("click",function(){
+ runRefresh("quotesRefreshBtn",function(){return fetch(API+"/api/refresh?mode=quotes")},"⏳ 刷新行情中…","✅ 行情已刷新","↻ 刷新行情");
+});
+document.getElementById("fullRefreshBtn").addEventListener("click",function(){
+ runRefresh("fullRefreshBtn",function(){return fetch(API+"/api/refresh?mode=full")},"⏳ 更新五层筛选中…","✅ 五层筛选已更新","⟳ 更新五层筛选");
 });
 
 // ---- Layer 4 定性分析按钮（根据当前筛选运行）----
@@ -879,8 +925,8 @@ function render(){
  document.getElementById("cnt").textContent="显示 "+rows.length+" / "+DATA.length+" 只";}
 document.getElementById("head").addEventListener("click",function(e){var k=e.target.getAttribute("data-k");if(!k)return;
  if(state.sk===k)state.sd=-state.sd;else{state.sk=k;state.sd=(COLS.find(function(c){return c[0]===k})[2]==="n")?-1:1}head();render()});
-document.querySelectorAll(".btn").forEach(function(b){b.addEventListener("click",function(){
- document.querySelectorAll(".btn").forEach(function(x){x.classList.remove("on")});b.classList.add("on");state.t=b.getAttribute("data-t");render()})});
+document.querySelectorAll(".filter-btn").forEach(function(b){b.addEventListener("click",function(){
+ document.querySelectorAll(".filter-btn").forEach(function(x){x.classList.remove("on")});b.classList.add("on");state.t=b.getAttribute("data-t");render()})});
 document.getElementById("q").addEventListener("input",function(e){state.q=e.target.value;render()});
 document.getElementById("ind").addEventListener("change",function(e){state.ind=e.target.value;render()});
 document.getElementById("warn").addEventListener("change",function(e){state.warn=e.target.checked;render()});
@@ -1022,14 +1068,17 @@ def write_md(tierA, tierB, tierC, path, year, total_eval):
 # 七、主流程
 # ============================================================
 def main():
-    global USE_CACHE
+    global USE_CACHE, FORCE_SPOT_REFRESH
     ap = argparse.ArgumentParser(description="A股五层选股流水线")
     ap.add_argument("--year", type=int, default=CONFIG["report_year"], help="主报告期年份（年报）")
     ap.add_argument("--fresh", action="store_true", help="忽略缓存，强制重新抓取")
+    ap.add_argument("--quotes-fresh", action="store_true", help="只强制刷新行情缓存，财报/基础数据继续使用缓存")
     ap.add_argument("--top", type=int, default=50, help="终端打印前 N 名")
     args = ap.parse_args()
     if args.fresh:
         USE_CACHE = False
+    if args.quotes_fresh:
+        FORCE_SPOT_REFRESH = True
     CONFIG["report_year"] = args.year
 
     os.makedirs(CACHE_DIR, exist_ok=True)
