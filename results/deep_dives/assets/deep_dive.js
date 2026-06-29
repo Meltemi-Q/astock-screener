@@ -51,10 +51,8 @@ function stockCodeFromLocation(){
   return /^[0-9]{6}$/.test(code||"")?code:"";
 }
 function updateBackLinkFromStatus(){
-  if(window.location.protocol==="file:")return;
-  fetch(API+"/api/status").then(function(r){return r.json()}).then(function(d){
-    if(d.latest_ts)$("backLink").href="../astock_screen_"+d.latest_ts+".html";
-  }).catch(function(){});
+  var link=$("backLink");
+  if(link)link.href="../astock_screen.html";
 }
 function showError(message){
   $("status").className="status error";

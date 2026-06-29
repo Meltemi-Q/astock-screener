@@ -237,15 +237,18 @@ fetch(API+"/api/status").then(function(r){return r.json()}).then(function(d){
 });
 
 // ---- Refresh actions ----
+function goStableEntry(){
+ window.location.href="astock_screen.html";
+}
 function runRefresh(btnId,request,loadingText,doneText,resetText){
  var btn=document.getElementById(btnId);
  var toast=document.getElementById("toast");
  btn.textContent=loadingText;btn.disabled=true;
  request().then(function(r){return r.json()}).then(function(d){
   if(d.done){
-   toast.textContent=doneText+"，正在重载页面…";
+   toast.textContent=doneText+"，正在打开最新总表…";
    toast.classList.add("show");
-   setTimeout(function(){window.location.reload()},800);
+   setTimeout(goStableEntry,800);
   }else if(d.cached){
    toast.textContent="⏳ "+(d.msg||"冷却中，稍后再试");
    toast.classList.add("show");
@@ -283,8 +286,8 @@ document.getElementById("layer4Btn").addEventListener("click",function(){
    toast.textContent=d.msg+" 开始轮询进度…";
    pollProgress();
   }else if(d.done){
-   toast.textContent="✅ 分析完成！正在刷新…";
-   setTimeout(function(){window.location.reload()},1000);
+   toast.textContent="✅ 分析完成！正在打开最新总表…";
+   setTimeout(goStableEntry,1000);
   }else{
    toast.textContent="⚠️ "+(d.msg||d.error||"未知错误");
    setTimeout(function(){toast.classList.remove("show")},4000);
@@ -309,10 +312,10 @@ function pollProgress(){
    if(!p){clearInterval(pollTimer);btn.textContent="🧠 定性分析";btn.disabled=false;return}
    if(p.done===true){
     clearInterval(pollTimer);
-    toast.textContent="✅ 定性分析完成！正在刷新…";
+    toast.textContent="✅ 定性分析完成！正在打开最新总表…";
     toast.classList.add("show");
     btn.textContent="🧠 定性分析";btn.disabled=false;
-    setTimeout(function(){window.location.reload()},1000);
+    setTimeout(goStableEntry,1000);
    }else{
     var pct=p.target>0?Math.round(p.done/p.target*100):0;
     toast.textContent="🧠 Tier "+p.tier+" 分析中: "+p.done+"/"+p.target+" ("+pct+"%) · 已用"+p.elapsed+"秒 · "+p.eta;

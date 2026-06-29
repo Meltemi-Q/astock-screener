@@ -69,6 +69,54 @@ class RegressionTests(unittest.TestCase):
         self.assertIn("location.origin", source)
         self.assertLess(source.index("var API="), source.index('fetch(API+"/api/status")'))
 
+    def test_stable_entrypoints_are_lightweight_aliases_to_latest_screen(self):
+        import astock_screener
+
+        old_out_dir = astock_screener.OUT_DIR
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                results_dir = Path(td) / "results"
+                results_dir.mkdir()
+                (results_dir / "astock_screen_20260628.html").write_text(
+                    "<html>latest screen</html>", encoding="utf-8"
+                )
+                astock_screener.OUT_DIR = str(results_dir)
+
+                astock_screener.write_latest_entrypoints("20260628")
+
+                for name in ("index.html", "astock_screen.html"):
+                    html = (results_dir / name).read_text(encoding="utf-8")
+                    self.assertIn("astock_screen_20260628.html", html)
+                    self.assertIn("固定入口", html)
+                    self.assertLess(len(html), 3000)
+        finally:
+            astock_screener.OUT_DIR = old_out_dir
+
+    def test_server_stable_routes_resolve_to_latest_dated_screen(self):
+        import server
+
+        old_results_dir = server.RESULTS_DIR
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                results_dir = Path(td)
+                (results_dir / "astock_screen.html").write_text("alias", encoding="utf-8")
+                (results_dir / "astock_screen_20260627.html").write_text("old", encoding="utf-8")
+                latest = results_dir / "astock_screen_20260628.html"
+                latest.write_text("latest", encoding="utf-8")
+                server.RESULTS_DIR = str(results_dir)
+
+                self.assertEqual(Path(server._latest_screen_path()), latest)
+
+            source = (ROOT / "server.py").read_text(encoding="utf-8")
+            self.assertIn('path in ("/", "/index.html", "/astock_screen.html")', source)
+            self.assertIn("_serve_latest_screen", source)
+            self.assertIn("def do_HEAD", source)
+            self.assertIn("head_only=True", source)
+            self.assertIn("ConnectionResetError", source)
+            self.assertIn("BrokenPipeError", source)
+        finally:
+            server.RESULTS_DIR = old_results_dir
+
     def test_deep_dive_generation_writes_shared_shell_and_json_payload(self):
         import stock_deep_dive
 
@@ -155,7 +203,8 @@ class RegressionTests(unittest.TestCase):
             self.assertIn("report.html?code=000001", html)
             self.assertNotIn('href="000001.html"', html)
             self.assertIn('id="backLink"', html)
-            self.assertIn('fetch(API+"/api/status")', html)
+            self.assertIn('href="../astock_screen.html"', html)
+            self.assertNotIn('href="../astock_screen_20260627.html"', html)
 
     def test_deep_dive_index_accepts_csv_metric_field_names(self):
         import stock_deep_dive
@@ -190,9 +239,10 @@ class RegressionTests(unittest.TestCase):
     def test_deep_dive_shell_does_not_overwrite_latest_back_link_with_old_payload_ts(self):
         source = (ROOT / "templates" / "deep_dive" / "assets" / "deep_dive.js").read_text(encoding="utf-8")
 
-        self.assertIn('fetch(API+"/api/status")', source)
+        self.assertIn('../astock_screen.html', source)
         self.assertNotIn('meta.screen_ts||"20260627"', source)
         self.assertNotIn('backLink").href="../astock_screen_"+(meta.screen_ts', source)
+        self.assertNotIn('backLink").href="../astock_screen_"+d.latest_ts+".html"', source)
 
     def test_screener_marks_json_deep_dive_reports_and_links_shared_shell(self):
         import astock_screener
@@ -310,7 +360,7 @@ class RegressionTests(unittest.TestCase):
         self.assertIn(".funnel{display:flex;gap:0;height:170px;", source)
         self.assertIn("padding:18px 6px 40px", source)
 
-    def test_stale_screen_html_redirects_to_latest_report(self):
+    def test_stale_screen_html_is_preserved_as_historical_snapshot(self):
         import astock_screener
 
         old_out_dir = astock_screener.OUT_DIR
@@ -327,8 +377,7 @@ class RegressionTests(unittest.TestCase):
                 astock_screener.write_stale_screen_redirects("20260628")
 
                 html = old.read_text(encoding="utf-8")
-                self.assertIn("astock_screen_20260628.html", html)
-                self.assertIn("旧版选股页已更新", html)
+                self.assertEqual("<html>old 352</html>", html)
         finally:
             astock_screener.OUT_DIR = old_out_dir
 
@@ -376,6 +425,19 @@ class RegressionTests(unittest.TestCase):
         self.assertIn('id="refreshHint"', main_source)
         self.assertIn('盘后适合更新五层筛选', main_source)
         self.assertIn('盘后：适合更新五层筛选', main_source)
+
+    def test_refresh_actions_return_to_stable_screen_entrypoint(self):
+        main_source = (ROOT / "astock_screener.py").read_text(encoding="utf-8")
+
+        self.assertIn('function goStableEntry()', main_source)
+        self.assertIn('window.location.href="astock_screen.html"', main_source)
+        self.assertNotIn("window.location.reload()},800", main_source)
+
+    def test_run_sh_opens_stable_screen_entrypoint(self):
+        run_source = (ROOT / "run.sh").read_text(encoding="utf-8")
+
+        self.assertIn("astock_screen.html", run_source)
+        self.assertNotIn('open "http://localhost:$SERVE_PORT/astock_screen_${TS}.html"', run_source)
 
     def test_server_refresh_mode_maps_to_expected_screener_args(self):
         import server

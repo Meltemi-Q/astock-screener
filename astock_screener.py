@@ -77,6 +77,7 @@ SPOT_FIELDS = "f12,f13,f14,f2,f9,f23,f20,f21,f38,f115"
 WORKDIR   = os.path.dirname(os.path.abspath(__file__))
 CACHE_DIR = os.path.join(WORKDIR, "cache")
 OUT_DIR   = os.path.join(WORKDIR, "results")
+STABLE_SCREEN_NAME = "astock_screen.html"
 SSL_CTX   = ssl.create_default_context()
 SSL_CTX.check_hostname = False
 SSL_CTX.verify_mode = ssl.CERT_NONE  # 公开只读行情数据，免证书校验以规避 macOS 自带 python 证书问题
@@ -793,15 +794,18 @@ fetch(API+"/api/status").then(function(r){return r.json()}).then(function(d){
 });
 
 // ---- Refresh actions ----
+function goStableEntry(){
+ window.location.href="astock_screen.html";
+}
 function runRefresh(btnId,request,loadingText,doneText,resetText){
  var btn=document.getElementById(btnId);
  var toast=document.getElementById("toast");
  btn.textContent=loadingText;btn.disabled=true;
  request().then(function(r){return r.json()}).then(function(d){
   if(d.done){
-   toast.textContent=doneText+"，正在重载页面…";
+   toast.textContent=doneText+"，正在打开最新总表…";
    toast.classList.add("show");
-   setTimeout(function(){window.location.reload()},800);
+   setTimeout(goStableEntry,800);
   }else if(d.cached){
    toast.textContent="⏳ "+(d.msg||"冷却中，稍后再试");
    toast.classList.add("show");
@@ -839,8 +843,8 @@ document.getElementById("layer4Btn").addEventListener("click",function(){
    toast.textContent=d.msg+" 开始轮询进度…";
    pollProgress();
   }else if(d.done){
-   toast.textContent="✅ 分析完成！正在刷新…";
-   setTimeout(function(){window.location.reload()},1000);
+   toast.textContent="✅ 分析完成！正在打开最新总表…";
+   setTimeout(goStableEntry,1000);
   }else{
    toast.textContent="⚠️ "+(d.msg||d.error||"未知错误");
    setTimeout(function(){toast.classList.remove("show")},4000);
@@ -865,10 +869,10 @@ function pollProgress(){
    if(!p){clearInterval(pollTimer);btn.textContent="🧠 定性分析";btn.disabled=false;return}
    if(p.done===true){
     clearInterval(pollTimer);
-    toast.textContent="✅ 定性分析完成！正在刷新…";
+    toast.textContent="✅ 定性分析完成！正在打开最新总表…";
     toast.classList.add("show");
     btn.textContent="🧠 定性分析";btn.disabled=false;
-    setTimeout(function(){window.location.reload()},1000);
+    setTimeout(goStableEntry,1000);
    }else{
     var pct=p.target>0?Math.round(p.done/p.target*100):0;
     toast.textContent="🧠 Tier "+p.tier+" 分析中: "+p.done+"/"+p.target+" ("+pct+"%) · 已用"+p.elapsed+"秒 · "+p.eta;
@@ -1005,34 +1009,35 @@ def write_html(records, path, year, total_eval, tierN):
 
 
 def write_stale_screen_redirects(latest_ts):
-    """把旧的 astock_screen_*.html 改为跳转最新页，避免旧 deepCount/旧图表再次暴露。"""
+    """保留历史日期页；稳定入口负责指向最新总表。"""
+    return
+
+
+def write_latest_entrypoints(latest_ts):
+    """写轻量稳定入口，避免日常访问固定到某个日期文件。"""
     latest_name = f"astock_screen_{latest_ts}.html"
-    if not os.path.isdir(OUT_DIR):
-        return
-    for name in os.listdir(OUT_DIR):
-        if not (name.startswith("astock_screen_") and name.endswith(".html")):
-            continue
-        if name == latest_name:
-            continue
-        path = os.path.join(OUT_DIR, name)
-        redirect = f"""<!DOCTYPE html>
+    target_js = json.dumps(latest_name, ensure_ascii=False)
+    os.makedirs(OUT_DIR, exist_ok=True)
+    html = f"""<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="refresh" content="0; url={latest_name}">
-<title>旧版选股页已更新</title>
+<title>A股五层选股固定入口</title>
 <style>
 body{{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#f6f8fb;color:#172033}}
 .box{{max-width:560px;margin:14vh auto;padding:24px;background:#fff;border:1px solid #dbe4f0;border-radius:8px}}
 a{{color:#2563eb}}
 </style></head><body>
 <div class="box">
-<h1>旧版选股页已更新</h1>
-<p>正在跳转到最新总表：<a href="{latest_name}">{latest_name}</a></p>
+<h1>A股五层选股固定入口</h1>
+<p>正在打开最新总表：<a href="{latest_name}">{latest_name}</a></p>
+<p>日期页继续作为后台历史产物保留；日常请访问 <code>astock_screen.html</code> 或根路径。</p>
 </div>
-<script>location.replace("{latest_name}")</script>
+<script>location.replace({target_js})</script>
 </body></html>"""
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(redirect)
+    for name in ("index.html", STABLE_SCREEN_NAME):
+        with open(os.path.join(OUT_DIR, name), "w", encoding="utf-8") as f:
+            f.write(html)
 
 
 def write_md(tierA, tierB, tierC, path, year, total_eval):
@@ -1122,6 +1127,7 @@ def main():
     write_csv(records, csv_path)
     write_md(tierA, tierB, tierC, md_path, args.year, len(records))
     write_html(records, html_path, args.year, len(records), (len(tierA), len(tierB), len(tierC)))
+    write_latest_entrypoints(ts)
     write_stale_screen_redirects(ts)
 
     # 终端摘要
@@ -1139,6 +1145,7 @@ def main():
               f"{n(r['yoy']):>6} {n(r['pe_ttm'],1):>6} {n(r['peg'],2):>5} "
               f"{n((r['discount'] or 0)*100):>6}  {r['industry']}")
     print("\n✅ 完整结果：")
+    print(f"   网页固定入口: {os.path.join(OUT_DIR, STABLE_SCREEN_NAME)}")
     print(f"   网页 (全部可筛选排序): {html_path}")
     print(f"   CSV  (全量+落选原因): {csv_path}")
     print(f"   榜单 (Markdown 表格):  {md_path}")

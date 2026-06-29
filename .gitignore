@@ -2,6 +2,8 @@ __pycache__/
 cache/
 results/*
 !results/
+!results/index.html
+!results/astock_screen.html
 !results/astock_screen_20260627.html
 !results/astock_screen_20260628.html
 !results/astock_shortlist_20260628.md

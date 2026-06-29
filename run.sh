@@ -88,6 +88,7 @@ if [ "$DO_SCREENER" = true ]; then
   TS=$(date +%Y%m%d)
   echo ""
   echo "─────────────────────────────────────────────"
+  [ -f "results/astock_screen.html" ] && echo "🌐 固定入口: $(pwd)/results/astock_screen.html"
   [ -f "results/astock_screen_${TS}.html" ] && echo "🌐 总表: $(pwd)/results/astock_screen_${TS}.html"
   [ -f "results/astock_shortlist_${TS}.md" ]  && echo "📄 榜单: $(pwd)/results/astock_shortlist_${TS}.md"
   [ -f "results/astock_screen_${TS}.csv" ]    && echo "📊 CSV:  $(pwd)/results/astock_screen_${TS}.csv"
@@ -145,13 +146,12 @@ if [ "$DO_SERVE" = true ]; then
     echo "  ● 已连接 — 按钮可用：🔄刷新 · ⚡一键研报 · 🧠定性分析"
   fi
 
-  echo "  http://localhost:$SERVE_PORT"
+  echo "  http://localhost:$SERVE_PORT/astock_screen.html"
 
   # 用浏览器打开（通过 http:// 而非 file://，使所有按钮可用）
-  TS=$(date +%Y%m%d)
   if [ "$(uname)" = "Darwin" ]; then
-    if [ -f "results/astock_screen_${TS}.html" ]; then
-      open "http://localhost:$SERVE_PORT/astock_screen_${TS}.html" 2>/dev/null || true
+    if [ -f "results/astock_screen.html" ] || [ -n "$(find results -maxdepth 1 -name 'astock_screen_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].html' -print -quit 2>/dev/null)" ]; then
+      open "http://localhost:$SERVE_PORT/astock_screen.html" 2>/dev/null || true
     else
       open "http://localhost:$SERVE_PORT" 2>/dev/null || true
     fi

@@ -3,7 +3,7 @@
 本地 HTTP 服务器 —— 让 HTML 中的「刷新数据」「生成研报」「AI分析」按钮真正可用。
 用法: python3 server.py [--port 8899]
 """
-import os, sys, json, subprocess, threading, time
+import os, sys, json, subprocess, threading, time, re
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 
 WORKDIR = os.path.dirname(os.path.abspath(__file__))
@@ -16,6 +16,20 @@ _last_run = 0
 # ── 任务进度追踪 ──
 _job = {"status": "idle", "tier": "", "started": 0, "target": 0, "done": 0}
 _job_lock = threading.Lock()
+
+SCREEN_HTML_RE = re.compile(r"^astock_screen_\d{8}\.html$")
+
+
+def _latest_screen_path(results_dir=None):
+    """返回最新日期版总表 HTML；忽略稳定别名页。"""
+    results_dir = results_dir or RESULTS_DIR
+    if not os.path.isdir(results_dir):
+        return ""
+    screens = sorted(
+        [f for f in os.listdir(results_dir) if SCREEN_HTML_RE.match(f)],
+        reverse=True,
+    )
+    return os.path.join(results_dir, screens[0]) if screens else ""
 
 
 def _count_existing():
@@ -66,12 +80,23 @@ class ScreenerHandler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=RESULTS_DIR, **kwargs)
 
     def do_GET(self):
+        path = self.path.split("?")[0]
+        if path in ("/", "/index.html", "/astock_screen.html"):
+            if self._serve_latest_screen():
+                return
         if self.path.startswith("/api/"):
             self._handle_api()
         elif self._redirect_legacy_deep_link():
             return
         else:
             super().do_GET()
+
+    def do_HEAD(self):
+        path = self.path.split("?")[0]
+        if path in ("/", "/index.html", "/astock_screen.html"):
+            if self._serve_latest_screen(head_only=True):
+                return
+        super().do_HEAD()
 
     def do_POST(self):
         if self.path.startswith("/api/"):
@@ -112,6 +137,27 @@ class ScreenerHandler(SimpleHTTPRequestHandler):
         self.send_response(302)
         self.send_header("Location", f"/deep_dives/report.html?code={code}")
         self.end_headers()
+        return True
+
+    def _serve_latest_screen(self, head_only=False):
+        latest_path = _latest_screen_path()
+        if not latest_path:
+            return False
+        try:
+            with open(latest_path, "rb") as f:
+                body = f.read()
+        except OSError:
+            return False
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        if not head_only:
+            try:
+                self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError):
+                return True
         return True
 
     def _api_refresh(self, mode):
@@ -233,7 +279,8 @@ class ScreenerHandler(SimpleHTTPRequestHandler):
                             "exit_code": _job.get("exit_code", 1)}
                 _job["status"] = "idle"
 
-        self.send_json({"latest_ts": latest_ts, "deep_count": deep_count,
+        self.send_json({"latest_ts": latest_ts, "latest_href": f"astock_screen_{latest_ts}.html" if latest_ts else "",
+                       "stable_href": "astock_screen.html", "deep_count": deep_count,
                        "progress": progress})
 
     def send_json(self, data, status=200):
@@ -279,6 +326,7 @@ def main():
             print(f"❌ 启动失败: {e}")
         sys.exit(1)
     print(f"🚀 本地服务已启动: http://localhost:{args.port}")
+    print(f"   总表: http://localhost:{args.port}/astock_screen.html")
     print(f"   状态: http://localhost:{args.port}/api/status")
     print(f"   刷新: http://localhost:{args.port}/api/refresh?fresh=1")
     print(f"   研报: http://localhost:{args.port}/api/deep?code=000423")

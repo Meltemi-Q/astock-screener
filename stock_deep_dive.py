@@ -29,6 +29,7 @@ CACHE_DIR = os.path.join(WORKDIR, "cache")
 OUT_DIR = os.path.join(WORKDIR, "results", "deep_dives")
 TEMPLATE_DIR = os.path.join(WORKDIR, "templates", "deep_dive")
 DATA_DIR_NAME = "data"
+STABLE_SCREEN_HREF = "astock_screen.html"
 PREFETCH_THRESHOLD = int(os.environ.get("DEEP_PREFETCH_THRESHOLD", "50"))
 DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-pro")
 DEEPSEEK_RETRIES = int(os.environ.get("DEEPSEEK_RETRIES", "3"))
@@ -775,7 +776,7 @@ footer{{margin-top:40px;padding:16px 0;border-top:1px solid #232936;color:#5a627
 </style></head><body>
 <div class="container">
 <header>
-    <a href="../astock_screen_{screen_ts}.html" class="back">← 回到选股总表</a>
+    <a href="../{STABLE_SCREEN_HREF}" class="back">← 回到选股总表</a>
     <h1>{name} <span style="font-size:16px;color:#8b93a1">{code}</span></h1>
     <div class="sub">{ind} · {'  |  '.join(str(d['year']) for d in financials[-3:])}年</div>
 </header>
@@ -1204,7 +1205,7 @@ def ensure_deep_dive_app(base_dir):
         os.path.join("assets", "deep_dive.css"): os.path.join(TEMPLATE_DIR, "assets", "deep_dive.css"),
         os.path.join("assets", "deep_dive.js"): os.path.join(TEMPLATE_DIR, "assets", "deep_dive.js"),
     }
-    screen_href = f"astock_screen_{latest_screen_ts(os.path.dirname(base_dir))}.html"
+    screen_href = STABLE_SCREEN_HREF
     for rel, src in files.items():
         with open(src, encoding="utf-8") as f:
             content = f.read().replace("__SCREEN_HREF__", screen_href)
@@ -1439,7 +1440,7 @@ def generate_index(stocks_done, base_dir, screen_ts=None):
 	</style></head><body>
 	<div class="container">
 	<nav class="topbar">
-	    <a id="backLink" href="../astock_screen_{screen_ts}.html" class="nav-link">← 选股总表</a>
+	    <a id="backLink" href="../{STABLE_SCREEN_HREF}" class="nav-link">← 选股总表</a>
 	    <a href="report.html?code={stocks_done[0]['code'] if stocks_done else ''}" class="nav-link muted">首只研报</a>
 	    <button id="themeToggle" type="button" class="nav-link muted" title="切换暗色/亮色主题">🌙 暗色</button>
 	</nav>
@@ -1470,11 +1471,6 @@ def generate_index(stocks_done, base_dir, screen_ts=None):
 	    setTheme(document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark");
 	  }});
 	}})();
-	if(window.location.protocol!=="file:"){{
-	  fetch(API+"/api/status").then(function(r){{return r.json()}}).then(function(d){{
-	    if(d.latest_ts)document.getElementById("backLink").href="../astock_screen_"+d.latest_ts+".html";
-	  }}).catch(function(){{}});
-	}}
 	</script>
 	</body></html>"""
     idx_path = os.path.join(base_dir, "index.html")
