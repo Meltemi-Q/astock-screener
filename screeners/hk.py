@@ -45,6 +45,7 @@ from data_sources.eastmoney import (
 from data_sources.hkex import (
     fetch_hkex_security_master,
     fetch_eastmoney_hk_financials,
+    fetch_eastmoney_hk_cashflow,
     validate_hkex_master,
 )
 from screeners.contracts import (
@@ -294,10 +295,9 @@ def build_hk_records(year: int = 2025) -> list[dict]:
         net_profit = target_fin.get("net_profit")
         report_currency = target_fin.get("currency", "CNY")
 
-        # 经营现金流：当前 East Money HK 财务指标 API 不包含此字段
-        # (RPT_HKF10_FN_GMAININDICATOR 无 cashflow 列)
-        # 后续可通过单独的现金流量表报告补充
-        operating_cashflow = None
+        # 经营现金流：从 RPT_HKSK_FN_CASHFLOW 报告获取
+        cashflow_map = fetch_eastmoney_hk_cashflow(code)
+        operating_cashflow = cashflow_map.get(fallback_year) if cashflow_map else None
 
         # 行业分类：当前 API 未提供，默认 "港股"
         # 后续可通过东财行业分类 API 或港股 GICS 分类补充

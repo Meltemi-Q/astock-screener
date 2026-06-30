@@ -509,6 +509,78 @@ def fetch_eastmoney_hk_financials(code):
     return records
 
 
+def fetch_eastmoney_hk_cashflow(code):
+    """Fetch HK stock cashflow data from East Money datacenter-web.
+
+    Uses report name ``RPT_HKSK_FN_CASHFLOW`` to get operating cashflow.
+    Parses ``ITEM_NAME`` to locate the row matching '经营活动产生的现金流量净额'.
+
+    Args:
+        code: HKEX stock code (e.g. "00700" for Tencent).
+
+    Returns:
+        dict mapping fiscal_year (int) → operating_cashflow (float),
+        or empty dict if unavailable.
+    """
+    from urllib import parse
+
+    code_padded = _pad_code(code)
+    report_name = "RPT_HKSK_FN_CASHFLOW"
+    columns = "SECURITY_CODE,REPORT_DATE,ITEM_NAME,AMOUNT"
+    filt = f'(SECURITY_CODE="{code_padded}")'
+
+    base = EASTMONEY_DC_BASE
+    out, page, pages = [], 1, 1
+    while page <= pages:
+        params = {
+            "reportName": report_name,
+            "columns": columns,
+            "pageSize": 500,
+            "pageNumber": page,
+            "filter": filt,
+            "sortColumns": "REPORT_DATE",
+            "sortTypes": -1,
+            "source": "WEB",
+            "client": "WEB",
+        }
+        url = base + "?" + parse.urlencode(params, quote_via=parse.quote)
+        d = get_json(url, ttl_hours=HK_FINANCIALS_TTL)
+        res = d.get("result") or {}
+        if page == 1:
+            pages = res.get("pages") or 1
+        out.extend(res.get("data") or [])
+        page += 1
+        time.sleep(0.05)
+
+    # Look for operating cashflow rows (经营活动产生的现金流量净额)
+    # Match Chinese item name, case-insensitive
+    TARGETS = [
+        "经营活动产生的现金流量净额",
+        "经营活动现金流量净额",
+        "经营业务所得之现金流入净额",
+        "Net cash flows from operating activities",
+    ]
+
+    result = {}
+    for row in out:
+        item_name = (row.get("ITEM_NAME") or "").strip()
+        if item_name not in TARGETS:
+            # Fuzzy: check if contains key Chinese substring
+            if "经营活动" not in item_name and "经营业务" not in item_name:
+                continue
+        rpt_date = (row.get("REPORT_DATE") or "").strip()
+        if ".000Z" in rpt_date or "T" in rpt_date:
+            rpt_date = rpt_date.split("T")[0].replace(".000Z", "")
+        if not rpt_date or len(rpt_date) < 4:
+            continue
+        year = int(rpt_date[:4])
+        # Take max value per year (handle duplicate rows)
+        amt = _fnum(row.get("AMOUNT"))
+        if amt is not None:
+            result[year] = max(result.get(year, float("-inf")), amt)
+    return result
+
+
 def validate_hkex_master(master):
     """Validate a HKEX security master list.
 
