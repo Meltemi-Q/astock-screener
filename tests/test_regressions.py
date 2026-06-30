@@ -154,6 +154,16 @@ class RegressionTests(unittest.TestCase):
                 self.assertIn("a.concat(b)", source)
                 self.assertIn("本期无 A/B 候选", source)
 
+    def test_market_rows_open_stock_detail_panel(self):
+        for rel in ("screeners/hk.py", "screeners/us.py"):
+            with self.subTest(file=rel):
+                source = (ROOT / rel).read_text(encoding="utf-8")
+                self.assertIn('id="detailPanel"', source)
+                self.assertIn("function openDetail", source)
+                self.assertIn('data-code="', source)
+                self.assertIn('location.hash="code="', source)
+                self.assertIn("window.addEventListener(\"hashchange\", syncDetailFromHash)", source)
+
     def test_server_stable_market_routes_use_http_redirect(self):
         source = (ROOT / "server.py").read_text(encoding="utf-8")
 

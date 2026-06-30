@@ -746,9 +746,23 @@ tr.warn:hover td{background:var(--warn-hover)}
 .bA{background:#dcfce7;color:#166534}.bB{background:#fef3c7;color:#92400e}.bC{background:#e2e8f0;color:#475569}.b-{background:var(--tag);color:var(--muted)}
 .pos{color:var(--green)}.neg{color:var(--red)}
 .code{color:var(--link);font-variant-numeric:tabular-nums}
+.detail-link{appearance:none;background:none;border:0;padding:0;margin:0;color:var(--link);font:inherit;cursor:pointer;text-align:left}
+.detail-link:hover{text-decoration:underline}.detail-link.code{font-variant-numeric:tabular-nums}.detail-link.name-link{color:var(--text)}
 .note{color:var(--yellow);font-size:11px;text-align:left;max-width:320px;white-space:normal}
 .cnt{color:var(--muted);font-size:12px;margin-left:auto}
 .hint{color:var(--muted);font-size:12px;white-space:nowrap}
+.detail-panel{position:fixed;inset:0;z-index:80;background:var(--bg);display:none;overflow:auto}
+.detail-panel.open{display:block}
+.detail-head{position:sticky;top:0;z-index:2;background:var(--surface);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow)}
+.detail-title h2{margin:0 0 4px;font-size:18px;color:var(--heading)}.detail-title h2 span{font-size:13px;color:var(--muted);font-weight:600;margin-left:8px}
+.detail-sub{display:flex;gap:10px;flex-wrap:wrap;align-items:center;color:var(--muted);font-size:12px}
+.detail-body{padding:16px 20px 28px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.detail-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;box-shadow:var(--shadow)}
+.detail-card.full{grid-column:1/-1}.detail-card h3{margin:0 0 10px;font-size:13px;color:var(--muted)}
+.detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.detail-metric{border:1px solid var(--border);background:var(--surface-soft);border-radius:7px;padding:9px 10px;min-height:58px}
+.detail-metric span{display:block;color:var(--muted);font-size:11px;margin-bottom:4px}.detail-metric b{font-size:18px;color:var(--heading);word-break:break-word}
+.detail-note{white-space:normal;line-height:1.6;color:var(--yellow);font-size:13px}
 footer{padding:10px 20px;color:var(--muted);font-size:11px;border-top:1px solid var(--border)}
 @media(max-width:720px){.dash{grid-template-columns:1fr;padding:12px}.controls{align-items:stretch}.controls .btn,.controls select,.controls .chk{flex:1 1 auto}.controls input#q{max-width:none;flex-basis:100%}.cnt{flex-basis:100%;margin-left:0}.head-main{align-items:flex-start}.theme-btn{margin-left:0}}
 </style></head><body>
@@ -800,6 +814,13 @@ footer{padding:10px 20px;color:var(--muted);font-size:11px;border-top:1px solid 
 <button class="btn primary" onclick="window.location.reload()">↻ 重新加载</button>
 <span class="cnt" id="cnt"></span>
 </div>
+<div class="detail-panel" id="detailPanel" aria-hidden="true">
+<div class="detail-head">
+<button class="btn" id="detailBack">← 返回总表</button>
+<div class="detail-title"><h2 id="detailTitle"></h2><div class="detail-sub" id="detailSub"></div></div>
+</div>
+<div class="detail-body" id="detailBody"></div>
+</div>
 <div class="toast" id="toast"></div>
 <div class="wrap"><table><thead><tr id="head"></tr></thead><tbody id="body"></tbody></table></div>
 <footer>美股数据来源：SEC EDGAR (XBRL 10-K) + Nasdaq Trader + 东方财富行情 · 第0层排雷→第1层质量→第2层估值→第3层安全边际 · 第4层定性需人工把关 · 市场: 美股</footer>
@@ -811,6 +832,7 @@ var COLS=[["rk","#","n"],["tier","档","s"],["code","代码","s"],["name","名�
 ["er","预期年化%","n"],["disc","折让%","n"],["debt","负债%","n"],["cap","市值亿·USD","n"],["ind","行业","s"],["note","落选原因","s"]];
 var state={t:"all",q:"",ind:"",pass:false,sk:"sc",sd:-1};
 function fmt(v){return v===null||v===undefined?"":v}
+function esc(v){return String(fmt(v)).replace(/[&<>"']/g,function(ch){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]})}
 function cssVar(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim()}
 function setTheme(theme){
  document.documentElement.setAttribute("data-theme",theme);
@@ -905,11 +927,40 @@ function head(){document.getElementById("head").innerHTML=COLS.map(function(c){
  var ar=state.sk===c[0]?(state.sd<0?" ▼":" ▲"):"";
  var cl=c[2]==="s"?"l":"";return '<th class="'+cl+'" data-k="'+c[0]+'">'+c[1]+ar+'</th>'}).join("")}
 function tierBadge(t){var k=t||"-";return '<span class="badge b'+k+'">'+(t||"-")+'</span>'}
+function detailValue(v,suffix){return v===null||v===undefined||v===""?"-":esc(v)+(suffix||"")}
+function detailMetric(label,value,suffix){return '<div class="detail-metric"><span>'+esc(label)+'</span><b>'+detailValue(value,suffix)+'</b></div>'}
+function findRecord(code){return DATA.find(function(r){return String(r.code)===String(code)})}
+function openDetail(code,push){
+ var r=findRecord(code);if(!r)return;
+ document.getElementById("detailTitle").innerHTML=esc(r.code)+' <span>'+esc(r.name)+'</span>';
+ document.getElementById("detailSub").innerHTML=tierBadge(r.tier)+'<span>评分 '+detailValue(r.sc)+'</span><span>第 '+detailValue(r.L)+' 层</span><span>'+esc(r.ind)+'</span>';
+ var body='';
+ body+='<section class="detail-card"><h3>交易与评级</h3><div class="detail-grid">'
+   +detailMetric("现价",r.px)+detailMetric("一手",r.mb)+detailMetric("评分",r.sc)+detailMetric("市值(亿 USD)",r.cap)+'</div></section>';
+ body+='<section class="detail-card"><h3>质量指标</h3><div class="detail-grid">'
+   +detailMetric("ROE",r.roe,"%")+detailMetric("毛利率",r.gm,"%")+detailMetric("净利率",r.nm,"%")+detailMetric("负债率",r.debt,"%")+'</div></section>';
+ body+='<section class="detail-card"><h3>成长与估值</h3><div class="detail-grid">'
+   +detailMetric("同比",r.yoy,"%")+detailMetric("CAGR",r.cagr,"%")+detailMetric("PE",r.pe)+detailMetric("PEG",r.peg)+detailMetric("预期年化",r.er,"%")+detailMetric("折让",r.disc,"%")+'</div></section>';
+ body+='<section class="detail-card full"><h3>落选原因/风险</h3><div class="detail-note">'+(r.note?esc(r.note):"无")+'</div></section>';
+ document.getElementById("detailBody").innerHTML=body;
+ document.getElementById("detailPanel").classList.add("open");
+ document.getElementById("detailPanel").setAttribute("aria-hidden","false");
+ if(push)location.hash="code="+encodeURIComponent(r.code);
+}
+function closeDetail(push){
+ document.getElementById("detailPanel").classList.remove("open");
+ document.getElementById("detailPanel").setAttribute("aria-hidden","true");
+ if(push&&location.hash.indexOf("code=")>=0)history.pushState("",document.title,location.pathname+location.search);
+}
+function syncDetailFromHash(){
+ var m=location.hash.match(/(?:^#|&)code=([^&]+)/);
+ if(m)openDetail(decodeURIComponent(m[1]),false);else closeDetail(false);
+}
 function rowHTML(r){
  var cells=COLS.map(function(c){var k=c[0],v=r[k];
   if(k==="tier")return '<td>'+tierBadge(v)+'</td>';
-  if(k==="code")return '<td class="l"><span class="code">'+fmt(v)+'</span></td>';
-  if(k==="name")return '<td class="l">'+fmt(v)+'</td>';
+  if(k==="code")return '<td class="l"><button class="detail-link code" data-code="'+esc(r.code)+'">'+esc(v)+'</button></td>';
+  if(k==="name")return '<td class="l"><button class="detail-link name-link" data-code="'+esc(r.code)+'">'+esc(v)+'</button></td>';
   if(k==="ind")return '<td class="l">'+fmt(v)+'</td>';
   if(k==="note")return '<td class="note">'+fmt(v)+'</td>';
   if(k==="disc"){var cls=v>0?"pos":(v<0?"neg":"");return '<td class="'+cls+'">'+fmt(v)+'</td>'}
@@ -939,7 +990,10 @@ document.querySelectorAll(".filter-btn").forEach(function(b){b.addEventListener(
 document.getElementById("q").addEventListener("input",function(e){state.q=e.target.value;render()});
 document.getElementById("ind").addEventListener("change",function(e){state.ind=e.target.value;render()});
 document.getElementById("pass").addEventListener("change",function(e){state.pass=e.target.checked;render()});
-head();render();
+document.getElementById("body").addEventListener("click",function(e){var el=e.target.closest("[data-code]");if(el)openDetail(el.getAttribute("data-code"),true)});
+document.getElementById("detailBack").addEventListener("click",function(){closeDetail(true)});
+window.addEventListener("hashchange", syncDetailFromHash);
+head();render();syncDetailFromHash();
 </script></body></html>"""
 
 
