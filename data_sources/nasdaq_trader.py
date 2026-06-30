@@ -100,7 +100,13 @@ def build_us_stock_universe():
                         key tickers (AAPL, MSFT, NVDA, GOOGL) are missing.
     """
     # ── Nasdaq-listed ──
-    nasdaq_text = get_text(NASDAQ_LISTED_URL, ttl_hours=NASDAQ_TTL_HOURS)
+    try:
+        nasdaq_text = get_text(NASDAQ_LISTED_URL, ttl_hours=NASDAQ_TTL_HOURS)
+    except OSError as e:
+        raise RuntimeError(
+            f"Nasdaq Trader API 不可达: {e}\n"
+            "  大陆用户请将 nasdaqtrader.com 加入代理直连规则，或设置 HTTPS_PROXY"
+        ) from e
     nasdaq_rows = _parse_nasdaq_tsv(nasdaq_text)
 
     # ── Other-listed ──

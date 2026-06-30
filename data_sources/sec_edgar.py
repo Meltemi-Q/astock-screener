@@ -20,6 +20,15 @@ SEC_HEADERS = {"User-Agent": SEC_USER_AGENT}
 SEC_TTL_HOURS = 24  # cache SEC data for 24 hours
 SEC_MIN_INTERVAL = 0.1  # 10 req/s max
 
+_SEC_HELP_URLS = (
+    "\n  SEC/Nasdaq API 不可达。可能原因：\n"
+    "  1. 大陆网络需代理。若使用 ClashX/Clash Verge，在配置里加：\n"
+    "       - DOMAIN-SUFFIX,sec.gov,DIRECT\n"
+    "       - DOMAIN-SUFFIX,nasdaqtrader.com,DIRECT\n"
+    "  2. 或设置 HTTPS_PROXY 环境变量指向你的代理。\n"
+    "  3. 也可以跳过美股筛选，仅使用 A 股和港股。\n"
+)
+
 _last_sec_request = 0.0
 
 
@@ -41,10 +50,15 @@ def _sec_get_json(url, ttl_hours=None):
 
     Returns:
         Parsed JSON (dict/list).
+    Raises:
+        RuntimeError with proxy/config help message on network failure.
     """
     _sec_rate_limit()
     ttl = SEC_TTL_HOURS if ttl_hours is None else ttl_hours
-    return get_json(url, ttl_hours=ttl, headers=SEC_HEADERS)
+    try:
+        return get_json(url, ttl_hours=ttl, headers=SEC_HEADERS)
+    except OSError as e:
+        raise RuntimeError(f"SEC API 请求失败: {e}{_SEC_HELP_URLS}") from e
 
 
 def _sec_get_text(url, ttl_hours=None):
