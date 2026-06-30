@@ -96,3 +96,9 @@ economy/
         ├── assets/
         └── data/         每只股票一个 XXXXXX.json
 ```
+
+## 港股/美股扩展
+
+港股和美股完整五层筛选的产品、数据源、开发路线和回测验收要求见：
+
+- [`PRD_GLOBAL_MARKETS.md`](PRD_GLOBAL_MARKETS.md)
