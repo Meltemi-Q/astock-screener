@@ -16,7 +16,7 @@ Follows the push2delay patterns from astock_screener.py.
 
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from .http import get_json, CACHE_DIR
+from .http import get_json
 
 # ── Constants ──────────────────────────────────────────────
 QUOTE_TTL_HOURS = 2    # quotes refresh every 2 hours

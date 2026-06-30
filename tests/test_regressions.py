@@ -30,6 +30,17 @@ class RegressionTests(unittest.TestCase):
         self.assertIn("用法", result.stdout)
         self.assertNotIn("抓取数据中", result.stdout + result.stderr)
 
+    def test_run_sh_stops_existing_project_servers_before_starting(self):
+        source = (ROOT / "run.sh").read_text(encoding="utf-8")
+
+        self.assertIn("stop_existing_project_servers", source)
+        self.assertIn("server.py --port", source)
+        self.assertIn("lsof -tiTCP", source)
+        self.assertLess(
+            source.index("stop_existing_project_servers"),
+            source.index("for try_port in"),
+        )
+
     def test_stock_deep_dive_help_renders(self):
         result = subprocess.run(
             [sys.executable, "stock_deep_dive.py", "--help"],
@@ -103,6 +114,12 @@ class RegressionTests(unittest.TestCase):
                 (results_dir / "astock_screen_20260627.html").write_text("old", encoding="utf-8")
                 latest = results_dir / "astock_screen_20260628.html"
                 latest.write_text("latest", encoding="utf-8")
+                rows = ["rank,tier,code,name"]
+                rows.extend(f"{i},-,{i:06d},stock{i}" for i in range(1, 4001))
+                (results_dir / "astock_screen_20260628.csv").write_text(
+                    "\n".join(rows),
+                    encoding="utf-8",
+                )
                 server.RESULTS_DIR = str(results_dir)
 
                 self.assertEqual(Path(server._latest_screen_path()), latest)
@@ -496,6 +513,12 @@ class RegressionTests(unittest.TestCase):
             self.assertIn("--fresh", full_args)
         finally:
             server._last_run = old_last_run
+
+    def test_server_uses_threading_http_server_for_parallel_status_requests(self):
+        source = (ROOT / "server.py").read_text(encoding="utf-8")
+
+        self.assertIn("ThreadingHTTPServer", source)
+        self.assertIn('ThreadingHTTPServer(("127.0.0.1", args.port)', source)
 
     def test_quotes_fresh_bypasses_only_spot_cache(self):
         source = (ROOT / "astock_screener.py").read_text(encoding="utf-8")

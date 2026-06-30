@@ -13,8 +13,6 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from screeners.contracts import (
-    MARKET_CN,
-    MARKET_HK,
     make_screening_record,
 )
 from screeners.scoring import (
@@ -22,7 +20,6 @@ from screeners.scoring import (
     score,
     run_full_pipeline,
     industry_median_pe,
-    DEFAULT_CONFIG,
     median,
     scale,
 )
@@ -146,6 +143,7 @@ class TestEvaluate(unittest.TestCase):
         # B tier requires: no L0 fails, no L1 fails
         l0_fails = sum(1 for f in fails if f in ("ST", "亏损")
                        or "负债率" in f or "商誉" in f or "OCF" in f)
+        self.assertEqual(l0_fails, 0)
         self.assertGreater(len(fails), 0, "Should have some fails beyond L0/L1")
         self.assertEqual(tier, "B_优质待跌")
 

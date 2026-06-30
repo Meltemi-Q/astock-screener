@@ -8,7 +8,6 @@ Does NOT pull live network data; uses cached/fixture data.
 from __future__ import annotations
 import json
 import os
-import time
 from collections import defaultdict
 from typing import Any
 

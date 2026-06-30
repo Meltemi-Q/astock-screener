@@ -103,6 +103,31 @@ fi
 cleanup() { [ -n "${SVR_PID:-}" ] && kill "$SVR_PID" 2>/dev/null || true; }
 trap cleanup EXIT INT TERM
 
+stop_existing_project_servers() {
+  local ports=()
+  local port pid cmd proc_cwd
+  for port in $(seq "$SERVE_PORT" $((SERVE_PORT + 10))) 18899; do
+    ports+=("$port")
+  done
+
+  for port in "${ports[@]}"; do
+    while IFS= read -r pid; do
+      [ -n "$pid" ] || continue
+      cmd=$(ps -p "$pid" -o command= 2>/dev/null || true)
+      case "$cmd" in
+        *"server.py --port"*) ;;
+        *) continue ;;
+      esac
+
+      proc_cwd=$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | awk '/^n/{sub(/^n/,"");print;exit}')
+      if [ "$proc_cwd" = "$PWD" ]; then
+        echo "  ● 停止旧服务: PID $pid (port $port)"
+        kill "$pid" 2>/dev/null || true
+      fi
+    done < <(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)
+  done
+}
+
 # ── Step 1: 五层选股 ──
 if [ "$DO_SCREENER" = true ]; then
   echo "========================================="
@@ -187,6 +212,7 @@ fi
 
 # ── 启动本地 HTTP 服务 + 打开浏览器 ──
 if [ "$DO_SERVE" = true ]; then
+  stop_existing_project_servers
   START_PORT=$SERVE_PORT
   for try_port in $(seq "$SERVE_PORT" $((SERVE_PORT + 10))); do
     if lsof -nP -iTCP:"$try_port" -sTCP:LISTEN >/dev/null 2>&1; then

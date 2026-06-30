@@ -7,7 +7,6 @@ Downloads the official Nasdaq-listed and other-exchange-listed symbol files
 issues, and cross-references with the SEC CIK master.
 """
 
-import time
 from .http import get_text
 
 # ── Constants ──────────────────────────────────────────────

@@ -4,7 +4,6 @@ Per PRD section 8.4. Tests market-switching API behavior, error responses,
 and backward compatibility with A-share-only endpoints.
 """
 
-import json
 import sys
 import tempfile
 import unittest
@@ -112,6 +111,37 @@ class TestApiStatus(unittest.TestCase):
         finally:
             server.RESULTS_DIR = old_results
 
+    def test_output_validation_normalizes_short_tier_codes(self):
+        """HK/US CSV short tier codes are normalized for status cards."""
+        import csv
+        from screeners import output_validation
+
+        old_rule = output_validation.MARKET_RULES["us"].copy()
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                tdp = Path(td)
+                output_validation.MARKET_RULES["us"]["min_rows"] = 1
+                output_validation.MARKET_RULES["us"]["required_codes"] = ()
+
+                with (tdp / "usstock_screen_20260630.csv").open(
+                    "w", newline="", encoding="utf-8-sig"
+                ) as f:
+                    writer = csv.DictWriter(f, fieldnames=["code", "tier"])
+                    writer.writeheader()
+                    writer.writerow({"code": "AAPL", "tier": "A"})
+                    writer.writerow({"code": "MSFT", "tier": "B"})
+                    writer.writerow({"code": "NVDA", "tier": "C"})
+                (tdp / "usstock_screen_20260630.html").write_text("", encoding="utf-8")
+
+                status = output_validation.validate_market_result(str(tdp), "us", "20260630")
+
+            self.assertTrue(status["valid"], status)
+            self.assertEqual(status["tier_counts"]["A_可买入"], 1)
+            self.assertEqual(status["tier_counts"]["B_优质待跌"], 1)
+            self.assertEqual(status["tier_counts"]["C_接近合格"], 1)
+        finally:
+            output_validation.MARKET_RULES["us"] = old_rule
+
 
 class TestApiRefresh(unittest.TestCase):
     """Tests for /api/refresh endpoint."""
@@ -137,7 +167,9 @@ class TestApiRefresh(unittest.TestCase):
                 res_dir = tdp / "results"
                 res_dir.mkdir(parents=True)
 
-                # Create a dummy HK screen file so _latest_screen_ts works
+                # Create a dummy HK screen file so file-count logic works.
+                # Artifact validation is patched below; production validation
+                # is covered separately.
                 (res_dir / "hkstock_screen_20260630.html").write_text("", encoding="utf-8")
                 (res_dir / "hkstock_screen_20260630.csv").write_text("", encoding="utf-8")
 
@@ -152,6 +184,20 @@ class TestApiRefresh(unittest.TestCase):
                         args=["python3", "screeners/hk.py"],
                         returncode=0, stdout="ok", stderr="",
                     ),
+                ), patch.object(
+                    server,
+                    "latest_market_result",
+                    return_value={
+                        "status": "ready",
+                        "latest": {
+                            "ts": "20260630",
+                            "row_count": 1200,
+                            "tier_counts": {},
+                            "warnings": [],
+                        },
+                        "latest_invalid": None,
+                        "checked": 1,
+                    },
                 ):
                     handler._api_refresh("hk", "quotes")
 
@@ -159,10 +205,36 @@ class TestApiRefresh(unittest.TestCase):
                 self.assertTrue(captured["data"]["done"])
                 self.assertEqual(captured["data"]["market"], "hk")
                 self.assertEqual(captured["data"]["mode"], "quotes")
+                self.assertEqual(captured["data"]["effective_mode"], "full")
 
         finally:
             server.RESULTS_DIR = old_results
             server._last_run = old_last_run
+
+    def test_api_status_invalid_result_is_not_ready(self):
+        """Small HK sample output is reported as invalid, not ready."""
+        old_results = server.RESULTS_DIR
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                tdp = Path(td)
+                server.RESULTS_DIR = str(tdp)
+                (tdp / "hkstock_screen_20260630.csv").write_text(
+                    "rank,tier,code,name\n1,A,00700,Tencent\n",
+                    encoding="utf-8",
+                )
+                (tdp / "hkstock_screen_20260630.html").write_text("", encoding="utf-8")
+
+                handler, captured = _make_handler()
+                handler._api_status(["hk"])
+
+                self.assertEqual(captured["status"], 200)
+                self.assertFalse(captured["data"]["done"])
+                self.assertEqual(captured["data"]["status"], "invalid")
+                self.assertEqual(captured["data"]["latest_invalid_ts"], "20260630")
+                self.assertTrue(captured["data"]["errors"])
+
+        finally:
+            server.RESULTS_DIR = old_results
 
 
 class TestApiDeep(unittest.TestCase):

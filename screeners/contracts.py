@@ -6,8 +6,6 @@ these contracts before entering the five-layer scoring pipeline.
 """
 
 from __future__ import annotations
-from typing import TypedDict
-
 # ── Market identifiers ──
 MARKET_CN = "cn"
 MARKET_HK = "hk"

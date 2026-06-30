@@ -20,13 +20,16 @@ import subprocess
 import threading
 import time
 import re
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs
+
+from screeners.output_validation import latest_market_result
 
 # ── 路径 ────────────────────────────────────────────────
 WORKDIR = os.path.dirname(os.path.abspath(__file__))
 RESULTS_DIR = os.path.join(WORKDIR, "results")
 DEEP_DIR = os.path.join(RESULTS_DIR, "deep_dives")
+TEMPLATE_SCREEN = os.path.join(WORKDIR, "templates", "screen.html")
 DEFAULT_PORT = 8899
 
 # ── 市场配置注册表 ──────────────────────────────────────
@@ -118,32 +121,20 @@ def _get_markets(market_arg: str | None) -> list[str]:
 
 
 def _latest_screen_path(market: str = "cn", results_dir: str | None = None) -> str:
-    """返回指定市场最新日期版总表 HTML 的绝对路径。"""
+    """返回指定市场最新有效日期版总表 HTML 的绝对路径。"""
     results_dir = results_dir or RESULTS_DIR
-    if not os.path.isdir(results_dir):
+    ts = _latest_screen_ts(market)
+    if not ts:
         return ""
     cfg = MARKET_CONFIG[market]
-    prefix = cfg["html_prefix"]
-    screens = sorted([
-        f for f in os.listdir(results_dir)
-        if f.startswith(f"{prefix}_") and DATE_HTML_RE.match(f)
-    ], reverse=True)
-    return os.path.join(results_dir, screens[0]) if screens else ""
+    return os.path.join(results_dir, f"{cfg['html_prefix']}_{ts}.html")
 
 
 def _latest_screen_ts(market: str) -> str:
-    """返回指定市场最新 CSV 的时间戳 (YYYYMMDD)，无数据返回空字符串。"""
-    cfg = MARKET_CONFIG[market]
-    prefix = cfg["csv_prefix"]
-    if not os.path.isdir(RESULTS_DIR):
-        return ""
-    csvs = sorted([
-        f for f in os.listdir(RESULTS_DIR)
-        if f.startswith(f"{prefix}_") and f.endswith(".csv")
-    ], reverse=True)
-    if not csvs:
-        return ""
-    return csvs[0].replace(f"{prefix}_", "").replace(".csv", "")
+    """返回指定市场最新有效 CSV 的时间戳 (YYYYMMDD)，无有效数据返回空字符串。"""
+    status = latest_market_result(RESULTS_DIR, market)
+    latest = status.get("latest") if status.get("status") == "ready" else None
+    return latest.get("ts", "") if latest else ""
 
 
 def _latest_screen_href(market: str) -> str:
@@ -169,20 +160,43 @@ def _latest_screen_file_count(market: str) -> int:
 
 def _market_status(market: str) -> dict:
     """返回单个市场的状态快照。"""
-    ts = _latest_screen_ts(market)
+    result_status = latest_market_result(RESULTS_DIR, market)
     count = _latest_screen_file_count(market)
-    if not ts:
+    cfg = MARKET_CONFIG[market]
+    if result_status["status"] == "ready":
+        latest = result_status["latest"]
+        ts = latest["ts"]
+        return {
+            "latest_ts": ts,
+            "latest_href": f"{cfg['html_prefix']}_{ts}.html",
+            "stable_href": cfg["stable_name"],
+            "file_count": count,
+            "row_count": latest.get("row_count", 0),
+            "tier_counts": latest.get("tier_counts", {}),
+            "status": "ready",
+            "warnings": latest.get("warnings", []),
+        }
+    if result_status["status"] == "invalid":
+        invalid = result_status["latest_invalid"]
         return {
             "latest_ts": None,
-            "file_count": 0,
-            "status": "not_generated",
+            "latest_href": "",
+            "stable_href": cfg["stable_name"],
+            "file_count": count,
+            "status": "invalid",
+            "row_count": invalid.get("row_count", 0),
+            "latest_invalid_ts": invalid.get("ts"),
+            "latest_invalid_href": f"{cfg['html_prefix']}_{invalid.get('ts')}.html",
+            "errors": invalid.get("errors", []),
+            "warnings": invalid.get("warnings", []),
         }
     return {
-        "latest_ts": ts,
-        "latest_href": _latest_screen_href(market),
-        "stable_href": MARKET_CONFIG[market]["stable_name"],
+        "latest_ts": None,
+        "latest_href": "",
+        "stable_href": cfg["stable_name"],
         "file_count": count,
-        "status": "ready",
+        "status": "not_generated",
+        "warnings": [f"{cfg['label']}暂无有效筛选结果，请先运行更新五层筛选"],
     }
 
 
@@ -302,6 +316,10 @@ function setTheme(theme){
 
 def _build_unified_screen_html() -> bytes:
     """构建多市场统一入口页 HTML。"""
+    if os.path.exists(TEMPLATE_SCREEN):
+        with open(TEMPLATE_SCREEN, encoding="utf-8") as f:
+            return f.read().encode("utf-8")
+
     cards_parts = []
     market_data = {}
     for m in ALL_MARKETS:
@@ -416,14 +434,31 @@ class ScreenerHandler(SimpleHTTPRequestHandler):
     def _serve_market_stable(self, market: str, head_only: bool = False):
         """返回市场稳定入口页，自动重定向到最新日期总表 HTML。"""
         cfg = MARKET_CONFIG[market]
-        latest_ts = _latest_screen_ts(market)
+        status = _market_status(market)
+        latest_ts = status.get("latest_ts")
         if latest_ts:
             latest_name = f"{cfg['html_prefix']}_{latest_ts}.html"
             target_js = json.dumps(latest_name, ensure_ascii=False)
+            refresh_meta = f'<meta http-equiv="refresh" content="0; url={latest_name}">'
             redirect_js = f"<script>location.replace({target_js})</script>"
+            message = f'正在打开最新总表：<a href="{latest_name}">{latest_name}</a>'
         else:
             latest_name = ""
+            refresh_meta = ""
             redirect_js = ""
+            reasons = status.get("errors") or status.get("warnings") or ["暂无有效正式筛选结果"]
+            reason_html = "".join(f"<li>{r}</li>" for r in reasons)
+            invalid_link = ""
+            if status.get("latest_invalid_href"):
+                invalid = status["latest_invalid_href"]
+                invalid_link = (
+                    f'<p>最近一次产物未通过校验：'
+                    f'<a href="{invalid}">{invalid}</a>，仅供排查，不作为正式结果。</p>'
+                )
+            message = (
+                f"<p>{cfg['label']}暂无可验收的正式结果。</p>"
+                f"<ul>{reason_html}</ul>{invalid_link}"
+            )
 
         stable_name = cfg["stable_name"]
         label = cfg["label"]
@@ -431,7 +466,7 @@ class ScreenerHandler(SimpleHTTPRequestHandler):
         html = f"""<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="refresh" content="0; url={latest_name}">
+{refresh_meta}
 <title>{label}五层选股固定入口</title>
 <style>
 body{{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#f6f8fb;color:#172033}}
@@ -442,7 +477,7 @@ a{{color:#2563eb}}
 </style></head><body>
 <div class="box">
 <h1>{label}五层选股固定入口</h1>
-<p>{'正在打开最新总表：<a href="' + latest_name + '">' + latest_name + '</a>' if latest_ts else '暂无筛选结果，请先运行选股脚本。'}</p>
+{message}
 <p>日期页继续作为后台历史产物保留；日常请访问 <code>{stable_name}</code>。</p>
 <div class="back"><a href="/screen.html">← 返回全市场总览</a></div>
 </div>
@@ -547,13 +582,21 @@ a{{color:#2563eb}}
         _last_run[market] = now
 
         label_map = {"quotes": "刷新行情", "full": "更新五层筛选"}
-        fresh_label = label_map.get(mode, f"刷新({mode})")
+        requested_mode = mode
+        effective_mode = mode
+        pre_warnings: list[str] = []
+        if market != "cn" and mode == "quotes":
+            effective_mode = "full"
+            pre_warnings.append(
+                f"{cfg['label']}暂不支持只刷新行情，已改为更新五层筛选"
+            )
+        fresh_label = label_map.get(effective_mode, f"刷新({effective_mode})")
 
         args = [sys.executable, os.path.join(WORKDIR, cfg["screen_script"])]
 
         # 市场特定参数
-        if mode in cfg.get("fresh_flags", {}):
-            args.extend(cfg["fresh_flags"][mode])
+        if effective_mode in cfg.get("fresh_flags", {}):
+            args.extend(cfg["fresh_flags"][effective_mode])
         # HK/US: 直接运行 screener 脚本即可 (数据源内部有缓存逻辑)
 
         try:
@@ -565,7 +608,9 @@ a{{color:#2563eb}}
             self.send_json({
                 "error": f"{fresh_label}超时(>300s)",
                 "market": market,
-                "mode": mode,
+                "mode": requested_mode,
+                "effective_mode": effective_mode,
+                "warnings": pre_warnings,
             }, status=504)
             return
         except FileNotFoundError:
@@ -577,6 +622,7 @@ a{{color:#2563eb}}
             return
 
         latest_ts = _latest_screen_ts(market)
+        status_info = _market_status(market)
         data = {
             "done": result.returncode == 0,
             "market": market,
@@ -584,15 +630,29 @@ a{{color:#2563eb}}
             "latest_href": _latest_screen_href(market),
             "stable_href": cfg["stable_name"],
             "progress": None,
-            "warnings": [],
-            "mode": mode,
+            "warnings": list(pre_warnings),
+            "mode": requested_mode,
+            "effective_mode": effective_mode,
+            "status": status_info.get("status"),
         }
         if result.returncode != 0:
             data["error"] = f"{fresh_label}失败 (exit code={result.returncode})"
             data["stderr_tail"] = result.stderr[-500:] if result.stderr else ""
             data["warnings"].append(f"{cfg['label']} {fresh_label}返回非零退出码")
             status = 500
+        elif status_info.get("status") != "ready":
+            data["done"] = False
+            data["error"] = f"{cfg['label']}产物未通过正式验收"
+            data["errors"] = status_info.get("errors", [])
+            data["latest_invalid_ts"] = status_info.get("latest_invalid_ts")
+            data["latest_invalid_href"] = status_info.get("latest_invalid_href")
+            data["row_count"] = status_info.get("row_count", 0)
+            data["warnings"].extend(status_info.get("warnings", []))
+            status = 422
         else:
+            data["row_count"] = status_info.get("row_count", 0)
+            data["tier_counts"] = status_info.get("tier_counts", {})
+            data["warnings"].extend(status_info.get("warnings", []))
             status = 200
 
         self.send_json(data, status=status)
@@ -785,7 +845,8 @@ a{{color:#2563eb}}
         # ── 单市场模式 (向后兼容旧版 HTML 仪表盘) ──
         market = markets[0]
         cfg = MARKET_CONFIG[market]
-        ts = _latest_screen_ts(market)
+        status_info = _market_status(market)
+        ts = status_info.get("latest_ts")
         deep_count = _count_deep_existing() if market == "cn" else 0
 
         # ── 进度追踪 ──
@@ -821,19 +882,28 @@ a{{color:#2563eb}}
             with _job_lock:
                 _jobs[market]["status"] = "idle"
 
-        warnings = []
-        if not ts:
+        warnings = list(status_info.get("warnings", []))
+        errors = list(status_info.get("errors", []))
+        if not ts and not warnings and not errors:
             warnings.append(f"{cfg['label']}暂无筛选结果，请先运行选股")
 
         data = {
-            "done": bool(ts),
+            "done": status_info.get("status") == "ready",
             "market": market,
             "latest_ts": ts,
-            "latest_href": _latest_screen_href(market),
+            "latest_href": status_info.get("latest_href", ""),
             "stable_href": cfg["stable_name"],
             "progress": progress,
             "warnings": warnings,
+            "errors": errors,
+            "status": status_info.get("status"),
+            "file_count": status_info.get("file_count", 0),
+            "row_count": status_info.get("row_count", 0),
+            "tier_counts": status_info.get("tier_counts", {}),
         }
+        if status_info.get("latest_invalid_ts"):
+            data["latest_invalid_ts"] = status_info.get("latest_invalid_ts")
+            data["latest_invalid_href"] = status_info.get("latest_invalid_href")
         if market == "cn":
             data["deep_count"] = deep_count
 
@@ -870,7 +940,7 @@ def main():
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
     try:
-        server = HTTPServer(("127.0.0.1", args.port), ScreenerHandler)
+        server = ThreadingHTTPServer(("127.0.0.1", args.port), ScreenerHandler)
     except OSError as e:
         if "Address already in use" in str(e) or "Address already in use" in repr(e):
             print(f"❌ 端口 {args.port} 已被占用，尝试：lsof -ti:{args.port} | xargs kill")

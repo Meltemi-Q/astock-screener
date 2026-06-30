@@ -10,10 +10,9 @@ Provides:
 Cache TTL: 24 hours for security master, 6 hours for financial data.
 """
 
-import os
 import io
 import time
-from .http import get_json, get_text, get_bytes, CACHE_DIR, _http_get, _cache_uid
+from .http import get_json, get_text, get_bytes
 
 # ── Constants ──────────────────────────────────────────────
 HKEX_XLSX_URL = (
@@ -240,6 +239,30 @@ def _pad_code(code):
     return code.zfill(5)
 
 
+def _cell(row, idx, default=""):
+    """Return a row cell safely."""
+    if idx is None:
+        return default
+    try:
+        value = row[idx]
+    except (IndexError, TypeError):
+        return default
+    return default if value is None else value
+
+
+def _int_cell(value) -> int:
+    """Parse integer cells like 1000, '1,000', or '1000.0'."""
+    if value is None or value == "":
+        return 0
+    text = str(value).strip().replace(",", "")
+    if not text:
+        return 0
+    try:
+        return int(float(text))
+    except (ValueError, TypeError):
+        return 0
+
+
 def _parse_hkex_xlsx(data):
     """Parse HKEX ListOfSecurities.xlsx binary data.
 
@@ -254,12 +277,20 @@ def _parse_hkex_xlsx(data):
     ws = wb.active
 
     rows = []
-    # Read all rows; first row is header
     all_rows = list(ws.iter_rows(values_only=True))
     if not all_rows:
         return rows
 
-    header = [str(h).strip().lower() if h else "" for h in all_rows[0]]
+    header_idx = None
+    for i, row in enumerate(all_rows):
+        normalized = [str(h).strip().lower() if h else "" for h in row]
+        if any("stock code" in h or h == "code" for h in normalized):
+            header_idx = i
+            break
+    if header_idx is None:
+        header_idx = 0
+
+    header = [str(h).strip().lower() if h else "" for h in all_rows[header_idx]]
     # Map header columns to our keys
     col_map = {}
     for i, h in enumerate(header):
@@ -272,7 +303,7 @@ def _parse_hkex_xlsx(data):
             col_map["board_lot"] = i
         elif "isin" in hl:
             col_map["isin"] = i
-        elif "category" in hl:
+        elif "category" in hl and "sub" not in hl and "category" not in col_map:
             col_map["category"] = i
 
     # If we couldn't map columns by name, try positional fallback
@@ -288,22 +319,18 @@ def _parse_hkex_xlsx(data):
         # Category may be at position 4 or 5
         col_map["category"] = 4 if len(header) > 4 else None
 
-    for row in all_rows[1:]:
+    for row in all_rows[header_idx + 1:]:
         if not row:
             continue
-        code = str(row[col_map.get("code", 0)] or "").strip()
+        code = str(_cell(row, col_map.get("code", 0)) or "").strip()
         if not code or not code.isdigit():
             continue
-        name = str(row[col_map.get("name", 1)] or "").strip()
-        board_lot = row[col_map.get("board_lot", 2)] if "board_lot" in col_map else 0
-        try:
-            board_lot = int(board_lot) if board_lot else 0
-        except (ValueError, TypeError):
-            board_lot = 0
-        isin = str(row[col_map.get("isin", 3)] or "").strip() if "isin" in col_map else ""
+        name = str(_cell(row, col_map.get("name", 1)) or "").strip()
+        board_lot = _int_cell(_cell(row, col_map.get("board_lot")))
+        isin = str(_cell(row, col_map.get("isin")) or "").strip()
         category = ""
         if "category" in col_map and col_map["category"] is not None:
-            category = str(row[col_map["category"]] or "").strip()
+            category = str(_cell(row, col_map["category"]) or "").strip()
 
         rows.append({
             "code": _pad_code(code),
@@ -348,7 +375,7 @@ def _parse_hkex_csv(text):
                     col["board_lot"] = i
                 elif "isin" in hl:
                     col["isin"] = i
-                elif "category" in hl:
+                elif "category" in hl and "sub" not in hl and "category" not in col:
                     col["category"] = i
             continue
         if header is None:
@@ -359,10 +386,7 @@ def _parse_hkex_csv(text):
         name = str(line[col.get("name", 1)] or "").strip() if "name" in col else ""
         board_lot = 0
         if "board_lot" in col:
-            try:
-                board_lot = int(line[col["board_lot"]] or 0)
-            except (ValueError, TypeError):
-                board_lot = 0
+            board_lot = _int_cell(line[col["board_lot"]])
         isin = str(line[col.get("isin", 3)] or "").strip() if "isin" in col else ""
         category = str(line[col.get("category", 4)] or "").strip() if "category" in col else ""
         rows.append({
@@ -377,15 +401,20 @@ def _parse_hkex_csv(text):
 
 # ── Public API ─────────────────────────────────────────────
 
-def fetch_hkex_security_master():
+def fetch_hkex_security_master(allow_fixture: bool = False):
     """Fetch the full HKEX security master list.
 
     Tries in order:
     1. Download xlsx from HKEX and parse with openpyxl.
     2. Fallback: download CSV version of the same list.
-    3. Ultimate fallback: use built-in fixture data.
+    3. Optional development fallback: use built-in fixture data.
 
     Filters to common stocks only (excludes ETFs, warrants, CBBCs, REITs).
+
+    Args:
+        allow_fixture: If True, use the small built-in sample list when
+        official HKEX sources are unavailable. Production callers must keep
+        this False so incomplete samples do not become formal output.
 
     Returns:
         list[dict]: Each dict has keys: code (5-digit 0-padded string),
@@ -422,9 +451,14 @@ def fetch_hkex_security_master():
             print(f"  [HKEX Master] CSV fallback failed: {e}")
             rows = None
 
-    # ── Try 3: Fixture data ──
+    # ── Try 3: Fixture data (development only) ──
     if not rows:
-        print("  [HKEX Master] Using fixture data as ultimate fallback")
+        if not allow_fixture:
+            raise RuntimeError(
+                "HKEX security master unavailable or incomplete; refusing to "
+                "use fixture data for formal full-market output"
+            )
+        print("  [HKEX Master] Using fixture data as explicit development fallback")
         rows = [
             {"code": c, "name": n, "board_lot": b, "category": cat, "isin": i}
             for c, n, b, cat, i in _FIXTURE_HK_STOCKS

@@ -8,8 +8,6 @@ Usage:
   python3 -m unittest tests.test_global_data_sources --live  # include live
 """
 
-import json
-import os
 import sys
 import unittest
 from pathlib import Path
@@ -665,8 +663,6 @@ class TestNasdaqTrader(unittest.TestCase):
 
     def test_nasdaq_universe_size(self):
         """Verify 3000-12000 stocks after filtering."""
-        from data_sources.nasdaq_trader import build_us_stock_universe
-
         with patch("data_sources.nasdaq_trader.get_text") as mock_get:
             mock_get.side_effect = [
                 NASDAQ_LISTED_FIXTURE,
@@ -731,6 +727,37 @@ class TestNasdaqTrader(unittest.TestCase):
 class TestHkexSecurityMaster(unittest.TestCase):
     """Tests for HKEX security master list."""
 
+    def test_hkex_xlsx_parser_detects_header_after_title_rows(self):
+        """HKEX xlsx parser handles title rows before the real header."""
+        import io
+        from openpyxl import Workbook
+        from data_sources.hkex import _parse_hkex_xlsx
+
+        wb = Workbook()
+        ws = wb.active
+        ws.append(["List of Securities"])
+        ws.append(["Updated as at 30/06/2026"])
+        ws.append([
+            "Stock Code", "Name of Securities", "Category",
+            "Sub-Category", "Board Lot", "ISIN",
+        ])
+        ws.append([
+            "00700", "TENCENT", "Equity Securities (Main Board)",
+            "Equity", "100", "KYG875721634",
+        ])
+        ws.append([
+            "09988", "BABA-W", "Equity Securities (Main Board)",
+            "Equity", "2,500", "KYG017191142",
+        ])
+        buf = io.BytesIO()
+        wb.save(buf)
+
+        rows = _parse_hkex_xlsx(buf.getvalue())
+
+        self.assertEqual([r["code"] for r in rows], ["00700", "09988"])
+        self.assertEqual(rows[0]["category"], "Equity Securities (Main Board)")
+        self.assertEqual(rows[1]["board_lot"], 2500)
+
     def test_hkex_security_master_contains_core_hk_names(self):
         """Verify fixture contains 00700, 09988."""
         codes = {r["code"] for r in HKEX_MASTER_FIXTURE}
@@ -745,6 +772,146 @@ class TestHkexSecurityMaster(unittest.TestCase):
         valid, msg = validate_hkex_master(HKEX_MASTER_FIXTURE)
         self.assertFalse(valid, f"Expected validation to fail with {msg}")
         self.assertIn("2000", msg)
+
+
+class TestGlobalScreenerRecordAssembly(unittest.TestCase):
+    """Tests for retaining full quote universes even with partial fundamentals."""
+
+    def test_hk_build_records_falls_back_to_quote_universe_when_hkex_master_unavailable(self):
+        """HK screener keeps quote rows and flags missing fundamentals."""
+        from screeners import hk
+
+        spot = {
+            "00700": {
+                "code": "00700", "name": "腾讯控股", "price": 380.0,
+                "market_cap": 3.5e12, "pe_ttm": 18.0, "pe_dyn": 17.0, "pb": 4.0,
+            },
+            "09988": {
+                "code": "09988", "name": "阿里巴巴-W", "price": 120.0,
+                "market_cap": 2.2e12, "pe_ttm": 14.0, "pe_dyn": 13.0, "pb": 2.1,
+            },
+        }
+
+        def fake_financials(code):
+            if code != "00700":
+                return []
+            return [
+                {
+                    "report_date": "2025-12-31", "currency": "HKD",
+                    "revenue": 100.0, "gross_profit": 60.0, "net_profit": 30.0,
+                    "roe": 25.0, "gross_margin": 60.0, "net_margin": 30.0,
+                    "debt_ratio": 20.0,
+                },
+                {
+                    "report_date": "2024-12-31", "currency": "HKD",
+                    "net_profit": 20.0,
+                },
+                {
+                    "report_date": "2022-12-31", "currency": "HKD",
+                    "net_profit": 10.0,
+                },
+            ]
+
+        with patch.object(hk, "fetch_hkex_security_master", side_effect=RuntimeError("HKEX offline")), \
+             patch.object(hk, "fetch_hk_spot_snapshot", return_value=spot), \
+             patch.object(hk, "fetch_eastmoney_hk_financials", side_effect=fake_financials), \
+             patch.object(hk, "fetch_eastmoney_hk_cashflow", return_value={2025: 35.0}):
+            records = hk.build_hk_records(2025)
+
+        by_code = {r["code"]: r for r in records}
+        self.assertIn("00700", by_code)
+        self.assertIn("09988", by_code)
+        self.assertEqual(by_code["09988"]["data_quality_flag"], "missing_financials")
+        self.assertIn("ROE<", ";".join(by_code["09988"]["fails"]))
+
+    def test_hk_fin_fetch_limit_zero_keeps_quote_rows_without_network_fetch(self):
+        """HK cache-budget mode skips financial APIs but keeps quote rows."""
+        from screeners import hk
+
+        spot = {
+            "00700": {
+                "code": "00700", "name": "腾讯控股", "price": 380.0,
+                "market_cap": 3.5e12, "pe_ttm": 18.0, "pe_dyn": 17.0, "pb": 4.0,
+            },
+        }
+
+        with patch.dict("os.environ", {"HK_FIN_MAX_FETCHES": "0"}), \
+             patch.object(hk, "fetch_hkex_security_master", side_effect=RuntimeError("HKEX offline")), \
+             patch.object(hk, "fetch_hk_spot_snapshot", return_value=spot), \
+             patch.object(hk, "fetch_eastmoney_hk_financials") as mock_fin, \
+             patch.object(hk, "fetch_eastmoney_hk_cashflow") as mock_cashflow:
+            records = hk.build_hk_records(2025)
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["code"], "00700")
+        self.assertEqual(records[0]["data_quality_flag"], "missing_financials")
+        mock_fin.assert_not_called()
+        mock_cashflow.assert_not_called()
+
+    def test_us_build_records_retains_quote_rows_without_sec_financials(self):
+        """US screener keeps quote rows and flags missing SEC fundamentals."""
+        from screeners import us
+        from screeners.scoring import run_full_pipeline, DEFAULT_CONFIG
+
+        merged = [
+            {"ticker": "AAPL", "name": "Apple Inc.", "exchange": "NASDAQ", "has_cik": True, "cik": 320193},
+            {"ticker": "MSFT", "name": "Microsoft Corp.", "exchange": "NASDAQ", "has_cik": True, "cik": 789019},
+        ]
+        spot = {
+            "AAPL": {"price": 200.0, "market_cap": 3.0e12, "pe_ttm": 30.0, "pe_dyn": 28.0, "pb": 10.0},
+            "MSFT": {"price": 450.0, "market_cap": 3.4e12, "pe_ttm": 35.0, "pe_dyn": 32.0, "pb": 12.0},
+        }
+
+        def fake_api(_cik, ticker, _year):
+            if ticker != "AAPL":
+                return None
+            return {
+                "sic": "3571",
+                "latest": {
+                    "roe": 35.0, "gross_margin": 55.0, "net_margin": 25.0,
+                    "ocf_to_profit": 1.1, "debt_ratio": 45.0, "net_profit": 100.0,
+                },
+                "yoy": 12.0,
+                "cagr": 11.0,
+            }
+
+        with patch.object(us, "build_us_stock_universe", return_value=[]), \
+             patch.object(us, "fetch_sec_ticker_master", return_value=[]), \
+             patch.object(us, "merge_universe_with_sec", return_value=merged), \
+             patch.object(us, "fetch_us_spot_snapshot", return_value=spot), \
+             patch.object(us, "_safe_api_call", side_effect=fake_api):
+            records = us.build_us_records(2025)
+
+        records, _, _ = run_full_pipeline(records, config=DEFAULT_CONFIG, market="us")
+        by_code = {r["code"]: r for r in records}
+        self.assertIn("AAPL", by_code)
+        self.assertIn("MSFT", by_code)
+        self.assertEqual(by_code["MSFT"]["data_quality_flag"], "missing_financials")
+        self.assertIn("ROE<", ";".join(by_code["MSFT"]["fails"]))
+
+    def test_us_sec_fetch_limit_zero_keeps_quote_rows_without_network_fetch(self):
+        """US cache-only mode skips uncached SEC calls but keeps quote rows."""
+        from screeners import us
+
+        merged = [
+            {"ticker": "MSFT", "name": "Microsoft Corp.", "exchange": "NASDAQ", "has_cik": True, "cik": 789019},
+        ]
+        spot = {
+            "MSFT": {"price": 450.0, "market_cap": 3.4e12, "pe_ttm": 35.0, "pe_dyn": 32.0, "pb": 12.0},
+        }
+
+        with patch.dict("os.environ", {"US_SEC_MAX_FRESH_FETCHES": "0"}), \
+             patch.object(us, "build_us_stock_universe", return_value=[]), \
+             patch.object(us, "fetch_sec_ticker_master", return_value=[]), \
+             patch.object(us, "merge_universe_with_sec", return_value=merged), \
+             patch.object(us, "fetch_us_spot_snapshot", return_value=spot), \
+             patch.object(us, "_has_fresh_company_facts_cache", return_value=False), \
+             patch.object(us, "_safe_api_call", side_effect=AssertionError("should not fetch")):
+            records = us.build_us_records(2025)
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["code"], "MSFT")
+        self.assertEqual(records[0]["data_quality_flag"], "missing_financials")
 
 
 class TestEastmoneyGlobalQuotes(unittest.TestCase):

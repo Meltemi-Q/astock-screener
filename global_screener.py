@@ -24,7 +24,6 @@ WORKDIR = os.path.dirname(os.path.abspath(__file__))
 if WORKDIR not in sys.path:
     sys.path.insert(0, WORKDIR)
 
-import astock_screener
 from screeners.cn import build_cn_records, write_cn_results
 from screeners.hk import build_hk_records, write_hk_results
 from screeners.us import build_us_records, write_us_results
@@ -211,7 +210,7 @@ def main():
 
     # ── Grand summary ──
     print(f"\n{'='*60}")
-    print(f"  全球多市场选股汇总")
+    print("  全球多市场选股汇总")
     print(f"{'='*60}")
     total_stocks = sum(r["total"] for r in results)
     print(f"  总股票数:  {total_stocks}")

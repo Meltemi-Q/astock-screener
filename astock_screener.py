@@ -523,7 +523,7 @@ def write_csv(records, path):
             "pe_ttm", "peg", "eyield", "exp_ret", "discount", "pb",
             "mktcap_yi", "risk_notes", "fail_reasons"]
     with open(path, "w", newline="", encoding="utf-8-sig") as f:
-        w = csv.writer(f)
+        w = csv.writer(f, lineterminator="\n")
         w.writerow(cols)
         for i, r in enumerate(records, 1):
             min_buy = int((r["price"] or 0) * 100)

@@ -41,10 +41,7 @@ if WORKDIR not in sys.path:
     sys.path.insert(0, WORKDIR)
 
 from data_sources.eastmoney import (
-    fetch_us_quotes_batch,
     fetch_us_spot_snapshot,
-    fetch_global_quote,
-    fetch_global_kline,
 )
 from data_sources.sec_edgar import (
     fetch_sec_ticker_master,
@@ -52,7 +49,6 @@ from data_sources.sec_edgar import (
     extract_annual_financials,
     extract_roe,
     compute_derived_ratios,
-    fetch_apple_test,
 )
 from data_sources.nasdaq_trader import (
     build_us_stock_universe,
@@ -61,8 +57,6 @@ from data_sources.nasdaq_trader import (
 from screeners.contracts import (
     MARKET_US,
     make_screening_record,
-    make_annual_financial,
-    check_tier_ab_eligibility,
 )
 from screeners.scoring import run_full_pipeline, DEFAULT_CONFIG
 
@@ -73,6 +67,8 @@ SEC_FETCH_WORKERS = 3        # 线程池并发数 (保守，避免触发限流)
 
 # 缓存目录：SEC companyfacts JSON 文件
 US_FACTS_CACHE_DIR = os.path.join(WORKDIR, "cache", "us_facts")
+US_FACTS_CACHE_TTL = 24 * 3600
+DEFAULT_US_SEC_MAX_FRESH_FETCHES = 250
 
 # 输出目录
 RESULTS_DIR = os.path.join(WORKDIR, "results")
@@ -214,12 +210,9 @@ def _fetch_cached_company_facts(cik: int | str) -> dict:
     """
     os.makedirs(US_FACTS_CACHE_DIR, exist_ok=True)
 
-    cik_padded = str(int(cik)).zfill(10)
-    cache_path = os.path.join(US_FACTS_CACHE_DIR, f"CIK{cik_padded}.json")
+    cache_path = _company_facts_cache_path(cik)
 
-    # 24 小时缓存
-    cache_ttl = 24 * 3600
-    if os.path.exists(cache_path) and (time.time() - os.path.getmtime(cache_path)) < cache_ttl:
+    if _has_fresh_company_facts_cache(cik):
         try:
             with open(cache_path, "r", encoding="utf-8") as f:
                 return json.load(f)
@@ -239,6 +232,31 @@ def _fetch_cached_company_facts(cik: int | str) -> dict:
             pass
 
     return facts
+
+
+def _company_facts_cache_path(cik: int | str) -> str:
+    cik_padded = str(int(cik)).zfill(10)
+    return os.path.join(US_FACTS_CACHE_DIR, f"CIK{cik_padded}.json")
+
+
+def _has_fresh_company_facts_cache(cik: int | str) -> bool:
+    cache_path = _company_facts_cache_path(cik)
+    return (
+        os.path.exists(cache_path)
+        and (time.time() - os.path.getmtime(cache_path)) < US_FACTS_CACHE_TTL
+    )
+
+
+def _sec_max_fresh_fetches() -> int:
+    """Return max uncached SEC companyfacts fetches for one full run.
+
+    ``US_SEC_MAX_FRESH_FETCHES=0`` means cache-only. ``-1`` means unlimited.
+    """
+    raw = os.environ.get("US_SEC_MAX_FRESH_FETCHES", str(DEFAULT_US_SEC_MAX_FRESH_FETCHES))
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_US_SEC_MAX_FRESH_FETCHES
 
 
 def _safe_api_call(cik: int | str, ticker: str, year: int) -> dict | None:
@@ -364,9 +382,34 @@ def build_us_records(year: int = 2025) -> list[dict]:
     print(f"\n[4/5] 抓取 SEC 财务数据 (并发={SEC_FETCH_WORKERS})...")
     t0 = time.time()
 
-    # 仅对有 CIK 的股票抓取财务数据
+    # 仅对有 CIK 的股票抓取财务数据；默认只补一批 uncached SEC facts，
+    # 其余股票保留行情行并标记 missing_financials，避免全量运行卡数小时。
     stocks_with_cik = [r for r in merged if r["has_cik"]]
-    print(f"  待抓取: {len(stocks_with_cik)} 只")
+    fetch_limit = _sec_max_fresh_fetches()
+    cached_fetches = []
+    fresh_candidates = []
+    for r in stocks_with_cik:
+        if _has_fresh_company_facts_cache(r["cik"]):
+            cached_fetches.append(r)
+        else:
+            fresh_candidates.append(r)
+
+    def _cap_key(row):
+        quote = spot_data.get(row["ticker"]) or {}
+        return _fnum(quote.get("market_cap")) or 0.0
+
+    fresh_candidates.sort(key=_cap_key, reverse=True)
+    if fetch_limit < 0:
+        fresh_fetches = fresh_candidates
+    else:
+        fresh_fetches = fresh_candidates[:fetch_limit]
+    skipped_by_budget = max(0, len(fresh_candidates) - len(fresh_fetches))
+    stocks_to_fetch = cached_fetches + fresh_fetches
+    print(
+        f"  待处理 SEC 财务: {len(stocks_to_fetch)} 只 "
+        f"(缓存 {len(cached_fetches)}, 新抓 {len(fresh_fetches)}, "
+        f"预算跳过 {skipped_by_budget})"
+    )
 
     fin_results: dict[str, dict | None] = {}  # ticker → financial data
     completed = 0
@@ -375,7 +418,7 @@ def build_us_records(year: int = 2025) -> list[dict]:
 
     with ThreadPoolExecutor(max_workers=SEC_FETCH_WORKERS) as ex:
         futures = {}
-        for r in stocks_with_cik:
+        for r in stocks_to_fetch:
             ticker = r["ticker"]
             cik = r["cik"]
             futures[ex.submit(_safe_api_call, cik, ticker, year)] = ticker
@@ -390,15 +433,15 @@ def build_us_records(year: int = 2025) -> list[dict]:
                 print(f"  ⚠ {ticker}: 财务数据抓取异常: {e}")
 
             completed += 1
-            if completed % 200 == 0 or completed == len(stocks_with_cik):
+            if completed % 200 == 0 or completed == len(stocks_to_fetch):
                 elapsed = time.time() - t0
                 rate = completed / max(1, elapsed)
-                eta = (len(stocks_with_cik) - completed) / max(0.01, rate)
-                print(f"    进度: {completed}/{len(stocks_with_cik)} "
+                eta = (len(stocks_to_fetch) - completed) / max(0.01, rate)
+                print(f"    进度: {completed}/{len(stocks_to_fetch)} "
                       f"({rate:.1f} req/s, 预计剩余 {eta:.0f}s)")
 
     valid_fin = sum(1 for v in fin_results.values() if v is not None)
-    print(f"  财务数据: {valid_fin}/{len(stocks_with_cik)} 成功 "
+    print(f"  财务数据: {valid_fin}/{len(stocks_to_fetch)} 成功 "
           f"({time.time() - t0:.1f}s)")
 
     # ── Step 5: 组装归一化记录 ──
@@ -423,14 +466,13 @@ def build_us_records(year: int = 2025) -> list[dict]:
             skipped_no_spot += 1
             continue
 
-        # 检查财务数据
+        # 财务数据缺失时仍保留行情行，避免正式总表退化成少量样本。
         fin = fin_results.get(ticker)
         if fin is None:
             skipped_no_fin += 1
-            continue
 
         # 提取行业与 SIC
-        sic = fin.get("sic", "")
+        sic = fin.get("sic", "") if fin else ""
         industry = str(sic).strip() if sic else ""
         # 尝试从 Nasdaq 名称或 SIC 描述提取更好的行业名
         if not industry:
@@ -441,9 +483,9 @@ def build_us_records(year: int = 2025) -> list[dict]:
             print(f"  ⚠ 过滤金融股: {ticker} (SIC={sic})")
             continue
 
-        latest = fin.get("latest")
-        yoy = fin.get("yoy")
-        cagr = fin.get("cagr")
+        latest = fin.get("latest") if fin else None
+        yoy = fin.get("yoy") if fin else None
+        cagr = fin.get("cagr") if fin else None
 
         # 从行情提取估值
         pe_ttm = _fnum(spot.get("pe_ttm"))
@@ -475,7 +517,9 @@ def build_us_records(year: int = 2025) -> list[dict]:
             goodwill_ratio=None,   # 美股不计算商誉
             deduct_ratio=None,      # 美股不计算扣非比
             ttm_netp=latest.get("net_profit") if latest else None,
-            data_quality_flag="" if latest else "missing_financials",
+            data_quality_flag="" if latest else (
+                "missing_financials" if r.get("has_cik") else "missing_cik"
+            ),
         )
 
         records.append(record)
@@ -484,7 +528,7 @@ def build_us_records(year: int = 2025) -> list[dict]:
     print(f"  组装: {len(records)} 只归一化记录 ({elapsed:.1f}s)")
 
     # 汇总
-    print(f"\n  跳过统计:")
+    print("\n  跳过统计:")
     print(f"    无 SEC CIK: {skipped_no_cik}")
     print(f"    无行情数据: {skipped_no_spot}")
     print(f"    无财务数据: {skipped_no_fin}")
@@ -510,7 +554,7 @@ def _write_us_csv(records: list[dict], path: str):
         "market_cap_yi_usd", "fail_reasons",
     ]
     with open(path, "w", newline="", encoding="utf-8-sig") as f:
-        w = csv.writer(f)
+        w = csv.writer(f, lineterminator="\n")
         w.writerow(cols)
         for i, r in enumerate(records, 1):
             min_buy = int((r.get("price") or 0) * 100)
@@ -1095,8 +1139,6 @@ def test_us_screener(
 
     fin_results: dict[str, dict | None] = {}
     completed = 0
-    t0 = time.time()
-
     with ThreadPoolExecutor(max_workers=SEC_FETCH_WORKERS) as ex:
         futures = {}
         for r in merged:
@@ -1107,7 +1149,7 @@ def test_us_screener(
             ticker = futures[future]
             try:
                 fin_results[ticker] = future.result()
-            except Exception as e:
+            except Exception:
                 fin_results[ticker] = None
             completed += 1
 
@@ -1166,7 +1208,7 @@ def test_us_screener(
     print(f"  未通过:          {tier_counts.get('-', 0)}")
 
     if records:
-        print(f"\n  Top 5:")
+        print("\n  Top 5:")
         for i, r in enumerate(records[:5], 1):
             print(
                 f"  {i}. {r['code']} {r.get('name','')} "
@@ -1191,7 +1233,7 @@ def main():
     )
     ap.add_argument(
         "--test", type=int, default=0, metavar="N",
-        help="限制测试数量 (默认 0 = 全量运行)"
+        help="限制测试数量；测试模式默认不写正式 results/ 产物"
     )
     ap.add_argument(
         "--no-html", action="store_true", help="跳过 HTML 输出"
@@ -1201,7 +1243,8 @@ def main():
     )
     args = ap.parse_args()
 
-    if args.test > 0:
+    sample_mode = args.test > 0
+    if sample_mode:
         records, tier_counts = test_us_screener(year=args.year, max_stocks=args.test)
     else:
         records = build_us_records(args.year)
@@ -1210,7 +1253,12 @@ def main():
         else:
             return
 
-    if records and not args.no_html:
+    if records and not args.no_html and sample_mode and args.output_dir is None:
+        print(
+            "\nℹ️ 测试模式不会写入正式 results/ 产物。"
+            "如需保存样本，请显式传 --output-dir results/samples。"
+        )
+    elif records and not args.no_html:
         write_us_results(records, output_dir=args.output_dir, year=args.year)
     elif not records:
         print("\n⚠️ 未产出记录，请检查数据源或网络连接。")

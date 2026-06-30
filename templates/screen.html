@@ -45,6 +45,7 @@ main{max-width:960px;margin:0 auto;padding:28px 20px}
 .btn.secondary{background:#1d2033;border-color:#1e2340;color:#7fb3ff}
 :root[data-theme="light"] .btn.secondary{background:#eff6ff;border-color:#bfdbfe;color:#2563eb}
 .btn:disabled{opacity:.5;cursor:not-allowed;pointer-events:none}
+.disabled-link{opacity:.5;pointer-events:none}
 /* ── Server status bar ── */
 .status-bar{padding:10px 20px;background:var(--surface-soft);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:12px}
 .status-bar .conn{display:flex;align-items:center;gap:6px}
@@ -92,7 +93,7 @@ footer a{color:var(--link);text-decoration:none}
 <div class="card-actions">
 <a class="btn primary" href="astock_screen.html" id="link-cn">📊 查看总表</a>
 <button class="btn refresh" data-refresh="cn" data-mode="quotes">↻ 刷新行情</button>
-<button class="btn secondary" data-refresh="cn" data-mode="full">⟳ 全量更新</button>
+<button class="btn secondary" data-refresh="cn" data-mode="full">⟳ 更新五层筛选</button>
 </div>
 <div class="progress-wrap" id="progress-cn"><div class="progress-bar"></div></div>
 </div>
@@ -111,8 +112,7 @@ footer a{color:var(--link);text-decoration:none}
 <div class="card-meta" id="meta-hk"></div>
 <div class="card-actions">
 <a class="btn primary" href="hkstock_screen.html" id="link-hk">📊 查看总表</a>
-<button class="btn refresh" data-refresh="hk" data-mode="quotes">↻ 刷新行情</button>
-<button class="btn secondary" data-refresh="hk" data-mode="full">⟳ 全量更新</button>
+<button class="btn secondary" data-refresh="hk" data-mode="full">⟳ 更新五层筛选</button>
 </div>
 <div class="progress-wrap" id="progress-hk"><div class="progress-bar"></div></div>
 </div>
@@ -131,8 +131,7 @@ footer a{color:var(--link);text-decoration:none}
 <div class="card-meta" id="meta-us"></div>
 <div class="card-actions">
 <a class="btn primary" href="usstock_screen.html" id="link-us">📊 查看总表</a>
-<button class="btn refresh" data-refresh="us" data-mode="quotes">↻ 刷新行情</button>
-<button class="btn secondary" data-refresh="us" data-mode="full">⟳ 全量更新</button>
+<button class="btn secondary" data-refresh="us" data-mode="full">⟳ 更新五层筛选</button>
 </div>
 <div class="progress-wrap" id="progress-us"><div class="progress-bar"></div></div>
 </div>
@@ -203,6 +202,13 @@ var MARKET_META={
  us:{label:"美股",flag:"🇺🇸",exchange:"NYSE · NASDAQ",stable:"usstock_screen.html"}
 };
 
+function renderIssues(data){
+ var issues=[];
+ if(data&&data.errors)issues=issues.concat(data.errors);
+ if(data&&data.warnings)issues=issues.concat(data.warnings);
+ return issues.length?issues.slice(0,2).join("；"):"";
+}
+
 function updateCard(market,data){
  var card=document.getElementById("card-"+market);
  var statusEl=document.getElementById("status-"+market);
@@ -212,12 +218,16 @@ function updateCard(market,data){
  var dot=statusEl.querySelector(".status-dot");
  var txt=statusEl.querySelector(".status-text");
 
- if(!data||!data.latest_ts){
-  // Not generated yet
+ if(!data||data.status!=="ready"){
   dot.className="status-dot missing";
-  txt.textContent="尚未生成 — 点击下方按钮刷新";
+  txt.textContent=data&&data.status==="invalid"?"产物未通过验收":"尚未生成 — 点击下方按钮更新";
   statsEl.innerHTML="";
-  metaEl.textContent="该市场暂无五层筛选结果";
+  var issue=renderIssues(data);
+  if(data&&data.latest_invalid_ts){
+   metaEl.textContent="最近产物 "+data.latest_invalid_ts+" 未通过："+issue;
+  }else{
+   metaEl.textContent=issue||"该市场暂无五层筛选结果";
+  }
   if(linkEl)linkEl.classList.add("disabled-link");
  }else{
   dot.className="status-dot ready";
@@ -225,21 +235,8 @@ function updateCard(market,data){
   var y=ts.substring(0,4),m=ts.substring(4,6),d=ts.substring(6,8);
   txt.textContent="已生成 · "+y+"-"+m+"-"+d;
 
-  // Fetch detailed stats from individual market status
-  fetch("/api/status?market="+market)
-   .then(function(r){return r.json();})
-   .then(function(detail){
-    if(detail&&detail.done){
-     // Try to get tier counts from the CSV
-     var detailMeta="共 "+(detail.file_count||0)+" 份结果文件";
-     if(detail.latest_ts){
-      detailMeta+=" · 日期 "+detail.latest_ts.substring(0,4)+"-"+detail.latest_ts.substring(4,6)+"-"+detail.latest_ts.substring(6,8);
-     }
-     metaEl.textContent=detailMeta;
-    }
-   }).catch(function(){});
-
-  metaEl.textContent="共 "+(data.file_count||0)+" 份结果文件 · 日期 "+y+"-"+m+"-"+d;
+  updateTierStats(market,data.tier_counts||{},data.row_count||0);
+  metaEl.textContent="共 "+(data.row_count||0)+" 只 · "+(data.file_count||0)+" 份结果文件 · 日期 "+y+"-"+m+"-"+d;
   if(linkEl)linkEl.classList.remove("disabled-link");
  }
 }
@@ -274,11 +271,6 @@ function loadAllMarkets(){
      updateCard(m,data.markets[m]);
     }
    }
-   // Also fetch individual market status for tier counts
-   // Try parsing tier counts from each market's CSV via status endpoint
-   for(var m in MARKET_META){
-    fetchTierStats(m);
-   }
   })
   .catch(function(e){
    setConnStatus(false,"● 离线 — 服务器未运行 ("+e.message+")");
@@ -290,20 +282,6 @@ function loadAllMarkets(){
     txt.textContent="无法连接服务器";
    }
   });
-}
-
-function fetchTierStats(market){
- // Parse CSV via status endpoint - try to get tier distribution
- // First check if there's a latest CSV
- fetch("/api/status?market="+market)
-  .then(function(r){return r.json();})
-  .then(function(data){
-   if(!data||!data.latest_ts)return;
-   // We need tier counts from the CSV - make a separate request
-   return fetch("/api/status?market="+market+"&tiers=1")
-    .catch(function(){return null;});
-  })
-  .catch(function(){});
 }
 
 // ── Refresh button handlers ──
@@ -326,7 +304,7 @@ function handleRefresh(market,mode,btnEl,progressEl){
   .then(function(r){return r.json();})
   .then(function(data){
    if(data.done){
-    showToast(MARKET_META[market].label+" "+(mode==="full"?"全量更新":"行情刷新")+"完成 ✓");
+    showToast(MARKET_META[market].label+" "+(mode==="full"?"更新五层筛选":"行情刷新")+"完成 ✓");
     // Reload cards after short delay
     setTimeout(loadAllMarkets,1500);
    }else if(data.cached){
@@ -343,7 +321,7 @@ function handleRefresh(market,mode,btnEl,progressEl){
   .finally(function(){
    refreshBusy[market]=false;
    btnEl.disabled=false;
-   btnEl.textContent=mode==="full"?"⟳ 全量更新":"↻ 刷新行情";
+   btnEl.textContent=mode==="full"?"⟳ 更新五层筛选":"↻ 刷新行情";
    if(progressEl)progressEl.classList.remove("active","indeterminate");
   });
 }

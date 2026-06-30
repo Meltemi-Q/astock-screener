@@ -170,7 +170,7 @@ def build_cn_records(
         # ── 摘要 ────────────────────────────────────────────
         total_elapsed = time.time() - t_start
         print(f"\n{'─'*60}")
-        print(f"  Tier 分布:")
+        print("  Tier 分布:")
         for tier in ("A_可买入", "B_优质待跌", "C_接近合格", "-"):
             cnt = tier_counts.get(tier, 0)
             emoji = {
@@ -345,7 +345,7 @@ def test_cn_screener(year: int = 2025) -> tuple[list[dict], dict[str, int]]:
     print(f"  未通过:            {tier_counts.get('-', 0)}")
 
     if records:
-        print(f"\n  Top 5:")
+        print("\n  Top 5:")
         for i, r in enumerate(records[:5], 1):
             pe_ttm = r.get("pe_ttm")
             print(

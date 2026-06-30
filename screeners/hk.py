@@ -38,9 +38,7 @@ if WORKDIR not in sys.path:
     sys.path.insert(0, WORKDIR)
 
 from data_sources.eastmoney import (
-    fetch_hk_quotes_batch,
     fetch_hk_spot_snapshot,
-    fetch_global_kline,
 )
 from data_sources.hkex import (
     fetch_hkex_security_master,
@@ -51,8 +49,6 @@ from data_sources.hkex import (
 from screeners.contracts import (
     MARKET_HK,
     make_screening_record,
-    make_annual_financial,
-    check_tier_ab_eligibility,
     check_currency_match,
 )
 from screeners.scoring import run_full_pipeline, DEFAULT_CONFIG
@@ -64,6 +60,7 @@ _FINANCIAL_KEYWORDS = frozenset({"银行", "保险", "券商", "金融", "Bank",
 # 财务数据抓取并发数 & 间隔
 FIN_WORKERS = 10
 FIN_API_SLEEP = 0.05
+DEFAULT_HK_FIN_MAX_FETCHES = 500
 
 # 输出目录
 RESULTS_DIR = os.path.join(WORKDIR, "results")
@@ -99,6 +96,34 @@ def _is_financial_stock(name: str, category: str) -> bool:
     ):
         return True
     return False
+
+
+def _master_from_quote_universe(spot: dict[str, dict]) -> list[dict]:
+    """Build a degraded HK master from the quote universe when HKEX is unavailable."""
+    rows = []
+    for code, quote in sorted(spot.items()):
+        if not str(code).isdigit():
+            continue
+        rows.append({
+            "code": str(code).zfill(5),
+            "name": quote.get("name") or str(code).zfill(5),
+            "board_lot": 100,
+            "category": "Eastmoney quote universe",
+            "isin": "",
+        })
+    return rows
+
+
+def _hk_fin_max_fetches() -> int:
+    """Return max HK financial API fetches for one full run.
+
+    ``HK_FIN_MAX_FETCHES=0`` means skip financial APIs. ``-1`` means unlimited.
+    """
+    raw = os.environ.get("HK_FIN_MAX_FETCHES", str(DEFAULT_HK_FIN_MAX_FETCHES))
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_HK_FIN_MAX_FETCHES
 
 
 # ── 增长率计算 ─────────────────────────────────────────────
@@ -170,32 +195,57 @@ def build_hk_records(year: int = 2025) -> list[dict]:
 
     # ── 1. 证券主表 ─────────────────────────────────────────
     print("[1/4] 获取 HKEX 证券主表...")
-    master = fetch_hkex_security_master()
-    valid, msg = validate_hkex_master(master)
-    if not valid:
-        print(f"  ⚠️ 证券主表校验未通过: {msg}")
-        print(f"  ⚠️ 将继续使用当前数据（{len(master)} 只），但结果可能不完整")
-    else:
+    spot = None
+    master_source = "HKEX"
+    try:
+        master = fetch_hkex_security_master()
+        valid, msg = validate_hkex_master(master)
+        if not valid:
+            raise RuntimeError(f"HKEX security master validation failed: {msg}")
         print(f"  ✅ 证券主表校验通过 ({len(master)} 只)")
+    except Exception as exc:
+        print(f"  ⚠ HKEX 证券主表不可用: {exc}")
+        print("  ⚠ 改用 Eastmoney 港股行情 universe；缺失每手股数/ISIN 的行会标记数据质量")
+        print("\n[2/4] 获取港股实时行情...")
+        spot = fetch_hk_spot_snapshot()
+        print(f"  ✅ 行情快照: {len(spot)} 只")
+        master = _master_from_quote_universe(spot)
+        master_source = "Eastmoney quote universe"
+        print(f"  ✅ 兜底证券主表: {len(master)} 只")
     t1 = time.time()
 
     # 建立 code → master 映射
     master_map = {r["code"]: r for r in master}
 
     # ── 2. 实时行情快照 ─────────────────────────────────────
-    print("\n[2/4] 获取港股实时行情...")
-    spot = fetch_hk_spot_snapshot()
-    print(f"  ✅ 行情快照: {len(spot)} 只")
+    if spot is None:
+        print("\n[2/4] 获取港股实时行情...")
+        spot = fetch_hk_spot_snapshot()
+        print(f"  ✅ 行情快照: {len(spot)} 只")
     t2 = time.time()
 
     # ── 3. 财务数据（并行） ─────────────────────────────────
     print(f"\n[3/4] 获取财务数据（并行, {FIN_WORKERS}线程）...")
     # 只对有行情且在主表中的股票拉财务
-    codes_to_fetch = [
+    all_codes_to_fetch = [
         code for code in spot
         if code in master_map
     ]
-    print(f"  待拉取财务数据: {len(codes_to_fetch)} 只")
+
+    def _cap_key(code):
+        return _fnum((spot.get(code) or {}).get("market_cap")) or 0.0
+
+    all_codes_to_fetch.sort(key=_cap_key, reverse=True)
+    fetch_limit = _hk_fin_max_fetches()
+    if fetch_limit < 0:
+        codes_to_fetch = all_codes_to_fetch
+    else:
+        codes_to_fetch = all_codes_to_fetch[:fetch_limit]
+    skipped_by_budget = max(0, len(all_codes_to_fetch) - len(codes_to_fetch))
+    print(
+        f"  待拉取财务数据: {len(codes_to_fetch)} 只 "
+        f"(预算跳过 {skipped_by_budget} 只)"
+    )
 
     financials_map: dict[str, list[dict]] = {}
     cashflow_map: dict[str, dict] = {}
@@ -285,18 +335,23 @@ def build_hk_records(year: int = 2025) -> list[dict]:
                     fallback_year = year - 1
                     break
 
-        if target_fin is None:
+        missing_financials = target_fin is None
+        if missing_financials:
             skipped_financial += 1
-            continue
-
-        # 提取财务指标
-        roe = target_fin.get("roe")
-        gross_margin = target_fin.get("gross_margin")
-        net_margin = target_fin.get("net_margin")
-        debt_ratio = target_fin.get("debt_ratio")
-        revenue = target_fin.get("revenue")
-        net_profit = target_fin.get("net_profit")
-        report_currency = target_fin.get("currency", "CNY")
+            roe = None
+            gross_margin = None
+            net_margin = None
+            debt_ratio = None
+            net_profit = None
+            report_currency = "HKD"
+        else:
+            # 提取财务指标
+            roe = target_fin.get("roe")
+            gross_margin = target_fin.get("gross_margin")
+            net_margin = target_fin.get("net_margin")
+            debt_ratio = target_fin.get("debt_ratio")
+            net_profit = target_fin.get("net_profit")
+            report_currency = target_fin.get("currency", "CNY")
 
         # 经营现金流：从批量预取结果读取
         cf_year_map = cashflow_map.get(code, {})
@@ -307,7 +362,7 @@ def build_hk_records(year: int = 2025) -> list[dict]:
         industry = "港股"
 
         # 增长率
-        yoy, cagr = compute_growth(fin_list, fallback_year)
+        yoy, cagr = (None, None) if missing_financials else compute_growth(fin_list, fallback_year)
 
         # TTM 净利（估值用）
         ttm_netp = None
@@ -321,8 +376,12 @@ def build_hk_records(year: int = 2025) -> list[dict]:
 
         # 数据质量标记
         data_quality_flag = ""
+        if missing_financials:
+            data_quality_flag = "missing_financials"
+        elif master_source != "HKEX":
+            data_quality_flag = "quote_universe_master"
         quote_currency = "HKD"
-        if report_currency and report_currency.upper() not in ("HKD", "CNY"):
+        if not missing_financials and report_currency and report_currency.upper() not in ("HKD", "CNY"):
             # 非 HKD/CNY 报表货币
             if not check_currency_match(quote_currency, report_currency):
                 data_quality_flag = "currency_mismatch"
@@ -373,8 +432,9 @@ def build_hk_records(year: int = 2025) -> list[dict]:
 
     # ── 摘要 ───────────────────────────────────────────────
     print(f"\n{'─'*60}")
-    print(f"  装配统计:")
+    print("  装配统计:")
     print(f"    证券主表:          {len(master)} 只")
+    print(f"    主表来源:          {master_source}")
     print(f"    行情快照:          {len(spot)} 只")
     print(f"    财务数据覆盖:      {len(financials_map)} 只")
     print(f"    跳过-不在主表:      {skipped_missing_master}")
@@ -382,7 +442,7 @@ def build_hk_records(year: int = 2025) -> list[dict]:
     print(f"    跳过-无财务数据:    {skipped_financial}")
     print(f"    有效记录:          {len(records)} 只")
     print(f"    其中评估通过:      {total_eval} 只")
-    print(f"  Tier 分布:")
+    print("  Tier 分布:")
     for tier in ("A_可买入", "B_优质待跌", "C_接近合格", "-"):
         cnt = tier_counts.get(tier, 0)
         emoji = {"A_可买入": "🟢", "B_优质待跌": "🟡", "C_接近合格": "⚪", "-": "⚫"}.get(tier, "")
@@ -498,7 +558,7 @@ def _write_hk_csv(records: list[dict], path: str):
         "market_cap_yi_hkd", "fail_reasons",
     ]
     with open(path, "w", newline="", encoding="utf-8-sig") as f:
-        w = csv.writer(f)
+        w = csv.writer(f, lineterminator="\n")
         w.writerow(cols)
         for i, r in enumerate(records, 1):
             min_buy = int((r.get("price") or 0) * 100)
@@ -565,7 +625,7 @@ def _write_hk_md(
         "仅供观察，差一口气，可留意基本面是否改善。\n",
         _md_table_hk(tier_c[:40]),
         "\n\n---\n### 字段说明\n",
-        "- **现金流/利润**：港股财务指标 API 当前不含经营现金流，此项暂缺\n",
+        "- **现金流/利润**：经营现金流 ÷ 净利润，>=0.8 说明利润质量较稳\n",
         "- **折让%**：(合理市值−当前市值)/合理市值，正数=低于合理价；≥30% 才算到买点\n",
         "- **预期年化**：盈利收益率(1/PE) + 增长率\n",
         "- **PEG**：PE ÷ 增长率（同比与3年CAGR取小，偏保守）\n",
@@ -974,7 +1034,7 @@ def test_hk_screener(year: int = 2025) -> tuple[list[dict], dict[str, int]]:
     print(f"  未通过:          {tier_counts.get('-', 0)}")
 
     if records:
-        print(f"\n  Top 5:")
+        print("\n  Top 5:")
         for i, r in enumerate(records[:5], 1):
             print(
                 f"  {i}. {r['code']} {r.get('name','')} "

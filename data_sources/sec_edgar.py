@@ -12,7 +12,7 @@ Rate limit: SEC allows 10 requests/second; a simple 0.1 s floor is enforced.
 """
 
 import time
-from .http import get_json, _http_get, CACHE_DIR
+from .http import get_json
 
 # ── SEC-specific constants ─────────────────────────────────
 SEC_USER_AGENT = "InvestmentScreener/1.0 (investment.screener@example.com)"

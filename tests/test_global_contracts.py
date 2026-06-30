@@ -13,9 +13,6 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from screeners.contracts import (
-    MARKET_CN,
-    MARKET_HK,
-    MARKET_US,
     NORMALIZED_FIELDS,
     make_security_master,
     make_quote_snapshot,
