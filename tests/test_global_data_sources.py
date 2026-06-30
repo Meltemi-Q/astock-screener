@@ -2,9 +2,14 @@
 
 These tests use FIXTURES (cached sample data), not live network calls.
 Live tests must be explicitly enabled with --live flag.
+
+Usage:
+  python3 -m unittest tests.test_global_data_sources    # fixture only
+  python3 -m unittest tests.test_global_data_sources --live  # include live
 """
 
 import json
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -13,6 +18,11 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+# ── Live test gating ──────────────────────────────────────
+LIVE_TESTS = "--live" in sys.argv
+if "--live" in sys.argv:
+    sys.argv.remove("--live")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -830,6 +840,60 @@ class TestHkFinancials(unittest.TestCase):
                          "debt_ratio"}
         for key in required_keys:
             self.assertIn(key, result[0], f"Missing key: {key}")
+
+
+# ═══════════════════════════════════════════════════════════
+#  Live network tests (gated by --live flag)
+# ═══════════════════════════════════════════════════════════
+@unittest.skipUnless(LIVE_TESTS, "requires --live flag for network access")
+class LiveDataSourceTests(unittest.TestCase):
+    """Tests that hit real APIs. Only run with --live flag."""
+
+    def test_live_sec_ticker_master(self):
+        """Verify SEC ticker master returns real data with required fields."""
+        from data_sources.sec_edgar import fetch_sec_ticker_master
+        data = fetch_sec_ticker_master()
+        self.assertGreaterEqual(len(data), 3000, "SEC ticker master too small")
+        tickers = {r["ticker"] for r in data}
+        for t in ("AAPL", "MSFT", "NVDA"):
+            self.assertIn(t, tickers, f"{t} not in SEC ticker master")
+
+    def test_live_sec_apple_financials(self):
+        """Verify Apple CIK 0000320193 returns core financial fields."""
+        from data_sources.sec_edgar import fetch_sec_company_facts, extract_annual_financials, compute_derived_ratios
+        cik = "0000320193"
+        facts = fetch_sec_company_facts(cik)
+        self.assertIsNotNone(facts)
+        financials = extract_annual_financials(facts)
+        self.assertGreaterEqual(len(financials), 3, "Need >= 3 years of Apple financials")
+        derived = compute_derived_ratios(financials)
+        latest = derived[-1]
+        self.assertIsNotNone(latest.get("revenue"))
+        self.assertIsNotNone(latest.get("net_profit"))
+
+    def test_live_nasdaq_universe(self):
+        """Verify Nasdaq Trader universe builds correctly."""
+        from data_sources.nasdaq_trader import build_us_stock_universe
+        universe = build_us_stock_universe()
+        self.assertGreaterEqual(len(universe), 3000)
+        self.assertLessEqual(len(universe), 12000)
+        tickers = {r["ticker"] for r in universe}
+        for t in ("AAPL", "MSFT", "NVDA", "GOOGL"):
+            self.assertIn(t, tickers, f"{t} not in Nasdaq universe")
+
+    def test_live_eastmoney_hk_quote(self):
+        """Verify Eastmoney HK quote returns valid data for 00700."""
+        from data_sources.eastmoney import fetch_global_quote
+        quote = fetch_global_quote("hk", "00700")
+        self.assertIsNotNone(quote.get("price"))
+        self.assertEqual(quote.get("currency"), "HKD")
+
+    def test_live_eastmoney_us_quote(self):
+        """Verify Eastmoney US quote returns valid data for AAPL."""
+        from data_sources.eastmoney import fetch_global_quote
+        quote = fetch_global_quote("us", "AAPL")
+        self.assertIsNotNone(quote.get("price"))
+        self.assertEqual(quote.get("currency"), "USD")
 
 
 if __name__ == "__main__":

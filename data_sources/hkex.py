@@ -398,10 +398,14 @@ def fetch_hkex_security_master():
         print("  [HKEX Master] Downloading xlsx from HKEX...")
         data = get_bytes(HKEX_XLSX_URL, ttl_hours=HK_MASTER_TTL)
         rows = _parse_hkex_xlsx(data)
-        if rows:
+        if rows and len(rows) >= 2000:
             print(f"  [HKEX Master] Parsed {len(rows)} rows from xlsx")
+        elif rows:
+            print(f"  [HKEX Master] xlsx returned only {len(rows)} rows (below 2000 threshold), treating as failed")
+            rows = None
     except Exception as e:
         print(f"  [HKEX Master] xlsx attempt failed: {e}")
+        rows = None
 
     # ── Try 2: CSV fallback ──
     if not rows:
@@ -409,10 +413,14 @@ def fetch_hkex_security_master():
             print("  [HKEX Master] Trying CSV fallback...")
             text = get_text(HKEX_SECURITIES_CSV_URL, ttl_hours=HK_MASTER_TTL)
             rows = _parse_hkex_csv(text)
-            if rows:
+            if rows and len(rows) >= 2000:
                 print(f"  [HKEX Master] Parsed {len(rows)} rows from CSV")
+            elif rows:
+                print(f"  [HKEX Master] CSV returned only {len(rows)} rows (below 2000 threshold), treating as failed")
+                rows = None
         except Exception as e:
             print(f"  [HKEX Master] CSV fallback failed: {e}")
+            rows = None
 
     # ── Try 3: Fixture data ──
     if not rows:

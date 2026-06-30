@@ -15,7 +15,7 @@ import time
 from .http import get_json, _http_get, CACHE_DIR
 
 # ── SEC-specific constants ─────────────────────────────────
-SEC_USER_AGENT = "InvestmentScreener/1.0"
+SEC_USER_AGENT = "InvestmentScreener/1.0 (investment.screener@example.com)"
 SEC_HEADERS = {"User-Agent": SEC_USER_AGENT}
 SEC_TTL_HOURS = 24  # cache SEC data for 24 hours
 SEC_MIN_INTERVAL = 0.1  # 10 req/s max

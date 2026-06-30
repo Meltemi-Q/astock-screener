@@ -198,26 +198,29 @@ def build_hk_records(year: int = 2025) -> list[dict]:
     print(f"  待拉取财务数据: {len(codes_to_fetch)} 只")
 
     financials_map: dict[str, list[dict]] = {}
+    cashflow_map: dict[str, dict] = {}
     done = 0
     total = len(codes_to_fetch)
 
     def _fetch_one(code):
-        """单只股票财务数据抓取（带延时）。"""
+        """单只股票财务数据抓取（财报 + 现金流并行）。"""
         try:
             time.sleep(FIN_API_SLEEP)  # 限速
             fin = fetch_eastmoney_hk_financials(code)
-            return code, fin
+            cf = fetch_eastmoney_hk_cashflow(code)
+            return code, fin, cf
         except Exception as e:
             print(f"  ⚠️ [{code}] 财务数据抓取失败: {e}")
-            return code, []
+            return code, [], {}
 
     with ThreadPoolExecutor(max_workers=FIN_WORKERS) as ex:
         futures = {ex.submit(_fetch_one, code): code for code in codes_to_fetch}
         for future in as_completed(futures):
             try:
-                code, fin = future.result()
+                code, fin, cf = future.result()
                 if fin:
                     financials_map[code] = fin
+                    cashflow_map[code] = cf
             except Exception as e:
                 code = futures[future]
                 print(f"  ⚠️ [{code}] 线程异常: {e}")
@@ -295,9 +298,9 @@ def build_hk_records(year: int = 2025) -> list[dict]:
         net_profit = target_fin.get("net_profit")
         report_currency = target_fin.get("currency", "CNY")
 
-        # 经营现金流：从 RPT_HKSK_FN_CASHFLOW 报告获取
-        cashflow_map = fetch_eastmoney_hk_cashflow(code)
-        operating_cashflow = cashflow_map.get(fallback_year) if cashflow_map else None
+        # 经营现金流：从批量预取结果读取
+        cf_year_map = cashflow_map.get(code, {})
+        operating_cashflow = cf_year_map.get(fallback_year) if cf_year_map else None
 
         # 行业分类：当前 API 未提供，默认 "港股"
         # 后续可通过东财行业分类 API 或港股 GICS 分类补充
