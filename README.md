@@ -102,3 +102,19 @@ economy/
 港股和美股完整五层筛选的产品、数据源、开发路线和回测验收要求见：
 
 - [`PRD_GLOBAL_MARKETS.md`](PRD_GLOBAL_MARKETS.md)
+
+### 美股网络要求
+
+美股筛选器需访问 SEC（sec.gov）和 Nasdaq（nasdaqtrader.com），大陆用户需配置网络：
+
+```bash
+# 纯命令行
+export HTTPS_PROXY=http://your-proxy:port
+python3 global_screener.py --market us
+
+# ClashX / Clash Verge 用户在订阅配置 rules: 下加：
+#   - DOMAIN-SUFFIX,sec.gov,DIRECT
+#   - DOMAIN-SUFFIX,nasdaqtrader.com,🔥 自动选择
+```
+
+详细配置见 [PRD_GLOBAL_MARKETS.md §12](PRD_GLOBAL_MARKETS.md#12-大陆网络配置指南)。

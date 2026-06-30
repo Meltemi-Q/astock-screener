@@ -698,3 +698,65 @@ feat: add global market backtest harness
 - 回测 v0 和 v1 可运行并产出报告。
 - PRD 中列出的数据质量红线都有自动测试覆盖。
 
+---
+
+## 12. 大陆网络配置指南
+
+港股筛选器仅依赖东方财富 API，大陆网络可直接使用。美股筛选器需访问 SEC（sec.gov）和 Nasdaq Trader（nasdaqtrader.com），这两个网站在大陆受 GFW 不同程度限制。
+
+### 12.1 网络现状
+
+| 数据源 | 域名 | GFW 状态 | 方案 |
+|--------|------|---------|------|
+| SEC EDGAR | `data.sec.gov` | 可直连（延迟 ~5s） | Clash DIRECT 规则 |
+| Nasdaq Trader | `www.nasdaqtrader.com` | **被墙** | Clash 代理规则 |
+| 东方财富美股行情 | `push2.eastmoney.com` | 可直连 | 无需特殊配置 |
+
+### 12.2 ClashX / Clash Verge 配置
+
+在 Clash 订阅配置的 `rules:` 下添加两条规则（排在 MATCH 之前）：
+
+```yaml
+rules:
+  - DOMAIN-SUFFIX,sec.gov,DIRECT
+  - DOMAIN-SUFFIX,nasdaqtrader.com,🔥 自动选择
+```
+
+- `sec.gov` → DIRECT：境内直连可用，不耗代理流量
+- `nasdaqtrader.com` → `🔥 自动选择`（url-test 自动选最快节点）：被墙，必须走代理
+
+添加后 ClashX Pro → Config → Reload Config，或执行：
+
+```bash
+curl -X PUT "http://127.0.0.1:9090/configs?force=true" \
+  -H "Content-Type: application/json" \
+  -d '{"path":"/path/to/your/profile.yaml"}'
+```
+
+### 12.3 纯命令行方案
+
+不使用 Clash 的用户，设置环境变量即可：
+
+```bash
+export HTTPS_PROXY=http://your-proxy:port
+python3 global_screener.py --market us
+```
+
+### 12.4 验证
+
+```bash
+# SEC：应返回 200
+curl -sk -H 'User-Agent: InvestmentScreener/1.0 (test@example.com)' \
+  'https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json'
+
+# Nasdaq：应返回 TSV 文本
+curl -sk 'https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt'
+
+# 完整验证
+python3 global_screener.py --market us
+```
+
+### 12.5 代码侧提示
+
+若 SEC 或 Nasdaq 不可达，`data_sources/sec_edgar.py` 和 `data_sources/nasdaq_trader.py` 会抛出带完整配置指南的 `RuntimeError`，无需看文档即可排查。
+
