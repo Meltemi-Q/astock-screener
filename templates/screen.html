@@ -30,7 +30,7 @@ main{max-width:960px;margin:0 auto;padding:28px 20px}
 .card-stats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px}
 .stat-pill{background:var(--surface-soft);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;text-align:center;min-width:56px}
 .stat-pill .val{font-size:18px;font-weight:700;line-height:1.2}
-.stat-pill .val.A{color:var(--green)}.stat-pill .val.B{color:var(--yellow)}.stat-pill .val.C{color:var(--muted)}
+.stat-pill .val.signal{color:var(--link)}.stat-pill .val.A{color:var(--green)}.stat-pill .val.B{color:var(--yellow)}.stat-pill .val.C{color:var(--muted)}
 .stat-pill .lbl{font-size:10px;color:var(--muted);margin-top:1px}
 .card-meta{font-size:11px;color:var(--muted);margin-bottom:12px}
 .card-actions{display:flex;gap:8px;flex-wrap:wrap}
@@ -236,12 +236,20 @@ function updateCard(market,data){
   txt.textContent="已生成 · "+y+"-"+m+"-"+d;
 
   updateTierStats(market,data.tier_counts||{},data.row_count||0);
-  metaEl.textContent="共 "+(data.row_count||0)+" 只 · "+(data.file_count||0)+" 份结果文件 · 日期 "+y+"-"+m+"-"+d;
+  var signal=tierSignalCount(data.tier_counts||{});
+  metaEl.textContent="共 "+(data.row_count||0)+" 只 · 候选 "+signal+" 只 · "+(data.file_count||0)+" 份结果文件 · 日期 "+y+"-"+m+"-"+d;
   if(linkEl){
    linkEl.setAttribute("href", data.latest_href||data.stable_href||MARKET_META[market].stable);
    linkEl.classList.remove("disabled-link");
   }
  }
+}
+
+function tierSignalCount(tierCounts){
+ var a=tierCounts&&tierCounts["A_可买入"]||0;
+ var b=tierCounts&&tierCounts["B_优质待跌"]||0;
+ var c=tierCounts&&tierCounts["C_接近合格"]||0;
+ return a+b+c;
 }
 
 function updateTierStats(market,tierCounts,total){
@@ -250,11 +258,13 @@ function updateTierStats(market,tierCounts,total){
  var a=tierCounts&&tierCounts["A_可买入"]||0;
  var b=tierCounts&&tierCounts["B_优质待跌"]||0;
  var c=tierCounts&&tierCounts["C_接近合格"]||0;
+ var signal=a+b+c;
  var html="";
  if(total>0){
-  html+='<div class="stat-pill"><div class="val A">'+a+'</div><div class="lbl">Tier A</div></div>';
-  html+='<div class="stat-pill"><div class="val B">'+b+'</div><div class="lbl">Tier B</div></div>';
-  html+='<div class="stat-pill"><div class="val C">'+c+'</div><div class="lbl">Tier C</div></div>';
+  html+='<div class="stat-pill"><div class="val signal">'+signal+'</div><div class="lbl">候选池</div></div>';
+  html+='<div class="stat-pill"><div class="val A">'+a+'</div><div class="lbl">可买入</div></div>';
+  html+='<div class="stat-pill"><div class="val B">'+b+'</div><div class="lbl">待观察</div></div>';
+  html+='<div class="stat-pill"><div class="val C">'+c+'</div><div class="lbl">接近</div></div>';
   html+='<div class="stat-pill"><div class="val" style="font-size:18px;font-weight:700">'+total+'</div><div class="lbl">总分析</div></div>';
  }
  statsEl.innerHTML=html;

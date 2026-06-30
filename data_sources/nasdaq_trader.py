@@ -3,9 +3,11 @@
 """Nasdaq Trader Symbol Directory data source for US stock universe.
 
 Downloads the official Nasdaq-listed and other-exchange-listed symbol files
-(nasdaqlisted.txt, otherlisted.txt), parses them, filters out ETFs / test
-issues, and cross-references with the SEC CIK master.
+(nasdaqlisted.txt, otherlisted.txt), parses them, filters out ETFs / funds /
+non-common-stock instruments, and cross-references with the SEC CIK master.
 """
+
+import re
 
 from .http import get_text
 
@@ -13,6 +15,39 @@ from .http import get_text
 NASDAQ_LISTED_URL = "https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt"
 OTHER_LISTED_URL = "https://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt"
 NASDAQ_TTL_HOURS = 24
+
+
+def _is_excluded_us_security(name, ticker):
+    """Return True for instruments outside the ordinary-stock screener scope."""
+    upper_name = (name or "").upper()
+    upper_ticker = (ticker or "").upper()
+
+    if upper_ticker.endswith("$"):
+        return True
+    if "TEST" in upper_name:
+        return True
+
+    if re.search(r"\b(ETF|ETN|FUND)\b", upper_name):
+        return True
+
+    non_common_pattern = (
+        r"\b(UNIT|UNITS|WARRANT|WARRANTS|RIGHT|RIGHTS|"
+        r"PREFERRED|PREFERENCE|PFD)\b|"
+        r"\b(CONVERTIBLE|SENIOR)\s+NOTE\b"
+    )
+    if re.search(non_common_pattern, upper_name):
+        return True
+
+    spac_keywords = (
+        "ACQUISITION CORP",
+        "ACQUISITION CORPORATION",
+        "BLANK CHECK",
+        "SPAC",
+    )
+    if any(kw in upper_name for kw in spac_keywords):
+        return True
+
+    return False
 
 
 def _parse_nasdaq_tsv(text):
@@ -86,8 +121,9 @@ def build_us_stock_universe():
     Downloads both nasdaqlisted.txt and otherlisted.txt, parses them,
     combines the results, and filters out:
 
-    * ETFs / ETNs (Security Name contains "ETF", "ETN", or "Fund")
-    * Test issues (ticker ending with ``$`` or "Test" in Security Name)
+    * ETFs / ETNs / funds
+    * Test issues
+    * Units / warrants / rights / preferred shares / SPAC shells
 
     Returns:
         list[dict]: Each dict has keys:
@@ -152,27 +188,18 @@ def build_us_stock_universe():
             "market_category": "",
         })
 
-    # ── Filter ETFs / ETNs / Funds ──
-    def _is_etf_or_fund(name, ticker):
-        """Check whether a security looks like an ETF, ETN, or fund."""
-        upper = name.upper()
-        if any(kw in upper for kw in ("ETF", "ETN", "FUND")):
-            return True
-        if ticker.endswith("$"):
-            return True
-        if "TEST" in upper:
-            return True
-        return False
-
     filtered = []
     removed = 0
     for r in universe:
-        if _is_etf_or_fund(r["name"], r["ticker"]):
+        if _is_excluded_us_security(r["name"], r["ticker"]):
             removed += 1
             continue
         filtered.append(r)
 
-    print(f"  [Universe] {len(filtered)} stocks (removed {removed} ETFs/test issues)")
+    print(
+        f"  [Universe] {len(filtered)} common-stock candidates "
+        f"(removed {removed} funds/tests/non-common instruments)"
+    )
 
     # ── Validation ──
     assert 3000 <= len(filtered) <= 12000, \

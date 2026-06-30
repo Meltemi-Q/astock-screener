@@ -139,6 +139,21 @@ class RegressionTests(unittest.TestCase):
         self.assertIn('linkEl.setAttribute("href", data.latest_href', source)
         self.assertIn('data.stable_href||MARKET_META[market].stable', source)
 
+    def test_market_home_shows_candidate_pool_in_addition_to_tier_a(self):
+        source = (ROOT / "templates" / "screen.html").read_text(encoding="utf-8")
+
+        self.assertIn("var signal=a+b+c", source)
+        self.assertIn("候选池", source)
+        self.assertIn("候选 \"+signal+\" 只", source)
+
+    def test_market_leaderboards_show_candidate_pool_not_only_tier_a(self):
+        for rel in ("astock_screener.py", "screeners/hk.py", "screeners/us.py"):
+            with self.subTest(file=rel):
+                source = (ROOT / rel).read_text(encoding="utf-8")
+                self.assertIn("候选榜 Top 10", source)
+                self.assertIn("a.concat(b)", source)
+                self.assertIn("本期无 A/B 候选", source)
+
     def test_server_stable_market_routes_use_http_redirect(self):
         source = (ROOT / "server.py").read_text(encoding="utf-8")
 

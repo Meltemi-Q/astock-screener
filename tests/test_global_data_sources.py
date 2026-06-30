@@ -661,6 +661,30 @@ class TestNasdaqTrader(unittest.TestCase):
         self.assertIn("SPY", symbols, "ETF SPY should be in raw data")
         self.assertIn("QQQ", symbols, "ETF QQQ should be in raw data")
 
+    def test_nasdaq_filter_excludes_non_common_equity_instruments(self):
+        """US screener universe should exclude instruments that are not common stocks."""
+        from data_sources.nasdaq_trader import _is_excluded_us_security
+
+        excluded = [
+            ("AACIU", "Armada Acquisition Corp. III - Units"),
+            ("ACGLN", "Arch Capital Group Ltd. - Depositary Shares, Preferred Share"),
+            ("TESTW", "Example Inc. - Warrants"),
+            ("AACBR", "Ares Acquisition Corporation II - Rights"),
+            ("SPY", "SPDR S&P 500 ETF Trust"),
+        ]
+        for ticker, name in excluded:
+            with self.subTest(ticker=ticker):
+                self.assertTrue(_is_excluded_us_security(name, ticker))
+
+        kept = [
+            ("AAPL", "Apple Inc. - Common Stock"),
+            ("TSM", "Taiwan Semiconductor Manufacturing Company Ltd. - ADR"),
+            ("BRK.B", "Berkshire Hathaway Inc."),
+        ]
+        for ticker, name in kept:
+            with self.subTest(ticker=ticker):
+                self.assertFalse(_is_excluded_us_security(name, ticker))
+
     def test_nasdaq_universe_size(self):
         """Verify 3000-12000 stocks after filtering."""
         with patch("data_sources.nasdaq_trader.get_text") as mock_get:

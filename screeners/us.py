@@ -774,7 +774,7 @@ footer{padding:10px 20px;color:var(--muted);font-size:11px;border-top:1px solid 
 <div class="funnel" id="funnel"></div>
 </div>
 <div class="dash-card">
-<h3>🏆 Tier A 优质榜 Top 10</h3>
+<h3>🏆 候选榜 Top 10 (A+B)</h3>
 <div class="leaderboard" id="lbA"></div>
 </div>
 <div class="dash-card">
@@ -885,14 +885,15 @@ function renderLB(){
  var a=[],b=[];
  DATA.forEach(function(r){if(r.tier==="A")a.push(r);else if(r.tier==="B")b.push(r)});
  a.sort(function(x,y){return y.sc-x.sc});b.sort(function(x,y){return y.sc-x.sc});
- var rows=a.slice(0,10),html1="";
+ var rows=a.concat(b).slice(0,10),html1="";
  rows.forEach(function(r,i){
   var rc=i<3?"r"+(i+1):"";
+  var tg=r.tier==="A"?"a":"b";
   html1+='<div class="lb-row"><span class="lb-rank '+rc+'">'+(i+1)+'</span>'
     +'<span class="lb-code">'+r.code+'</span><span class="lb-name">'+r.name+'</span>'
-    +'<span class="lb-tag a">A</span><span class="lb-score">'+r.sc+'</span></div>';
+    +'<span class="lb-tag '+tg+'">'+r.tier+'</span><span class="lb-score">'+r.sc+'</span></div>';
  });
- document.getElementById("lbA").innerHTML=html1||'<div style="color:#64748b;font-size:12px;padding:20px;text-align:center">本期无A级标的</div>';
+ document.getElementById("lbA").innerHTML=html1||'<div style="color:#64748b;font-size:12px;padding:20px;text-align:center">本期无 A/B 候选</div>';
 }
 // init dashboard
 renderFunnel();renderLB();drawScoreChart();drawIndChart();
