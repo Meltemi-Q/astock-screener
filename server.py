@@ -438,10 +438,12 @@ class ScreenerHandler(SimpleHTTPRequestHandler):
         latest_ts = status.get("latest_ts")
         if latest_ts:
             latest_name = f"{cfg['html_prefix']}_{latest_ts}.html"
-            target_js = json.dumps(latest_name, ensure_ascii=False)
-            refresh_meta = f'<meta http-equiv="refresh" content="0; url={latest_name}">'
-            redirect_js = f"<script>location.replace({target_js})</script>"
-            message = f'正在打开最新总表：<a href="{latest_name}">{latest_name}</a>'
+            self.send_response(302)
+            self.send_header("Location", latest_name)
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         else:
             latest_name = ""
             refresh_meta = ""

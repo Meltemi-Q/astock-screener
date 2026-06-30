@@ -133,6 +133,18 @@ class RegressionTests(unittest.TestCase):
         finally:
             server.RESULTS_DIR = old_results_dir
 
+    def test_market_home_links_are_rewritten_to_latest_result(self):
+        source = (ROOT / "templates" / "screen.html").read_text(encoding="utf-8")
+
+        self.assertIn('linkEl.setAttribute("href", data.latest_href', source)
+        self.assertIn('data.stable_href||MARKET_META[market].stable', source)
+
+    def test_server_stable_market_routes_use_http_redirect(self):
+        source = (ROOT / "server.py").read_text(encoding="utf-8")
+
+        self.assertIn("send_response(302)", source)
+        self.assertIn('send_header("Location", latest_name)', source)
+
     def test_deep_dive_generation_writes_shared_shell_and_json_payload(self):
         import stock_deep_dive
 

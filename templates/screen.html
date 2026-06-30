@@ -237,7 +237,10 @@ function updateCard(market,data){
 
   updateTierStats(market,data.tier_counts||{},data.row_count||0);
   metaEl.textContent="共 "+(data.row_count||0)+" 只 · "+(data.file_count||0)+" 份结果文件 · 日期 "+y+"-"+m+"-"+d;
-  if(linkEl)linkEl.classList.remove("disabled-link");
+  if(linkEl){
+   linkEl.setAttribute("href", data.latest_href||data.stable_href||MARKET_META[market].stable);
+   linkEl.classList.remove("disabled-link");
+  }
  }
 }
 
