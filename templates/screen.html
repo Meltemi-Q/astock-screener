@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>全球多市场 · 五层选股</title>
+<style>
+*{box-sizing:border-box}
+:root{color-scheme:light;--bg:#f6f8fb;--text:#172033;--heading:#0f172a;--muted:#64748b;--surface:#fff;--surface-soft:#f8fafc;--border:#dbe4f0;--border-strong:#cbd5e1;--link:#2563eb;--green:#16a34a;--yellow:#b45309;--red:#dc2626;--toast-bg:#ecfdf5;--toast-border:#86efac;--shadow:0 1px 2px rgba(15,23,42,.04);--warn:#fff7ed;--hover:#f8fbff}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#0f1115;--text:#e6e8eb;--heading:#f8fafc;--muted:#9aa4b2;--surface:#131820;--surface-soft:#1a1f29;--border:#232936;--border-strong:#2a3140;--link:#7fb3ff;--green:#3ddc84;--yellow:#ffd166;--red:#ff6b6b;--toast-bg:#1a2a1a;--toast-border:#3ddc84;--shadow:none;--warn:#1f1a12;--hover:#161b24}
+body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh}
+header{padding:20px 28px;background:linear-gradient(135deg,#161a22,#0f1115);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+:root[data-theme="light"] header{background:linear-gradient(135deg,#ffffff,#eef4ff)}
+.header-left h1{margin:0 0 4px;font-size:20px;color:var(--heading)}
+.header-left .sub{font-size:12px;color:var(--muted)}
+.header-right{display:flex;align-items:center;gap:10px}
+.theme-btn,.settings-btn{cursor:pointer;background:var(--surface-soft);border:1px solid var(--border-strong);color:var(--text);border-radius:7px;padding:6px 14px;font-size:12px;white-space:nowrap;min-height:34px;transition:border-color .15s}
+.theme-btn:hover,.settings-btn:hover{border-color:var(--link)}
+main{max-width:960px;margin:0 auto;padding:28px 20px}
+/* ── Market cards ── */
+.market-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:20px}
+.market-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:22px 20px;position:relative;overflow:hidden;transition:box-shadow .2s,transform .15s,border-color .2s;box-shadow:var(--shadow)}
+.market-card:hover{box-shadow:0 4px 20px rgba(15,23,42,.15);transform:translateY(-1px);border-color:var(--border-strong)}
+.card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.card-flag{font-size:28px;line-height:1}
+.card-label{font-size:17px;font-weight:700;color:var(--heading);margin-left:8px;flex:1}
+.card-exchange{font-size:11px;color:var(--muted)}
+.card-status{display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:14px}
+.status-dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0}
+.status-dot.ready{background:var(--green)}.status-dot.missing{background:var(--red)}.status-dot.loading{background:var(--yellow);animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.card-stats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px}
+.stat-pill{background:var(--surface-soft);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;text-align:center;min-width:56px}
+.stat-pill .val{font-size:18px;font-weight:700;line-height:1.2}
+.stat-pill .val.A{color:var(--green)}.stat-pill .val.B{color:var(--yellow)}.stat-pill .val.C{color:var(--muted)}
+.stat-pill .lbl{font-size:10px;color:var(--muted);margin-top:1px}
+.card-meta{font-size:11px;color:var(--muted);margin-bottom:12px}
+.card-actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{cursor:pointer;background:var(--surface-soft);border:1px solid var(--border-strong);color:var(--text);border-radius:7px;padding:7px 14px;font-size:12px;white-space:nowrap;min-height:34px;transition:border-color .15s,background .15s;text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+.btn:hover{border-color:var(--link)}
+.btn.primary{background:var(--link);border-color:var(--link);color:#fff}
+.btn.primary:hover{background:#5b93ff}
+:root[data-theme="dark"] .btn.primary:hover{background:#6098ff}
+.btn.refresh{background:#1d3320;border-color:#1e3e1e;color:#3ddc84}
+:root[data-theme="light"] .btn.refresh{background:#ecfdf5;border-color:#bbf7d0;color:#15803d}
+.btn.refresh:hover{border-color:var(--green)}
+.btn.secondary{background:#1d2033;border-color:#1e2340;color:#7fb3ff}
+:root[data-theme="light"] .btn.secondary{background:#eff6ff;border-color:#bfdbfe;color:#2563eb}
+.btn:disabled{opacity:.5;cursor:not-allowed;pointer-events:none}
+/* ── Server status bar ── */
+.status-bar{padding:10px 20px;background:var(--surface-soft);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:12px}
+.status-bar .conn{display:flex;align-items:center;gap:6px}
+.status-bar .time{color:var(--muted)}
+/* ── Toast ── */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--toast-bg);border:1px solid var(--toast-border);border-radius:8px;padding:10px 16px;color:var(--green);font-size:12px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;max-width:min(520px,calc(100vw - 32px))}
+.toast.show{opacity:1}
+.toast.error{background:#2a1a1a;border-color:#ff6b6b;color:#ff6b6b}
+/* ── Progress bar ── */
+.progress-wrap{height:4px;background:var(--surface-soft);border-radius:999px;overflow:hidden;margin-top:8px;display:none}
+.progress-wrap.active{display:block}
+.progress-bar{height:100%;width:0;background:linear-gradient(90deg,var(--link),var(--green));border-radius:999px;transition:width .25s ease}
+.progress-wrap.indeterminate .progress-bar{width:38%;animation:progressSlide 1.2s ease-in-out infinite}
+@keyframes progressSlide{0%{transform:translateX(-120%)}50%{transform:translateX(70%)}100%{transform:translateX(260%)}}
+/* ── Footer ── */
+footer{padding:16px 28px;color:var(--muted);font-size:11px;border-top:1px solid var(--border);text-align:center}
+footer a{color:var(--link);text-decoration:none}
+@media(max-width:720px){header{padding:16px}.market-grid{grid-template-columns:1fr}.card-actions{flex-direction:column}.card-actions .btn{width:100%;justify-content:center}.header-left h1{font-size:17px}}
+</style></head><body>
+
+<header>
+<div class="header-left">
+<h1>🌍 全球多市场「五层选股流水线」</h1>
+<div class="sub">A股 · 港股 · 美股 — 统一量化筛选入口</div>
+</div>
+<div class="header-right">
+<button class="theme-btn" id="themeToggle" title="切换暗色/亮色主题">🌙 暗色</button>
+</div>
+</header>
+
+<main>
+<div class="market-grid" id="marketGrid">
+<!-- ├─ A 股 ─┤ -->
+<div class="market-card" data-market="cn" id="card-cn">
+<div class="card-top">
+<span class="card-flag">🇨🇳</span><span class="card-label">A股</span>
+</div>
+<div class="card-exchange">沪深交易所 · Shanghai &amp; Shenzhen</div>
+<div class="card-status" id="status-cn">
+<span class="status-dot loading"></span>
+<span class="status-text">加载中…</span>
+</div>
+<div class="card-stats" id="stats-cn"></div>
+<div class="card-meta" id="meta-cn"></div>
+<div class="card-actions">
+<a class="btn primary" href="astock_screen.html" id="link-cn">📊 查看总表</a>
+<button class="btn refresh" data-refresh="cn" data-mode="quotes">↻ 刷新行情</button>
+<button class="btn secondary" data-refresh="cn" data-mode="full">⟳ 全量更新</button>
+</div>
+<div class="progress-wrap" id="progress-cn"><div class="progress-bar"></div></div>
+</div>
+
+<!-- ├─ 港股 ─┤ -->
+<div class="market-card" data-market="hk" id="card-hk">
+<div class="card-top">
+<span class="card-flag">🇭🇰</span><span class="card-label">港股</span>
+</div>
+<div class="card-exchange">香港交易所 · HKEX</div>
+<div class="card-status" id="status-hk">
+<span class="status-dot loading"></span>
+<span class="status-text">加载中…</span>
+</div>
+<div class="card-stats" id="stats-hk"></div>
+<div class="card-meta" id="meta-hk"></div>
+<div class="card-actions">
+<a class="btn primary" href="hkstock_screen.html" id="link-hk">📊 查看总表</a>
+<button class="btn refresh" data-refresh="hk" data-mode="quotes">↻ 刷新行情</button>
+<button class="btn secondary" data-refresh="hk" data-mode="full">⟳ 全量更新</button>
+</div>
+<div class="progress-wrap" id="progress-hk"><div class="progress-bar"></div></div>
+</div>
+
+<!-- ├─ 美股 ─┤ -->
+<div class="market-card" data-market="us" id="card-us">
+<div class="card-top">
+<span class="card-flag">🇺🇸</span><span class="card-label">美股</span>
+</div>
+<div class="card-exchange">NYSE · NASDAQ · AMEX</div>
+<div class="card-status" id="status-us">
+<span class="status-dot loading"></span>
+<span class="status-text">加载中…</span>
+</div>
+<div class="card-stats" id="stats-us"></div>
+<div class="card-meta" id="meta-us"></div>
+<div class="card-actions">
+<a class="btn primary" href="usstock_screen.html" id="link-us">📊 查看总表</a>
+<button class="btn refresh" data-refresh="us" data-mode="quotes">↻ 刷新行情</button>
+<button class="btn secondary" data-refresh="us" data-mode="full">⟳ 全量更新</button>
+</div>
+<div class="progress-wrap" id="progress-us"><div class="progress-bar"></div></div>
+</div>
+</div>
+</main>
+
+<div class="status-bar">
+<div class="conn" id="connStatus">
+<span class="status-dot missing"></span> <span>检测服务器连接…</span>
+</div>
+<div class="time" id="lastCheck"></div>
+</div>
+
+<footer>
+数据来源：东方财富公开接口 · SEC EDGAR (XBRL 10-K) · Nasdaq Trader · HKEX 证券主表
+· <a href="https://github.com" target="_blank" rel="noopener">开源项目</a>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+// ── Theme ──
+function setTheme(t){
+ document.documentElement.setAttribute("data-theme",t);
+ localStorage.setItem("theme",t);
+ var btn=document.getElementById("themeToggle");
+ if(btn)btn.textContent=t==="dark"?"☀️ 亮色":"🌙 暗色";
+}
+(function(){
+ var s=localStorage.getItem("theme");
+ if(!s)s=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";
+ setTheme(s);
+ document.getElementById("themeToggle").addEventListener("click",function(){
+  setTheme(document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark");
+ });
+})();
+
+// ── Toast ──
+var toastTimer=null;
+function showToast(msg,isError){
+ var t=document.getElementById("toast");
+ t.textContent=msg;
+ t.className="toast"+(isError?" error":"")+" show";
+ clearTimeout(toastTimer);
+ toastTimer=setTimeout(function(){t.className="toast"},3500);
+}
+
+// ── Status bar ──
+function setConnStatus(ok,msg){
+ var el=document.getElementById("connStatus");
+ var dot=el.querySelector(".status-dot");
+ if(dot){
+  dot.className="status-dot "+(ok?"ready":"missing");
+ }
+ el.querySelector("span:last-child").textContent=msg||(ok?"● 已连接服务器":"● 离线 — 仅可查看已生成结果");
+}
+function setLastCheck(){
+ var now=new Date();
+ var ts=now.getHours().toString().padStart(2,"0")+":"+now.getMinutes().toString().padStart(2,"0")+":"+now.getSeconds().toString().padStart(2,"0");
+ document.getElementById("lastCheck").textContent="更新: "+ts;
+}
+
+// ── Fetch market status ──
+var MARKET_META={
+ cn:{label:"A股",flag:"🇨🇳",exchange:"沪深交易所",stable:"astock_screen.html"},
+ hk:{label:"港股",flag:"🇭🇰",exchange:"香港交易所",stable:"hkstock_screen.html"},
+ us:{label:"美股",flag:"🇺🇸",exchange:"NYSE · NASDAQ",stable:"usstock_screen.html"}
+};
+
+function updateCard(market,data){
+ var card=document.getElementById("card-"+market);
+ var statusEl=document.getElementById("status-"+market);
+ var statsEl=document.getElementById("stats-"+market);
+ var metaEl=document.getElementById("meta-"+market);
+ var linkEl=document.getElementById("link-"+market);
+ var dot=statusEl.querySelector(".status-dot");
+ var txt=statusEl.querySelector(".status-text");
+
+ if(!data||!data.latest_ts){
+  // Not generated yet
+  dot.className="status-dot missing";
+  txt.textContent="尚未生成 — 点击下方按钮刷新";
+  statsEl.innerHTML="";
+  metaEl.textContent="该市场暂无五层筛选结果";
+  if(linkEl)linkEl.classList.add("disabled-link");
+ }else{
+  dot.className="status-dot ready";
+  var ts=data.latest_ts;
+  var y=ts.substring(0,4),m=ts.substring(4,6),d=ts.substring(6,8);
+  txt.textContent="已生成 · "+y+"-"+m+"-"+d;
+
+  // Fetch detailed stats from individual market status
+  fetch("/api/status?market="+market)
+   .then(function(r){return r.json();})
+   .then(function(detail){
+    if(detail&&detail.done){
+     // Try to get tier counts from the CSV
+     var detailMeta="共 "+(detail.file_count||0)+" 份结果文件";
+     if(detail.latest_ts){
+      detailMeta+=" · 日期 "+detail.latest_ts.substring(0,4)+"-"+detail.latest_ts.substring(4,6)+"-"+detail.latest_ts.substring(6,8);
+     }
+     metaEl.textContent=detailMeta;
+    }
+   }).catch(function(){});
+
+  metaEl.textContent="共 "+(data.file_count||0)+" 份结果文件 · 日期 "+y+"-"+m+"-"+d;
+  if(linkEl)linkEl.classList.remove("disabled-link");
+ }
+}
+
+function updateTierStats(market,tierCounts,total){
+ var statsEl=document.getElementById("stats-"+market);
+ if(!statsEl)return;
+ var a=tierCounts&&tierCounts["A_可买入"]||0;
+ var b=tierCounts&&tierCounts["B_优质待跌"]||0;
+ var c=tierCounts&&tierCounts["C_接近合格"]||0;
+ var html="";
+ if(total>0){
+  html+='<div class="stat-pill"><div class="val A">'+a+'</div><div class="lbl">Tier A</div></div>';
+  html+='<div class="stat-pill"><div class="val B">'+b+'</div><div class="lbl">Tier B</div></div>';
+  html+='<div class="stat-pill"><div class="val C">'+c+'</div><div class="lbl">Tier C</div></div>';
+  html+='<div class="stat-pill"><div class="val" style="font-size:18px;font-weight:700">'+total+'</div><div class="lbl">总分析</div></div>';
+ }
+ statsEl.innerHTML=html;
+}
+
+function loadAllMarkets(){
+ setLastCheck();
+ fetch("/api/status?market=all")
+  .then(function(r){
+   if(!r.ok)throw new Error("HTTP "+r.status);
+   return r.json();
+  })
+  .then(function(data){
+   setConnStatus(true,"● 已连接服务器");
+   if(data&&data.markets){
+    for(var m in data.markets){
+     updateCard(m,data.markets[m]);
+    }
+   }
+   // Also fetch individual market status for tier counts
+   // Try parsing tier counts from each market's CSV via status endpoint
+   for(var m in MARKET_META){
+    fetchTierStats(m);
+   }
+  })
+  .catch(function(e){
+   setConnStatus(false,"● 离线 — 服务器未运行 ("+e.message+")");
+   // Set all cards to loading-failed
+   for(var m in MARKET_META){
+    var dot=document.getElementById("status-"+m).querySelector(".status-dot");
+    var txt=document.getElementById("status-"+m).querySelector(".status-text");
+    dot.className="status-dot missing";
+    txt.textContent="无法连接服务器";
+   }
+  });
+}
+
+function fetchTierStats(market){
+ // Parse CSV via status endpoint - try to get tier distribution
+ // First check if there's a latest CSV
+ fetch("/api/status?market="+market)
+  .then(function(r){return r.json();})
+  .then(function(data){
+   if(!data||!data.latest_ts)return;
+   // We need tier counts from the CSV - make a separate request
+   return fetch("/api/status?market="+market+"&tiers=1")
+    .catch(function(){return null;});
+  })
+  .catch(function(){});
+}
+
+// ── Refresh button handlers ──
+var refreshBusy={};
+
+function handleRefresh(market,mode,btnEl,progressEl){
+ if(refreshBusy[market])return;
+ refreshBusy[market]=true;
+ btnEl.disabled=true;
+ btnEl.textContent=mode==="full"?"⏳ 更新中…":"⏳ 刷新中…";
+
+ if(progressEl){
+  progressEl.classList.add("active","indeterminate");
+ }
+
+ var qs="market="+market+"&mode="+mode;
+ if(mode==="full")qs+="&fresh=1";
+
+ fetch("/api/refresh?"+qs,{method:"POST"})
+  .then(function(r){return r.json();})
+  .then(function(data){
+   if(data.done){
+    showToast(MARKET_META[market].label+" "+(mode==="full"?"全量更新":"行情刷新")+"完成 ✓");
+    // Reload cards after short delay
+    setTimeout(loadAllMarkets,1500);
+   }else if(data.cached){
+    showToast(MARKET_META[market].label+" 冷却中，请稍后再试",true);
+   }else if(data.error){
+    showToast(MARKET_META[market].label+" "+(mode==="full"?"更新":"刷新")+"失败: "+data.error,true);
+   }else{
+    showToast(MARKET_META[market].label+" "+(mode==="full"?"更新":"刷新")+"已启动，等待完成…");
+   }
+  })
+  .catch(function(e){
+   showToast("网络错误: "+e.message,true);
+  })
+  .finally(function(){
+   refreshBusy[market]=false;
+   btnEl.disabled=false;
+   btnEl.textContent=mode==="full"?"⟳ 全量更新":"↻ 刷新行情";
+   if(progressEl)progressEl.classList.remove("active","indeterminate");
+  });
+}
+
+// ── Attach refresh handlers ──
+document.querySelectorAll("[data-refresh]").forEach(function(btn){
+ btn.addEventListener("click",function(){
+  var market=btn.getAttribute("data-refresh");
+  var mode=btn.getAttribute("data-mode")||"quotes";
+  var progressEl=document.getElementById("progress-"+market);
+  handleRefresh(market,mode,btn,progressEl);
+ });
+});
+
+// ── Init ──
+loadAllMarkets();
+
+// Poll for updates every 30 seconds when a refresh is in progress
+setInterval(function(){
+ var busy=false;
+ for(var k in refreshBusy){if(refreshBusy[k])busy=true;}
+ if(busy)loadAllMarkets();
+},30000);
+
+})();
+</script></body></html>

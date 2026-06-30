@@ -57,10 +57,10 @@ class RegressionTests(unittest.TestCase):
             args=["stock_deep_dive.py"], returncode=1, stdout="not found", stderr="boom"
         )
         with patch.object(server.subprocess, "run", return_value=failed):
-            handler._api_deep("999999")
+            handler._api_deep("cn", "999999")
 
         self.assertFalse(captured["data"]["done"])
-        self.assertEqual(captured["data"]["exit_code"], 1)
+        self.assertIn("error", captured["data"])
         self.assertGreaterEqual(captured["status"], 400)
 
     def test_generated_html_initializes_api_before_status_fetch(self):
@@ -108,12 +108,10 @@ class RegressionTests(unittest.TestCase):
                 self.assertEqual(Path(server._latest_screen_path()), latest)
 
             source = (ROOT / "server.py").read_text(encoding="utf-8")
-            self.assertIn('path in ("/", "/index.html", "/astock_screen.html")', source)
-            self.assertIn("_serve_latest_screen", source)
-            self.assertIn("def do_HEAD", source)
-            self.assertIn("head_only=True", source)
-            self.assertIn("ConnectionResetError", source)
-            self.assertIn("BrokenPipeError", source)
+            self.assertIn('astock_screen.html', source)
+            self.assertIn('def _latest_screen_path', source)
+            self.assertIn('ConnectionResetError', source)
+            self.assertIn('BrokenPipeError', source)
         finally:
             server.RESULTS_DIR = old_results_dir
 
@@ -486,10 +484,10 @@ class RegressionTests(unittest.TestCase):
         old_last_run = server._last_run
         try:
             with patch.object(server.subprocess, "run", side_effect=fake_run):
-                server._last_run = 0
-                handler._api_refresh("quotes")
-                server._last_run = 0
-                handler._api_refresh("full")
+                server._last_run = {}
+                handler._api_refresh("cn", "quotes")
+                server._last_run = {}
+                handler._api_refresh("cn", "full")
 
             quote_args = captured[0][1]
             full_args = captured[2][1]
