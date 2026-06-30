@@ -252,14 +252,29 @@ def check_tier_ab_eligibility(record: dict, raw_fin: AnnualFinancial | None = No
     return len(missing) == 0, missing
 
 
+def _normalize_currency(currency: str) -> str:
+    value = (currency or "").upper().strip()
+    aliases = {
+        "人民币": "CNY",
+        "人民幣": "CNY",
+        "元": "CNY",
+        "¥": "CNY",
+        "港元": "HKD",
+        "港币": "HKD",
+        "港幣": "HKD",
+        "美元": "USD",
+    }
+    return aliases.get(value, value)
+
+
 def check_currency_match(quote_currency: str, report_currency: str) -> bool:
     """Check if quote and report currencies match (case-insensitive, CNY/RMB equivalence)."""
-    q = quote_currency.upper().strip()
-    r = report_currency.upper().strip()
+    q = _normalize_currency(quote_currency)
+    r = _normalize_currency(report_currency)
     if q == r:
         return True
     # CNY/RMB equivalence
-    cny_set = {"CNY", "RMB", "¥"}
+    cny_set = {"CNY", "RMB"}
     if q in cny_set and r in cny_set:
         return True
     return False

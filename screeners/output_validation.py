@@ -29,6 +29,7 @@ MARKET_RULES = {
         "min_rows": 4000,
         "max_rows": 8000,
         "required_codes": (),
+        "min_tier_signals": 1,
     },
     "hk": {
         "label": "港股",
@@ -37,6 +38,7 @@ MARKET_RULES = {
         "min_rows": 1000,
         "max_rows": 5000,
         "required_codes": ("00700", "09988"),
+        "min_tier_signals": 1,
     },
     "us": {
         "label": "美股",
@@ -45,6 +47,7 @@ MARKET_RULES = {
         "min_rows": 3000,
         "max_rows": 12000,
         "required_codes": ("AAPL", "MSFT", "NVDA", "GOOGL"),
+        "min_tier_signals": 1,
     },
 }
 
@@ -125,6 +128,16 @@ def validate_market_result(results_dir: str, market: str, ts: str) -> dict:
         if code.upper() not in codes:
             errors.append(f"missing required code {code}")
 
+    tier_signal_count = sum(
+        tier_counts.get(tier, 0)
+        for tier in ("A_可买入", "B_优质待跌", "C_接近合格")
+    )
+    if tier_signal_count < rule.get("min_tier_signals", 0):
+        errors.append(
+            f"tier_signal_count {tier_signal_count} below "
+            f"{rule['min_tier_signals']} minimum for {rule['label']}"
+        )
+
     if not os.path.exists(html_path):
         errors.append(f"missing html: {os.path.basename(html_path)}")
     if not os.path.exists(md_path):
@@ -137,6 +150,7 @@ def validate_market_result(results_dir: str, market: str, ts: str) -> dict:
         "valid": not errors,
         "row_count": row_count,
         "tier_counts": dict(tier_counts),
+        "tier_signal_count": tier_signal_count,
         "required_codes": list(rule["required_codes"]),
         "errors": errors,
         "warnings": warnings,

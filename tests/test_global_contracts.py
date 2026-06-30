@@ -180,6 +180,12 @@ class TestCurrencyMatch(unittest.TestCase):
         """¥ == CNY → True."""
         self.assertTrue(check_currency_match("¥", "CNY"))
 
+    def test_currency_match_chinese_aliases(self):
+        """Chinese currency aliases normalize to ISO codes."""
+        self.assertTrue(check_currency_match("人民币", "CNY"))
+        self.assertTrue(check_currency_match("HKD", "港元"))
+        self.assertTrue(check_currency_match("美元", "USD"))
+
 
 class TestSecurityMaster(unittest.TestCase):
     """Tests for make_security_master."""

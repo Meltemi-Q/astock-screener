@@ -115,7 +115,8 @@ class RegressionTests(unittest.TestCase):
                 latest = results_dir / "astock_screen_20260628.html"
                 latest.write_text("latest", encoding="utf-8")
                 rows = ["rank,tier,code,name"]
-                rows.extend(f"{i},-,{i:06d},stock{i}" for i in range(1, 4001))
+                rows.append("1,A,000001,stock1")
+                rows.extend(f"{i},-,{i:06d},stock{i}" for i in range(2, 4002))
                 (results_dir / "astock_screen_20260628.csv").write_text(
                     "\n".join(rows),
                     encoding="utf-8",

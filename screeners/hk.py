@@ -126,6 +126,21 @@ def _hk_fin_max_fetches() -> int:
         return DEFAULT_HK_FIN_MAX_FETCHES
 
 
+def _currency_code(value: str) -> str:
+    aliases = {
+        "人民币": "CNY",
+        "人民幣": "CNY",
+        "元": "CNY",
+        "¥": "CNY",
+        "港元": "HKD",
+        "港币": "HKD",
+        "港幣": "HKD",
+        "美元": "USD",
+    }
+    raw = (value or "").upper().strip()
+    return aliases.get(raw, raw)
+
+
 # ── 增长率计算 ─────────────────────────────────────────────
 
 def compute_growth(financials: list[dict], year: int) -> tuple[float | None, float | None]:
@@ -381,9 +396,10 @@ def build_hk_records(year: int = 2025) -> list[dict]:
         elif master_source != "HKEX":
             data_quality_flag = "quote_universe_master"
         quote_currency = "HKD"
-        if not missing_financials and report_currency and report_currency.upper() not in ("HKD", "CNY"):
+        report_currency_code = _currency_code(report_currency)
+        if not missing_financials and report_currency_code not in ("HKD", "CNY", "RMB"):
             # 非 HKD/CNY 报表货币
-            if not check_currency_match(quote_currency, report_currency):
+            if not check_currency_match(quote_currency, report_currency_code):
                 data_quality_flag = "currency_mismatch"
 
         # ── 金融股过滤 ──

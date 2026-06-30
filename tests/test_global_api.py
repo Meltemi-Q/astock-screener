@@ -122,6 +122,7 @@ class TestApiStatus(unittest.TestCase):
                 tdp = Path(td)
                 output_validation.MARKET_RULES["us"]["min_rows"] = 1
                 output_validation.MARKET_RULES["us"]["required_codes"] = ()
+                output_validation.MARKET_RULES["us"]["min_tier_signals"] = 1
 
                 with (tdp / "usstock_screen_20260630.csv").open(
                     "w", newline="", encoding="utf-8-sig"
@@ -141,6 +142,39 @@ class TestApiStatus(unittest.TestCase):
             self.assertEqual(status["tier_counts"]["C_接近合格"], 1)
         finally:
             output_validation.MARKET_RULES["us"] = old_rule
+
+    def test_output_validation_rejects_all_dash_tiers(self):
+        """A full-size market artifact with no A/B/C signal is not ready."""
+        import csv
+        from screeners import output_validation
+
+        old_rule = output_validation.MARKET_RULES["hk"].copy()
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                tdp = Path(td)
+                output_validation.MARKET_RULES["hk"]["min_rows"] = 2
+                output_validation.MARKET_RULES["hk"]["required_codes"] = ()
+                output_validation.MARKET_RULES["hk"]["min_tier_signals"] = 1
+
+                with (tdp / "hkstock_screen_20260630.csv").open(
+                    "w", newline="", encoding="utf-8-sig"
+                ) as f:
+                    writer = csv.DictWriter(f, fieldnames=["code", "tier"])
+                    writer.writeheader()
+                    writer.writerow({"code": "00700", "tier": "-"})
+                    writer.writerow({"code": "09988", "tier": "-"})
+                (tdp / "hkstock_screen_20260630.html").write_text("", encoding="utf-8")
+
+                status = output_validation.validate_market_result(str(tdp), "hk", "20260630")
+
+            self.assertFalse(status["valid"], status)
+            self.assertEqual(status["tier_signal_count"], 0)
+            self.assertTrue(
+                any("tier_signal_count" in err for err in status["errors"]),
+                status["errors"],
+            )
+        finally:
+            output_validation.MARKET_RULES["hk"] = old_rule
 
 
 class TestApiRefresh(unittest.TestCase):
