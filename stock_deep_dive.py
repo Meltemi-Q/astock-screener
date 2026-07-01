@@ -219,6 +219,22 @@ def fnum(x):
         return None
 
 
+def atomic_write_json(path, payload):
+    """原子写 JSON：先写临时文件再 os.replace，避免 HTTP 静态服务读到半截文件。"""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = f"{path}.{os.getpid()}.{threading.get_ident()}.tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+
+
 # ============================================================
 # 二、单只股票全面数据收集
 # ============================================================
@@ -436,7 +452,7 @@ def compute_financials(stock):
         cur_ratio = fnum(b.get("CURRENT_RATIO"))
         equity = fnum(b.get("TOTAL_EQUITY"))
         assets = fnum(b.get("TOTAL_ASSETS"))
-        goodwill = fnum(b.get("GOODWILL"))
+        # 注：RPT_DMSK_FN_BALANCE 摘要表不含商誉列，原 GOODWILL 字段恒为 None，已移除以免研报出现恒空商誉误导
         cf_oper = fnum(c.get("NETCASH_OPERATE"))
         cf_invest = fnum(c.get("NETCASH_INVEST"))
         cf_finance = fnum(c.get("NETCASH_FINANCE"))
@@ -449,23 +465,37 @@ def compute_financials(stock):
             "year": year, "rev": rev, "netp": netp, "roe": roe, "gm": gm,
             "eps": eps, "nm": nm, "ocf_ps": ocf_ps, "ocf_ratio": ocf_ratio,
             "debt": debt, "cur_ratio": cur_ratio, "roa": roa,
-            "equity": equity, "assets": assets, "goodwill": goodwill,
+            "equity": equity, "assets": assets,
             "cf_oper": cf_oper, "cf_invest": cf_invest, "cf_finance": cf_finance,
         })
 
-    # 计算增长率
-    if len(years_data) >= 2:
+    # 计算增长率：按年份对齐，而非位置索引（年报有缺口时避免错位相除）
+    if years_data:
         latest = years_data[-1]
-        prev = years_data[-2]
-        latest["rev_yoy"] = ((latest["rev"] - prev["rev"]) / prev["rev"] * 100) if (latest["rev"] and prev["rev"] and prev["rev"] != 0) else None
-        latest["netp_yoy"] = ((latest["netp"] - prev["netp"]) / prev["netp"] * 100) if (latest["netp"] and prev["netp"] and prev["netp"] != 0) else None
-        if len(years_data) >= 4:
-            first = years_data[-4]
-            n = 3
-            cagr_rev = ((latest["rev"] / first["rev"]) ** (1/n) - 1) * 100 if (latest["rev"] and first["rev"] and first["rev"] > 0) else None
-            cagr_netp = ((latest["netp"] / first["netp"]) ** (1/n) - 1) * 100 if (latest["netp"] and first["netp"] and first["netp"] > 0) else None
-            latest["cagr_rev"] = cagr_rev
-            latest["cagr_netp"] = cagr_netp
+        try:
+            latest_year = int(latest["year"])
+        except (TypeError, ValueError):
+            latest_year = None
+        # 建立 年份 -> 数据 的映射，便于按目标年份精确取值
+        by_year = {}
+        for d in years_data:
+            try:
+                by_year[int(d["year"])] = d
+            except (TypeError, ValueError):
+                pass
+
+        if latest_year is not None:
+            # YoY：严格取上一自然年（latest_year - 1），缺口则不计算
+            prev = by_year.get(latest_year - 1)
+            if prev:
+                latest["rev_yoy"] = ((latest["rev"] - prev["rev"]) / prev["rev"] * 100) if (latest["rev"] and prev["rev"] and prev["rev"] != 0) else None
+                latest["netp_yoy"] = ((latest["netp"] - prev["netp"]) / prev["netp"] * 100) if (latest["netp"] and prev["netp"] and prev["netp"] != 0) else None
+            # 3年 CAGR：严格取 latest_year - 3 作为基期，缺口则不计算
+            first = by_year.get(latest_year - 3)
+            if first:
+                n = 3
+                latest["cagr_rev"] = ((latest["rev"] / first["rev"]) ** (1/n) - 1) * 100 if (latest["rev"] and first["rev"] and first["rev"] > 0) else None
+                latest["cagr_netp"] = ((latest["netp"] / first["netp"]) ** (1/n) - 1) * 100 if (latest["netp"] and first["netp"] and first["netp"] > 0) else None
 
     return years_data
 
@@ -483,19 +513,27 @@ def deepseek_analyze(stock, financials):
     code = stock["code"]
     ind = stock["industry"]
 
-    # 财务摘要
+    # 财务摘要。营收/净利统一换算成【亿元】，与总市值口径一致，避免 AI 因裸大数误判体量。
+    def _yi(v):
+        """把元级大数换算成亿元，保留2位；无值返回'?'。"""
+        try:
+            return f"{float(v)/1e8:.2f}"
+        except (TypeError, ValueError):
+            return "?"
+
     fy = financials[-1] if financials else {}
     finfo = f"""
 股票: {name}({code}) | 行业: {ind}
 最新年报: {fy.get('year','?')}年
-营收: {fy.get('rev','?')} | 净利润: {fy.get('netp','?')} | ROE: {fy.get('roe','?')}% | 毛利率: {fy.get('gm','?')}%
+（注：以下营收、净利润、总市值均为【亿元】人民币）
+营收: {_yi(fy.get('rev'))}亿 | 净利润: {_yi(fy.get('netp'))}亿 | ROE: {fy.get('roe','?')}% | 毛利率: {fy.get('gm','?')}%
 净利率: {fy.get('nm','?')}% | PE(TTM): {stock.get('pe_ttm','?')} | PB: {stock.get('pb','?')}
 负债率: {fy.get('debt','?')}% | ROA: {fy.get('roa','?')}%
 现金流/净利: {fy.get('ocf_ratio','?')} | 流动比率: {fy.get('cur_ratio','?')}
 总市值: {(stock.get('mktcap') or 0)/1e8:.1f}亿
 
-近三年财务趋势:
-{chr(10).join(f"  {d['year']}: 营收{d.get('rev','?')} 净利{d.get('netp','?')} ROE{d.get('roe','?')}% 毛利{d.get('gm','?')}%" for d in financials[-3:])}
+近三年财务趋势（营收/净利单位：亿元）:
+{chr(10).join(f"  {d['year']}: 营收{_yi(d.get('rev'))}亿 净利{_yi(d.get('netp'))}亿 ROE{d.get('roe','?')}% 毛利{d.get('gm','?')}%" for d in financials[-3:])}
 
 同行公司（同行业 {ind} 的优质标的）:
 {chr(10).join(f"  {p['code']} {p['name']}: PE={p.get('pe','?')} ROE={p.get('roe','?')}% 毛利={p.get('gm','?')}%" for p in stock.get('peers', [])[:5])}
@@ -1277,13 +1315,17 @@ def build_deep_dive_payload(stock, financials, analysis, screen_ts=None):
 
     price = stock.get("price") or 0
     mktcap = stock.get("mktcap") or 0
+    now = time.strftime("%Y-%m-%d %H:%M")
     return {
         "meta": {
             "code": code,
             "name": stock.get("name") or "",
             "industry": stock.get("industry") or "",
             "screen_ts": screen_ts,
-            "generated_at": time.strftime("%Y-%m-%d %H:%M"),
+            # generated_at 保留作向后兼容；量化数据与 AI 分析各自独立时间戳
+            "generated_at": now,
+            "data_generated_at": now,
+            "analysis_generated_at": now if analysis else None,
         },
         "quote": {
             "price": stock.get("price"),
@@ -1336,9 +1378,11 @@ def run_ai_only_for_existing_report(code, ai_limiter=None):
     if not analysis:
         return False
     payload["analysis"] = analysis
-    payload.setdefault("meta", {})["generated_at"] = time.strftime("%Y-%m-%d %H:%M")
-    with open(data_path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
+    # --ai-only 只刷新 AI 分析时间戳，量化数据抓取时间 data_generated_at 保持不变
+    meta = payload.setdefault("meta", {})
+    meta["analysis_generated_at"] = time.strftime("%Y-%m-%d %H:%M")
+    meta.setdefault("data_generated_at", meta.get("generated_at"))
+    atomic_write_json(data_path, payload)
     ensure_deep_dive_app(OUT_DIR)
     return True
 
@@ -1350,9 +1394,7 @@ def generate_html(stock, financials, analysis, output_path, screen_ts=None):
 
     payload = build_deep_dive_payload(stock, financials, analysis, screen_ts)
     data_path = os.path.join(base_dir, DATA_DIR_NAME, f"{stock['code']}.json")
-    os.makedirs(os.path.dirname(data_path), exist_ok=True)
-    with open(data_path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
+    atomic_write_json(data_path, payload)
 
     # 旧版按 XXXXXX.html 输出；新架构不再保留每只股票一份 HTML。
     if output_path.endswith(".html") and os.path.basename(output_path) not in ("index.html", "report.html"):

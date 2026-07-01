@@ -494,7 +494,7 @@ class RegressionTests(unittest.TestCase):
                 astock_screener.write_html([record], str(out), 2025, 1, (0, 1, 0))
 
                 html = out.read_text(encoding="utf-8")
-                self.assertIn("deep_dives/report.html?code='+v", html)
+                self.assertIn("deep_dives/report.html?code='+ec", html)
                 self.assertIn('"deepCount": 1', html)
         finally:
             astock_screener.OUT_DIR = old_out_dir

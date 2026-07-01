@@ -149,7 +149,15 @@ def main() -> int:
     ap.add_argument(
         "--strict-artifacts",
         action="store_true",
-        help="Fail if any market has no valid full-market artifact.",
+        help="Fail if any market has stale/empty/invalid full-market artifact.",
+    )
+    ap.add_argument(
+        "--strict",
+        action="store_true",
+        help=(
+            "CI/部署严格模式：等价于 --strict-artifacts，任一市场 stale/空/未验收即失败。"
+            " 默认宽松（缺产物不失败），便于本地探索。"
+        ),
     )
     ap.add_argument(
         "--markets",
@@ -209,7 +217,8 @@ def main() -> int:
     ]
 
     markets = [m.strip() for m in args.markets.split(",") if m.strip()]
-    checks.append(validate_artifacts(markets, args.strict_artifacts))
+    strict = args.strict or args.strict_artifacts
+    checks.append(validate_artifacts(markets, strict))
 
     if args.live:
         checks.append(run_live_data_tests())

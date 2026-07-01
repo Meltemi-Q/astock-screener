@@ -418,6 +418,180 @@ class TestRunFullPipeline(unittest.TestCase):
             self.assertIsNotNone(r.get("score"))
             self.assertIsInstance(r["score"], float)
 
+    def test_tier_ab_data_guard_blocks_missing_minesweep(self):
+        """缺关键行情数据(market_cap)的记录即使质量过关也不得进 Tier B（死代码护栏落地）。
+
+        排雷数据(ocf/debt)缺失已由 L0 fail-closed 拦下；此护栏兜住 L0/L1 检不到、
+        但进 A/B 需要的关键字段(price/market_cap 等)缺失的漏网情形。
+        """
+        rec = make_screening_record(
+            market="cn", code="900001", display_code="900001", name="缺行情数据",
+            industry="白酒", currency="CNY",
+            price=100.0, pe_ttm=18.0, market_cap=None,  # 缺市值
+            roe=30.0, gross_margin=91.0, net_margin=50.0,
+            yoy=22.0, cagr=20.0,
+            ocf_to_profit=1.2, debt_ratio=18.0,
+            goodwill_ratio=0.0, ttm_netp=80000000000,
+        )
+        records, _, _ = run_full_pipeline([rec])
+        # 若无护栏，L0+L1 全过 → 会被判 B；护栏应把它挡下并记 flag
+        self.assertNotEqual(records[0]["tier"], "A_可买入")
+        self.assertNotEqual(records[0]["tier"], "B_优质待跌")
+        self.assertIn("排雷数据不完整", records[0]["data_quality_flag"])
+
+
+class TestDiscountSemantics(unittest.TestCase):
+    """discount 应为 1 - 市值/合理市值（正值=便宜），且 L3 用 discount≥0.3 判买点。"""
+
+    def test_discount_positive_when_cheap(self):
+        # 市值 800B < 合理市值 1600B → discount = 0.5 > 0
+        rec = _make_tier_a_record()
+        self.assertGreater(rec["discount"], 0)
+        self.assertAlmostEqual(rec["discount"], 0.5, places=4)
+
+    def test_discount_negative_when_expensive(self):
+        # 市值 3200B > 合理市值 1600B → discount = 1 - 2.0 = -1.0 < 0
+        rec = make_screening_record(
+            market="cn", code="600519", display_code="600519", name="贵州茅台",
+            industry="白酒", currency="CNY",
+            price=1500.0, pe_ttm=18.0, market_cap=3200000000000,
+            roe=30.0, gross_margin=91.0, net_margin=50.0,
+            yoy=22.0, cagr=20.0,
+            ocf_to_profit=1.2, debt_ratio=18.0,
+            goodwill_ratio=0.0, ttm_netp=80000000000,
+        )
+        self.assertLess(rec["discount"], 0)
+        ind_pe = industry_median_pe([rec])
+        _, _, fails = evaluate(rec, ind_pe)
+        # 贵而未到买点：应有"安全边际不足"落选原因
+        self.assertTrue(any("安全边际" in f for f in fails))
+
+    def test_exp_ret_is_eyield_plus_g(self):
+        # exp_ret = 100/pe + g = 100/18 + 20 ≈ 25.56
+        rec = _make_tier_a_record()
+        self.assertAlmostEqual(rec["exp_ret"], 100.0 / 18.0 + 20.0, places=3)
+
+
+class TestGoodwillMineSweep(unittest.TestCase):
+    """商誉率 ≥30%(净资产) 必须被第0层排雷（口径为百分数）。"""
+
+    def test_goodwill_90pct_swept(self):
+        rec = make_screening_record(
+            market="cn", code="600001", display_code="600001", name="高商誉",
+            industry="综合", currency="CNY",
+            price=10.0, pe_ttm=15.0, market_cap=10000000000,
+            roe=20.0, gross_margin=40.0, net_margin=15.0,
+            yoy=15.0, cagr=12.0,
+            ocf_to_profit=1.0, debt_ratio=40.0,
+            goodwill_ratio=90.0,  # 商誉/净资产=90%（百分数口径）
+            ttm_netp=600000000,
+        )
+        ind_pe = industry_median_pe([rec])
+        deepest, tier, fails = evaluate(rec, ind_pe)
+        self.assertTrue(any("商誉" in f for f in fails), f"90% 商誉必须被排雷: {fails}")
+        self.assertEqual(deepest, 0)
+        self.assertNotIn(tier, ("A_可买入", "B_优质待跌", "C_接近合格"))
+
+
+class TestPerMarketOverride(unittest.TestCase):
+    """per-market 阈值覆盖机制：A股无覆盖保持原值；覆盖 hook 生效。"""
+
+    def test_resolve_config_cn_unchanged(self):
+        from screeners.scoring import resolve_config, DEFAULT_CONFIG
+        cfg = resolve_config(DEFAULT_CONFIG, "cn")
+        self.assertEqual(cfg["min_roe"], DEFAULT_CONFIG["min_roe"])
+        self.assertEqual(cfg["margin_of_safety"], DEFAULT_CONFIG["margin_of_safety"])
+
+    def test_resolve_config_override_applies(self):
+        from screeners.scoring import resolve_config, MARKET_THRESHOLD_OVERRIDES, DEFAULT_CONFIG
+        MARKET_THRESHOLD_OVERRIDES["hk"] = {"min_roe": 12.0}
+        try:
+            cfg = resolve_config(DEFAULT_CONFIG, "hk")
+            self.assertEqual(cfg["min_roe"], 12.0)
+            # 原 config 不被污染
+            self.assertEqual(DEFAULT_CONFIG["min_roe"], 15.0)
+        finally:
+            MARKET_THRESHOLD_OVERRIDES["hk"] = {}
+
+
+class TestCrossPathConsistency(unittest.TestCase):
+    """一致性：astock_screener(生产默认路径) 与 scoring(--market 路径) 对同一批构造输入产出相同 tier。"""
+
+    def _cross_records(self):
+        """构造覆盖 A/B/C/未通过 四种情形的输入，返回 (astock_rows, normalized_records)。"""
+        import astock_screener as ast_s
+
+        # 每个样本给出足以让两条路径重算派生量的原始字段
+        samples = [
+            # 全过 → A
+            dict(code="000A", name="全过A", industry="白酒", roe=30.0, gm=91.0, nm=50.0,
+                 yoy=22.0, cagr=20.0, ocf=1.2, debt=18.0, gw=0.0,
+                 pe=18.0, mktcap=800e9, ttm_netp=80e9),
+            # 质量过、估值不过 → B（PEG 高）
+            dict(code="000B", name="优质待跌B", industry="银行", roe=18.0, gm=45.0, nm=15.0,
+                 yoy=12.0, cagr=11.0, ocf=1.0, debt=50.0, gw=0.0,
+                 pe=25.0, mktcap=250e9, ttm_netp=40e9),
+            # 排雷过、质量差一项(ROE) → C
+            dict(code="000C", name="接近C", industry="银行", roe=12.0, gm=70.0, nm=35.0,
+                 yoy=12.0, cagr=11.0, ocf=1.3, debt=60.0, gw=0.0,
+                 pe=5.5, mktcap=800e9, ttm_netp=140e9),
+            # 商誉排雷 → 未通过
+            dict(code="000X", name="高商誉X", industry="综合", roe=20.0, gm=40.0, nm=15.0,
+                 yoy=15.0, cagr=12.0, ocf=1.0, debt=40.0, gw=90.0,
+                 pe=15.0, mktcap=10e9, ttm_netp=0.6e9),
+        ]
+
+        ast_rows, norm_recs = [], []
+        for s in samples:
+            g = min(s["yoy"], s["cagr"])
+            eyield = 100.0 / s["pe"]
+            peg = s["pe"] / g if g > 0 else None
+            exp_ret = eyield + g
+            rpe = max(12.0, min(30.0, g))
+            fair = s["ttm_netp"] * rpe
+            disc = 1.0 - s["mktcap"] / fair
+            # astock_screener 记录形态（evaluate 直接消费的字段）
+            ast_rows.append({
+                "code": s["code"], "name": s["name"], "industry": s["industry"],
+                "roe": s["roe"], "gross_margin": s["gm"], "net_margin": s["nm"],
+                "net_profit": s["ttm_netp"], "revenue": 1e11, "yoy": s["yoy"], "cagr": s["cagr"], "g": g,
+                "ocf_to_profit": s["ocf"], "debt_ratio": s["debt"], "goodwill_ratio": s["gw"],
+                "pe_ttm": s["pe"], "pe_dyn": s["pe"], "pb": 3.0, "mktcap": s["mktcap"],
+                "eyield": eyield, "peg": peg, "exp_ret": exp_ret,
+                "reasonable_pe": rpe, "fair_mktcap": fair, "discount": disc,
+                "is_st": False,
+            })
+            norm_recs.append(make_screening_record(
+                market="cn", code=s["code"], display_code=s["code"], name=s["name"],
+                industry=s["industry"], currency="CNY",
+                price=10.0, pe_ttm=s["pe"], market_cap=s["mktcap"],
+                roe=s["roe"], gross_margin=s["gm"], net_margin=s["nm"],
+                yoy=s["yoy"], cagr=s["cagr"],
+                ocf_to_profit=s["ocf"], debt_ratio=s["debt"], goodwill_ratio=s["gw"],
+                ttm_netp=s["ttm_netp"],
+            ))
+        return ast_s, ast_rows, norm_recs
+
+    def test_same_tier_across_paths(self):
+        ast_s, ast_rows, norm_recs = self._cross_records()
+
+        # astock_screener 路径
+        ast_ind_pe = ast_s.industry_median_pe(ast_rows)
+        ast_tiers = {}
+        for r in ast_rows:
+            _, tier, _ = ast_s.evaluate(r, ast_ind_pe)
+            ast_tiers[r["code"]] = tier
+
+        # scoring(--market) 路径
+        norm_recs, _, _ = run_full_pipeline(norm_recs, config=None, market="cn")
+        norm_tiers = {r["code"]: r["tier"] for r in norm_recs}
+
+        for code in ast_tiers:
+            self.assertEqual(
+                ast_tiers[code], norm_tiers[code],
+                f"{code}: 生产路径={ast_tiers[code]} 与 --market 路径={norm_tiers[code]} tier 不一致",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,45 @@
+# systemd unit 示例 —— 多市场五层选股 HTTP 服务常驻部署
+#
+# 用途：替代 ./run.sh 前台 wait 的常驻方式，适合公开 VPS（market.meltemi.vip）。
+# 崩溃自动重启（Restart=on-failure），随机重启延迟，避免抓崩数据源被封。
+#
+# 安装步骤：
+#   1. 按实际路径/用户修改下面的 User / WorkingDirectory / ExecStart。
+#   2. sudo cp deploy/screener.service /etc/systemd/system/screener.service
+#   3. sudo systemctl daemon-reload
+#   4. sudo systemctl enable --now screener.service
+#   5. sudo systemctl status screener.service   # 查看状态
+#      journalctl -u screener.service -f          # 跟随日志
+#
+# 公开部署务必配合 token 鉴权（SCREENER_TOKEN），并只监听 127.0.0.1，
+# 由前置 Nginx/Caddy 反代 + TLS。server.py 默认绑定 127.0.0.1。
+
+[Unit]
+Description=Multi-market five-layer stock screener HTTP service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/opt/economy
+# 计费/安全相关环境变量（按需设置；未设 SCREENER_TOKEN 时不启用鉴权）
+Environment=SCREENER_TOKEN=change-me-to-a-long-random-token
+Environment=SCREENER_COOLDOWN=60
+Environment=SCREENER_MAX_CONCURRENCY=2
+Environment=SCREENER_DAILY_QUOTA=200
+# 生产不回吐 stderr（默认即关闭）；如需排障临时设 SCREENER_DEBUG=1
+# Environment=SCREENER_DEBUG=1
+# CORS 白名单（逗号分隔完整 Origin）；不设则默认同源
+# Environment=SCREENER_CORS_ORIGINS=https://market.meltemi.vip
+ExecStart=/usr/bin/python3 /opt/economy/server.py --port 8899
+Restart=on-failure
+RestartSec=5
+# 资源与磁盘保护
+Nice=5
+# 允许写 results/ 与 cache/，其余只读（按需放开）
+# ReadWritePaths=/opt/economy/results /opt/economy/cache
+
+[Install]
+WantedBy=multi-user.target

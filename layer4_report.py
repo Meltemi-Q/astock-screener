@@ -77,16 +77,19 @@ var COLS=[["rk","#","n"],["code","代码","s"],["name","名称","s"],["ind","行
 ["out","行业","s"],["trap","陷阱","s"],["conf","信心","s"],["pe","PE","n"],["disc","折让%","n"],["th","一句话逻辑","s"]];
 var st={v:"all",q:"",sk:"bl",sd:-1};
 function fmt(x){return x===null||x===undefined||x===""?"":x}
+function esc(v){return String(v===null||v===undefined?"":v)
+ .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+ .replace(/"/g,"&quot;").replace(/'/g,"&#39;")}
 function head(){document.getElementById("head").innerHTML=COLS.map(function(c){
  var ar=st.sk===c[0]?(st.sd<0?" ▼":" ▲"):"";var cl=c[2]==="s"?"l":"";
- return '<th class="'+cl+'" data-k="'+c[0]+'">'+c[1]+ar+'</th>'}).join("")}
+ return '<th class="'+cl+'" data-k="'+c[0]+'">'+esc(c[1])+ar+'</th>'}).join("")}
 function rowHTML(r){return '<tr>'+COLS.map(function(c){var k=c[0],v=r[k];
- if(k==="vd")return '<td class="l v'+v+'">'+v+'</td>';
- if(k==="code")return '<td class="l code">'+v+'</td>';
- if(k==="name"||k==="mtype"||k==="ind"||k==="out"||k==="trap"||k==="conf")return '<td class="l">'+fmt(v)+'</td>';
- if(k==="th")return '<td class="th">'+fmt(v)+'</td>';
- if(k==="disc"){var cl=v>0?"pos":(v<0?"neg":"");return '<td class="'+cl+'">'+fmt(v)+'</td>'}
- return '<td>'+fmt(v)+'</td>'}).join("")+'</tr>'}
+ if(k==="vd")return '<td class="l v'+esc(v)+'">'+esc(v)+'</td>';
+ if(k==="code")return '<td class="l code">'+esc(v)+'</td>';
+ if(k==="name"||k==="mtype"||k==="ind"||k==="out"||k==="trap"||k==="conf")return '<td class="l">'+esc(fmt(v))+'</td>';
+ if(k==="th")return '<td class="th">'+esc(fmt(v))+'</td>';
+ if(k==="disc"){var cl=v>0?"pos":(v<0?"neg":"");return '<td class="'+cl+'">'+esc(fmt(v))+'</td>'}
+ return '<td>'+esc(fmt(v))+'</td>'}).join("")+'</tr>'}
 function render(){
  var q=st.q.trim().toLowerCase();
  var rs=ROWS.filter(function(r){

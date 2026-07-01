@@ -46,6 +46,7 @@ from data_sources.hkex import (
     fetch_eastmoney_hk_cashflow,
     validate_hkex_master,
 )
+from data_sources.http import get_json
 from screeners.contracts import (
     MARKET_HK,
     make_screening_record,
@@ -61,6 +62,17 @@ _FINANCIAL_KEYWORDS = frozenset({"银行", "保险", "券商", "金融", "Bank",
 FIN_WORKERS = 10
 FIN_API_SLEEP = 0.05
 DEFAULT_HK_FIN_MAX_FETCHES = 500
+
+# 行业桶最小样本数：桶内样本 < 此值时跳过 peer-PE 判定并记数据质量标记
+MIN_INDUSTRY_BUCKET = 5
+
+# 东财港股行业分类 push2delay clist 板块（f100=行业名）
+HK_INDUSTRY_BOARDS = [
+    "m:128+t:1",  # 主板
+    "m:128+t:2",  # 创业板
+    "m:128+t:3",  # 主板(次级)
+]
+HK_INDUSTRY_TTL_HOURS = 24
 
 # 输出目录
 RESULTS_DIR = os.path.join(WORKDIR, "results")
@@ -139,6 +151,80 @@ def _currency_code(value: str) -> str:
     }
     raw = (value or "").upper().strip()
     return aliases.get(raw, raw)
+
+
+def fetch_hk_industry_map() -> dict[str, str]:
+    """抓取港股真实行业分类（东财 push2delay clist，f100=东财行业名）。
+
+    对每只港股返回其东财一级行业名（如「银行」「专业零售」「药品及生物科技」）。
+    键为 5 位零填充代码（与行情快照一致），值为行业名；行业缺失/为 "-" 的不收录。
+
+    数据源不可用时返回空 dict（调用方会退化为 "港股" 单桶并记数据质量标记）。
+    """
+    host = "https://push2delay.eastmoney.com/api/qt/clist/get"
+    out: dict[str, str] = {}
+    for fs in HK_INDUSTRY_BOARDS:
+        pn = 1
+        total = None
+        while True:
+            url = (
+                f"{host}?pn={pn}&pz=100&po=1&np=1&fltt=2&invt=2&fid=f12"
+                f"&fs={fs}&fields=f12,f100"
+            )
+            try:
+                data = get_json(url, ttl_hours=HK_INDUSTRY_TTL_HOURS)
+            except Exception as e:
+                print(f"  ⚠ 港股行业分类抓取失败 ({fs} p{pn}): {e}")
+                break
+            result = (data or {}).get("data") or {}
+            if total is None:
+                total = result.get("total") or 0
+            diff = result.get("diff") or []
+            if not diff:
+                break
+            for r in diff:
+                code = str(r.get("f12") or "").strip()
+                ind = str(r.get("f100") or "").strip()
+                if code and ind and ind != "-":
+                    out.setdefault(code.zfill(5), ind)
+            if pn * 100 >= total:
+                break
+            pn += 1
+            time.sleep(0.12)
+    return out
+
+
+THIN_INDUSTRY_BUCKET_NAME = "港股·其它(样本不足)"
+
+
+def _apply_thin_industry_guard(records: list[dict], min_bucket: int = MIN_INDUSTRY_BUCKET):
+    """薄样本行业守卫：桶内有正 PE 的样本 < min_bucket 时并入共享兜底桶。
+
+    peer-PE（第2层「PE≤行业中位」）在样本极少的桶里没有统计意义。此函数把这类
+    记录的 industry 改写为共享兜底桶，使它们与其它薄桶股票一起计算中位数，而不是
+    各自成桶导致 peer-PE 判定退化，并对它们打 thin_industry_bucket 数据质量标记。
+
+    直接原地修改 records（在打分前调用）。
+    """
+    # 统计每个行业「有正 PE」的样本数
+    pe_counts: dict[str, int] = {}
+    for r in records:
+        pe = r.get("pe_ttm")
+        ind = r.get("industry") or ""
+        if pe is not None and pe > 0 and ind:
+            pe_counts[ind] = pe_counts.get(ind, 0) + 1
+
+    for r in records:
+        ind = r.get("industry") or ""
+        if not ind or ind == THIN_INDUSTRY_BUCKET_NAME:
+            continue
+        if pe_counts.get(ind, 0) < min_bucket:
+            r["industry"] = THIN_INDUSTRY_BUCKET_NAME
+            flag = r.get("data_quality_flag") or ""
+            if "thin_industry_bucket" not in flag:
+                r["data_quality_flag"] = (
+                    f"{flag};thin_industry_bucket" if flag else "thin_industry_bucket"
+                )
 
 
 # ── 增长率计算 ─────────────────────────────────────────────
@@ -239,6 +325,15 @@ def build_hk_records(year: int = 2025) -> list[dict]:
         print(f"  ✅ 行情快照: {len(spot)} 只")
     t2 = time.time()
 
+    # ── 行业分类（东财 f100，真实一级行业） ──
+    print("  获取港股行业分类...")
+    try:
+        industry_map = fetch_hk_industry_map()
+    except Exception as exc:
+        print(f"  ⚠ 港股行业分类不可用: {exc}")
+        industry_map = {}
+    print(f"  ✅ 行业分类覆盖: {len(industry_map)} 只")
+
     # ── 3. 财务数据（并行） ─────────────────────────────────
     print(f"\n[3/4] 获取财务数据（并行, {FIN_WORKERS}线程）...")
     # 只对有行情且在主表中的股票拉财务
@@ -302,6 +397,7 @@ def build_hk_records(year: int = 2025) -> list[dict]:
     skipped_missing_master = 0
     skipped_financial = 0
     skipped_no_price = 0
+    skipped_currency = 0
 
     for code, sp in spot.items():
         # 必须在主表中
@@ -366,15 +462,15 @@ def build_hk_records(year: int = 2025) -> list[dict]:
             net_margin = target_fin.get("net_margin")
             debt_ratio = target_fin.get("debt_ratio")
             net_profit = target_fin.get("net_profit")
-            report_currency = target_fin.get("currency", "CNY")
+            # 报表货币缺省按行情货币 HKD 处理，避免误判为 CNY
+            report_currency = target_fin.get("currency") or "HKD"
 
         # 经营现金流：从批量预取结果读取
         cf_year_map = cashflow_map.get(code, {})
         operating_cashflow = cf_year_map.get(fallback_year) if cf_year_map else None
 
-        # 行业分类：当前 API 未提供，默认 "港股"
-        # 后续可通过东财行业分类 API 或港股 GICS 分类补充
-        industry = "港股"
+        # 行业分类：东财一级行业（f100）；无覆盖时退化为 "港股" 单桶
+        industry = industry_map.get(code) or "港股"
 
         # 增长率
         yoy, cagr = (None, None) if missing_financials else compute_growth(fin_list, fallback_year)
@@ -395,12 +491,24 @@ def build_hk_records(year: int = 2025) -> list[dict]:
             data_quality_flag = "missing_financials"
         elif master_source != "HKEX":
             data_quality_flag = "quote_universe_master"
+
+        # ── 跨货币处理 ──
+        # 行情为 HKD。本管线只用到货币中性的比率字段（ROE/毛利/净利率/负债率/增速）
+        # 及由 HKD 行情自洽推导的绝对量（ttm_netp=market_cap/pe_ttm），因此 HKD 本币
+        # 与 CNY/RMB 报表（大量港股通/H股用人民币列报）在比率口径上可安全打分。
+        # 但真正异种货币（如 USD 列报）缺乏 FX 换算，不能与 HKD 行情混用 → 直接排除，
+        # 避免跨货币记录被误判为「可买入」。
         quote_currency = "HKD"
         report_currency_code = _currency_code(report_currency)
-        if not missing_financials and report_currency_code not in ("HKD", "CNY", "RMB"):
-            # 非 HKD/CNY 报表货币
-            if not check_currency_match(quote_currency, report_currency_code):
-                data_quality_flag = "currency_mismatch"
+        _ratio_safe = {"HKD", "CNY", "RMB"}
+        if (
+            not missing_financials
+            and report_currency_code
+            and report_currency_code not in _ratio_safe
+            and not check_currency_match(quote_currency, report_currency_code)
+        ):
+            skipped_currency += 1
+            continue
 
         # ── 金融股过滤 ──
         if _is_financial_stock(name, master_entry.get("category", "")):
@@ -436,6 +544,12 @@ def build_hk_records(year: int = 2025) -> list[dict]:
         )
         records.append(rec)
 
+    # ── 行业桶薄样本守卫 ──
+    # 桶内(有正 PE 的)样本 < MIN_INDUSTRY_BUCKET 时，「PE≤行业中位」缺乏统计意义。
+    # 将这些股票并入共享兜底桶「港股·其它(样本不足)」，避免它们因所在真实
+    # 行业样本太少而被 peer-PE 判定误伤，并打 data_quality_flag。
+    _apply_thin_industry_guard(records)
+
     t4 = time.time()
 
     # ── 5. 五层流水线打分 ──────────────────────────────────
@@ -456,6 +570,7 @@ def build_hk_records(year: int = 2025) -> list[dict]:
     print(f"    跳过-不在主表:      {skipped_missing_master}")
     print(f"    跳过-无有效价格:    {skipped_no_price}")
     print(f"    跳过-无财务数据:    {skipped_financial}")
+    print(f"    跳过-跨货币:        {skipped_currency}")
     print(f"    有效记录:          {len(records)} 只")
     print(f"    其中评估通过:      {total_eval} 只")
     print("  Tier 分布:")
@@ -911,7 +1026,7 @@ renderFunnel();renderLB();drawScoreChart();drawIndChart();
 window.addEventListener("resize",function(){drawScoreChart();drawIndChart()});
 
 // ---- Table ----
-var sel=document.getElementById("ind");sel.innerHTML='<option value="">全部行业</option>'+INDS.map(function(x){return '<option>'+x+'</option>'}).join("");
+var sel=document.getElementById("ind");sel.innerHTML='<option value="">全部行业</option>'+INDS.map(function(x){return '<option>'+esc(x)+'</option>'}).join("");
 function head(){document.getElementById("head").innerHTML=COLS.map(function(c){
  var ar=state.sk===c[0]?(state.sd<0?" ▼":" ▲"):"";
  var cl=c[2]==="s"?"l":"";return '<th class="'+cl+'" data-k="'+c[0]+'">'+c[1]+ar+'</th>'}).join("")}
@@ -950,10 +1065,10 @@ function rowHTML(r){
   if(k==="tier")return '<td>'+tierBadge(v)+'</td>';
   if(k==="code")return '<td class="l"><a class="code" href="deep_dives/report.html?market=hk&code='+esc(r.code)+'">'+esc(v)+'</a></td>';
   if(k==="name")return '<td class="l"><a class="name-link" href="deep_dives/report.html?market=hk&code='+esc(r.code)+'">'+esc(v)+'</a></td>';
-  if(k==="ind")return '<td class="l">'+fmt(v)+'</td>';
-  if(k==="note")return '<td class="note">'+fmt(v)+'</td>';
-  if(k==="disc"){var cls=v>0?"pos":(v<0?"neg":"");return '<td class="'+cls+'">'+fmt(v)+'</td>'}
-  return '<td>'+fmt(v)+'</td>'}).join("");
+  if(k==="ind")return '<td class="l">'+esc(v)+'</td>';
+  if(k==="note")return '<td class="note">'+esc(v)+'</td>';
+  if(k==="disc"){var cls=v>0?"pos":(v<0?"neg":"");return '<td class="'+cls+'">'+esc(v)+'</td>'}
+  return '<td>'+esc(v)+'</td>'}).join("");
  return '<tr>'+cells+'</tr>'}
 function render(){
  var q=state.q.trim().toLowerCase();

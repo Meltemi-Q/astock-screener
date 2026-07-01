@@ -11,6 +11,8 @@ and score() functions from astock_screener.py.
 from __future__ import annotations
 from collections import Counter
 
+from screeners.contracts import check_tier_ab_eligibility, REQUIRED_FOR_TIER_AB
+
 
 def scale(v, lo, hi):
     """Linear scale: maps minimum input to 0, maximum to 100."""
@@ -69,28 +71,32 @@ def evaluate(record, ind_pe, config=None):
     fails = []
 
     # ── Layer 0: Mine-sweeping ──
+    # 口径与 astock_screener 一致：关键排雷数据缺失一律 fail-closed(视为不通过)，不静默放行
     l0 = []
     # ST / delisting check (CN only)
     if market == "cn":
         name = record.get("name", "")
         if name and ("ST" in name or "*ST" in name):
             l0.append("ST")
-    # Loss-making
-    npr = record.get("net_profit_ttm")
-    if npr is not None and npr <= 0:
+    # Loss-making：优先用真实归母净利判亏损（与 astock 内联引擎一致），
+    # 缺失时才回退 ttm_netp(=市值/PE) 代理，避免仅缺 PE 的盈利股被误杀；两者皆缺 fail-closed
+    npr = record.get("net_profit")
+    if npr is None:
+        npr = record.get("ttm_netp")
+    if npr is None or npr <= 0:
         l0.append("亏损")
-    # Debt too high
+    # Debt too high：缺失也 fail-closed
     dr = record.get("debt_ratio")
-    if dr is not None and dr >= C["max_debt_ratio"]:
+    if dr is None or dr >= C["max_debt_ratio"]:
         l0.append(f"负债率≥{C['max_debt_ratio']}%")
-    # Goodwill risk (CN only, skip for HK/US)
+    # Goodwill risk (CN only, skip for HK/US)；有商誉字段才判，缺失视为无商誉=0（CN 走商誉表默认 0）
     if market == "cn":
         gw = record.get("goodwill_ratio")
         if gw is not None and gw >= C["max_goodwill_ratio"]:
-            l0.append(f"商誉≥{int(C['max_goodwill_ratio']*100)}%净资产")
-    # Cashflow quality
+            l0.append(f"商誉≥净资产{C['max_goodwill_ratio']}%")
+    # Cashflow quality：缺失也 fail-closed
     ocf = record.get("ocf_to_profit")
-    if ocf is not None and ocf < C["min_ocf_to_profit"]:
+    if ocf is None or ocf < C["min_ocf_to_profit"]:
         l0.append(f"OCF/净利<{C['min_ocf_to_profit']}")
     fails += l0
 
@@ -125,8 +131,10 @@ def evaluate(record, ind_pe, config=None):
     l3 = []
     if record.get("exp_ret") is None or record.get("exp_ret", 0) < C["min_expected_return"]:
         l3.append(f"预期年化<{C['min_expected_return']}%")
-    if record.get("discount") is None or record.get("discount", float("inf")) >= (1.0 - C["margin_of_safety"]):
-        l3.append(f"未打{C['margin_of_safety']}%折")
+    # discount 为正值口径(1-市值/合理市值)：买点需 discount ≥ 1-margin_of_safety(=0.3)，缺失 fail-closed
+    disc = record.get("discount")
+    if disc is None or disc < (1.0 - C["margin_of_safety"]):
+        l3.append(f"安全边际不足{int((1.0 - C['margin_of_safety']) * 100)}%(市值>合理市值×{C['margin_of_safety']})")
     fails += l3
 
     # Determine deepest layer passed
@@ -145,7 +153,7 @@ def evaluate(record, ind_pe, config=None):
         tier = "A_可买入"
     elif not l0 and not l1:
         tier = "B_优质待跌"
-    elif not l0 and len(l1) <= 1:
+    elif not l0 and len(l1) == 1:
         tier = "C_接近合格"
     else:
         tier = "-"
@@ -207,18 +215,57 @@ def score(record, ind_pe, config=None):
     return round(total, 2)
 
 
+def resolve_config(config, market):
+    """按 market 覆盖阈值：返回合并后的 config（浅拷贝 + 覆盖项）。
+
+    A股(cn)沿用现有阈值不变；港美股(hk/us)可在 MARKET_THRESHOLD_OVERRIDES 里挂钩后续调参，
+    留 hook 但当前默认空覆盖，保持既有行为。weights 也支持整体覆盖。
+    """
+    if config is None:
+        config = DEFAULT_CONFIG
+    overrides = MARKET_THRESHOLD_OVERRIDES.get(market) if market else None
+    if not overrides:
+        return config
+    merged = dict(config)
+    for k, v in overrides.items():
+        if k == "weights" and isinstance(v, dict):
+            w = dict(config.get("weights", {}))
+            w.update(v)
+            merged["weights"] = w
+        else:
+            merged[k] = v
+    return merged
+
+
 def run_full_pipeline(records, config=None, market=None):
     """Run evaluate + score on all records, mutating them in place.
-    
+
     Returns:
         (records, total_eval, tier_counts)
     """
+    config = resolve_config(config, market)  # 按 market 覆盖阈值（A股无覆盖，保持原值）
     ind_pe = industry_median_pe(records, market=market)
 
     total_eval = 0
     for r in records:
         r["deepest"], r["tier"], r["fails"] = evaluate(r, ind_pe, config)
         r["score"] = score(r, ind_pe, config)
+
+        # 死代码护栏落地：进入 Tier A/B 前校验关键排雷/行情数据齐全，缺失则阻止升档并记 data_quality_flag
+        if r["tier"] in ("A_可买入", "B_优质待跌"):
+            eligible, missing = check_tier_ab_eligibility(r)
+            # 补充关键排雷数据(对应 ocf/debt/assets/liab 的归一化产物)——缺失同样 fail-closed
+            for f in ("ocf_to_profit", "debt_ratio"):
+                if r.get(f) is None:
+                    missing.append(f)
+                    eligible = False
+            if not eligible:
+                r["data_quality_flag"] = "排雷数据不完整:" + ",".join(missing)
+                r["fails"] = list(r.get("fails") or []) + ["数据不足(阻止进A/B)"]
+                r["tier"] = "-"
+                if r.get("deepest", 0) >= 1:
+                    r["deepest"] = 0
+
         if r.get("deepest", 0) >= 1:
             total_eval += 1
 
@@ -231,7 +278,7 @@ DEFAULT_CONFIG = {
     # Layer 0: Mine-sweeping
     "min_ocf_to_profit": 0.8,
     "max_debt_ratio": 70.0,
-    "max_goodwill_ratio": 0.30,
+    "max_goodwill_ratio": 30.0,  # 百分数口径(商誉/净资产≥30% 排雷)，与 astock_screener 一致
     # Layer 1: Quality
     "min_roe": 15.0,
     "min_gross_margin": 30.0,
@@ -243,7 +290,8 @@ DEFAULT_CONFIG = {
     "max_pe_absolute": 80.0,
     # Layer 3: Safety margin
     "min_expected_return": 10.0,
-    "margin_of_safety": 0.30,
+    # margin_of_safety=0.7：当前市值 ≤ 合理市值×0.7 才买 ⇔ discount ≥ 1-0.7 = 0.3（与 astock_screener 一致）
+    "margin_of_safety": 0.70,
     # Scoring weights
     "weights": {
         "quality_weight": 0.55,
@@ -251,4 +299,15 @@ DEFAULT_CONFIG = {
         "pe_vs_peer": 1.5, "ocf": 1.0, "debt": 0.5,
         "peg": 1.0, "exp_ret": 1.0,
     },
+}
+
+
+# ── Per-market 阈值覆盖 hook ──
+# 键为 market ("cn"/"hk"/"us")，值为要覆盖的阈值子集（可含 "weights" 子字典）。
+# 现阶段全部留空（沿用 DEFAULT_CONFIG，A股阈值数值不变），供港美股后续按市场特性单独调参。
+# 示例：MARKET_THRESHOLD_OVERRIDES["hk"] = {"min_roe": 12.0}
+MARKET_THRESHOLD_OVERRIDES = {
+    "cn": {},
+    "hk": {},
+    "us": {},
 }

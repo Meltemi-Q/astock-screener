@@ -81,6 +81,7 @@ def _convert_to_normalized(raw_record: dict) -> dict:
         goodwill_ratio=raw_record.get("goodwill_ratio"),
         deduct_ratio=raw_record.get("deduct_ratio"),
         ttm_netp=raw_record.get("ttm_netp"),
+        net_profit=raw_record.get("net_profit"),  # 真实归母净利，供 L0 亏损排雷用真值而非 pe 代理
         data_quality_flag="",
     )
 

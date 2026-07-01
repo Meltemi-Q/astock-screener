@@ -210,9 +210,10 @@ def action_label(bond: dict, scores: dict) -> str:
     basic_status = bond.get("basic_status") or bond.get("status")
     if basic_status == "剔除":
         return "排除"
-    if scores.get("total", 0) >= 78 and basic_status in ("买入候选", "基础候选"):
+    # basic_status 只会是 基础候选/观察/剔除，不存在“买入候选”状态。
+    if scores.get("total", 0) >= 78 and basic_status == "基础候选":
         return "篮子候选"
-    if basic_status in ("买入候选", "基础候选"):
+    if basic_status == "基础候选":
         return "小仓试跑"
     return "观察"
 
@@ -379,8 +380,8 @@ def deepseek_analyze_cbond(payload: dict) -> dict | None:
 - 赎回触发价: {bond.get('redeem_trigger_price')}
 - 回售触发价: {bond.get('resale_trigger_price')}
 - 到期赎回价: {bond.get('maturity_redeem_price')}
-- 到期收益估算: {bond.get('maturity_yield_est')}%/年
-- 距强赎触发价: {bond.get('call_gap_pct')}%
+- 价格年化(不含票息,非真实YTM): {bond.get('maturity_yield_est')}%/年
+- 距强赎触发价(仅单日快照,未计连续触发天数): {bond.get('call_gap_pct')}%
 - 距回售触发价: {bond.get('put_gap_pct')}%
 - 常见下修压力线距离: {bond.get('down_revision_gap_pct')}%
 - 是否有普通有条件回售: {bond.get('has_conditional_resale')}
@@ -550,7 +551,7 @@ def parse_args(argv=None):
     ap = argparse.ArgumentParser(description="可转债深度分析页生成器")
     ap.add_argument("--code", help="单只可转债代码")
     ap.add_argument("--from-screen", action="store_true", help="从最新双低筛选结果批量生成")
-    ap.add_argument("--status", default="基础候选", choices=["基础候选", "买入候选", "观察", "剔除", "all"], help="批量生成的筛选状态")
+    ap.add_argument("--status", default="基础候选", choices=["基础候选", "观察", "剔除", "all"], help="批量生成的筛选状态")
     ap.add_argument("--limit", type=int, default=30, help="批量上限，默认30")
     ap.add_argument("--fresh", action="store_true", help="重新抓取可转债公开数据")
     ap.add_argument("--no-llm", action="store_true", help="跳过 DeepSeek，只生成量化详情")

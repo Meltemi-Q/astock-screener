@@ -1,5 +1,7 @@
 __pycache__/
 cache/
+# 安全审计报告：含线上漏洞细节，仅本地保留，不进公开仓库
+docs/AUDIT_*.md
 results/*
 !results/
 !results/index.html

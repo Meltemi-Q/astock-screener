@@ -22,6 +22,7 @@ import subprocess
 import threading
 import time
 import re
+import hmac
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs
 
@@ -88,12 +89,75 @@ MARKET_CONFIG = {
 VALID_MARKETS = frozenset(MARKET_CONFIG.keys())
 ALL_MARKETS = ["cn", "hk", "us"]
 
+# ── 公开部署安全 / 计费保护配置 ─────────────────────────
+# 冷却时间：计费/耗资源端点最短再次触发间隔（秒）。可用环境变量覆盖。
+COOLDOWN_SECONDS = int(os.environ.get("SCREENER_COOLDOWN", "60"))
+# 全局并发 subprocess 上限（同时运行的计费/抓取子进程数）。
+MAX_CONCURRENT_JOBS = int(os.environ.get("SCREENER_MAX_CONCURRENCY", "2"))
+# 每日调用配额（0 = 不限）。按“计费端点”累计。
+DAILY_QUOTA = int(os.environ.get("SCREENER_DAILY_QUOTA", "0"))
+# 可选鉴权 token：一旦设置，所有写/计费端点必须携带正确 token。
+AUTH_TOKEN = os.environ.get("SCREENER_TOKEN", "").strip()
+# 是否回吐 stderr/stdout 片段（默认关闭，避免泄漏内部路径）。
+DEBUG_ERRORS = os.environ.get("SCREENER_DEBUG", "").strip() not in ("", "0", "false", "False")
+# 数据新鲜度阈值（秒）：JSON 载荷在此时间内视为新鲜，可安全传 --ai-only。默认 6 小时。
+DEEP_FRESH_SECONDS = int(os.environ.get("SCREENER_DEEP_FRESH", str(6 * 3600)))
+# CORS Origin 白名单（逗号分隔）。默认空 = 只允许同源/本机，不下发通配。
+_cors_env = os.environ.get("SCREENER_CORS_ORIGINS", "").strip()
+CORS_ORIGINS = frozenset(o.strip() for o in _cors_env.split(",") if o.strip())
+
+# 全局并发信号量：限制同时运行的计费/抓取 subprocess 数量。
+_job_semaphore = threading.BoundedSemaphore(MAX_CONCURRENT_JOBS)
+
 # ── 全局状态 ────────────────────────────────────────────
-_last_run: dict[str, float] = {}  # market → last run timestamp
+_last_run: dict[str, float] = {}  # cooldown key → last run timestamp
+_last_run_lock = threading.Lock()  # 保护 _last_run 的读-判-写原子性
+
+# 每日配额计数：{"day": "YYYYMMDD", "count": N}
+_quota_state: dict = {"day": "", "count": 0}
+_quota_lock = threading.Lock()
 
 # 任务进度追踪 (每个 market 独立)
 _jobs: dict[str, dict] = {m: {"status": "idle", "tier": "", "started": 0, "target": 0, "done": 0} for m in ALL_MARKETS}
 _job_lock = threading.Lock()
+
+
+def _cooldown_check(key: str, cooldown: float = COOLDOWN_SECONDS) -> float:
+    """原子地检查并占用冷却窗口。
+
+    返回值：0 表示允许执行（已占用窗口）；正数表示剩余冷却秒数（拒绝）。
+    用一把锁把 读-判-写 包成原子，避免 ThreadingHTTPServer 下 TOCTOU 绕过。
+    """
+    now = time.time()
+    with _last_run_lock:
+        last = _last_run.get(key, 0)
+        remaining = cooldown - (now - last)
+        if remaining > 0:
+            return remaining
+        _last_run[key] = now
+        return 0
+
+
+def _quota_check_and_incr() -> bool:
+    """检查并递增每日配额。返回 True=允许，False=超额。DAILY_QUOTA=0 表示不限。"""
+    if DAILY_QUOTA <= 0:
+        return True
+    today = time.strftime("%Y%m%d")
+    with _quota_lock:
+        if _quota_state["day"] != today:
+            _quota_state["day"] = today
+            _quota_state["count"] = 0
+        if _quota_state["count"] >= DAILY_QUOTA:
+            return False
+        _quota_state["count"] += 1
+        return True
+
+
+def _err_tail(text: str | None) -> str:
+    """按 DEBUG 开关决定是否回吐 stderr/stdout 尾部，默认不泄漏。"""
+    if not DEBUG_ERRORS:
+        return ""
+    return (text or "")[-500:]
 
 # 文件名正则
 DATE_HTML_RE = re.compile(r"^(astock_screen|hkstock_screen|usstock_screen)_\d{8}\.html$")
@@ -332,6 +396,19 @@ def _deep_json_exists(code: str, market: str = "cn") -> bool:
     return os.path.exists(os.path.join(DEEP_DIR, "data", _deep_payload_filename(market, code)))
 
 
+def _deep_json_fresh(code: str, market: str = "cn", max_age: float = DEEP_FRESH_SECONDS) -> bool:
+    """检查深度研报 JSON 数据文件是否存在且在新鲜度阈值内。
+
+    用于判断是否可以安全地传 --ai-only（复用已抓取的量化数据，仅补 AI），
+    避免拿陈旧行情/财务数据做定性分析。
+    """
+    p = os.path.join(DEEP_DIR, "data", _deep_payload_filename(market, code))
+    try:
+        return (time.time() - os.path.getmtime(p)) <= max_age
+    except OSError:
+        return False
+
+
 def _cbond_deep_json_exists(code: str) -> bool:
     """检查可转债深度分析 JSON 数据文件是否存在。"""
     return os.path.exists(os.path.join(CBOND_DEEP_DIR, "data", f"{code}.json"))
@@ -442,30 +519,37 @@ def _build_unified_screen_html() -> bytes:
         with open(TEMPLATE_SCREEN, encoding="utf-8") as f:
             return f.read().encode("utf-8")
 
+    from html import escape as _h  # HTML 转义，防止状态字段注入卡片 HTML
+
     cards_parts = []
     market_data = {}
     for m in ALL_MARKETS:
         cfg = MARKET_CONFIG[m]
         status = _market_status(m)
         ts = status.get("latest_ts", "")
+        # ts 正常来自校验过的日期戳（安全），但它会插入 HTML，做防御性转义。
+        ts_html = _h(str(ts)) if ts else ""
+        file_count = status.get("file_count", 0)
         emoji = {"cn": "🇨🇳", "hk": "🇭🇰", "us": "🇺🇸"}.get(m, "")
         exchange = {"cn": "沪深", "hk": "港交所", "us": "NYSE/NASDAQ"}.get(m, "")
         card = f"""
-<a class="card" href="{cfg['stable_name']}">
-  <h2>{emoji} {cfg['label']}</h2>
+<a class="card" href="{_h(cfg['stable_name'])}">
+  <h2>{emoji} {_h(cfg['label'])}</h2>
   <div class="meta">五层量化筛选 + 交互式仪表盘</div>
   <div class="meta">交易所: {exchange}</div>
   <div class="status">
     <span class="dot {'ready' if ts else 'missing'}"></span>
-    {'已生成 · ' + ts if ts else '尚未生成'}
-    {' · ' + str(status['file_count']) + ' 份' if status['file_count'] else ''}
+    {'已生成 · ' + ts_html if ts else '尚未生成'}
+    {' · ' + _h(str(file_count)) + ' 份' if file_count else ''}
   </div>
 </a>"""
         cards_parts.append(card)
         market_data[m] = {"ts": ts, "label": cfg["label"]}
 
     html = UNIFIED_SCREEN_HTML.replace("__CARDS__", "\n".join(cards_parts))
-    html = html.replace("__DATA__", json.dumps(market_data, ensure_ascii=False))
+    # 注入 <script> 前对 </ 做转义，避免 </script> 提前闭合导致 XSS。
+    data_json = json.dumps(market_data, ensure_ascii=False).replace("</", "<\\/")
+    html = html.replace("__DATA__", data_json)
     return html.encode("utf-8")
 
 
@@ -481,6 +565,30 @@ class ScreenerHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         # 默认 serve results/ 目录下的静态文件
         super().__init__(*args, directory=RESULTS_DIR, **kwargs)
+
+    # ── 鉴权 ─────────────────────────────────────────
+
+    def _check_auth(self) -> bool:
+        """校验写/计费端点的 token。
+
+        AUTH_TOKEN 未设置时始终放行（不破坏本地开发）；一旦设置，
+        必须通过 header (X-Auth-Token / Authorization: Bearer) 或
+        query (?token=) 携带正确 token，否则返回 401。
+        """
+        if not AUTH_TOKEN:
+            return True
+        supplied = self.headers.get("X-Auth-Token", "").strip()
+        if not supplied:
+            auth = self.headers.get("Authorization", "").strip()
+            if auth.lower().startswith("bearer "):
+                supplied = auth[7:].strip()
+        if not supplied and "?" in self.path:
+            qs = parse_qs(self.path.split("?", 1)[1])
+            supplied = (qs.get("token", [""])[0] or "").strip()
+        if supplied and hmac.compare_digest(supplied, AUTH_TOKEN):
+            return True
+        self.send_json({"error": "未授权：缺少或无效的访问 token"}, status=401)
+        return False
 
     # ── 路由分发 ─────────────────────────────────────
 
@@ -628,7 +736,16 @@ a{{color:#2563eb}}
         if "?" in self.path:
             qs = {k: v[0] for k, v in parse_qs(self.path.split("?")[1]).items()}
 
+        # 写/计费端点集合（需要鉴权）。
+        billing_paths = frozenset({
+            "/api/refresh", "/api/deep", "/api/layer4",
+            "/api/cbond/refresh", "/api/cbond/deep",
+        })
+
         try:
+            if path in billing_paths and not self._check_auth():
+                return
+
             if path == "/api/cbond/status":
                 self._api_cbond_status()
 
@@ -653,7 +770,7 @@ a{{color:#2563eb}}
                 if not market:
                     self.send_json({"error": f"无效 market 参数: {qs.get('market')}，有效值: cn, hk, us"}, status=400)
                     return
-                self._api_deep(market, qs.get("code", ""))
+                self._api_deep(market, qs.get("code", ""), ai_only=qs.get("ai_only") == "1")
 
             elif path == "/api/layer4":
                 market = _get_market(qs.get("market", ""))
@@ -700,19 +817,34 @@ a{{color:#2563eb}}
             market: cn, hk, us.
             mode: "quotes" (仅行情) 或 "full" (全量重新抓取)。
         """
-        global _last_run
-        now = time.time()
-        last = _last_run.get(market, 0)
-        if now - last < 5:
+        # ── 冷却（原子 check-then-set，按 端点+市场 维度）──
+        remaining = _cooldown_check(f"refresh:{market}")
+        if remaining > 0:
             self.send_json({
                 "done": False, "cached": True,
                 "market": market,
-                "msg": "冷却中，5秒后再试",
-            })
+                "msg": f"冷却中，{int(remaining) + 1}秒后再试",
+            }, status=429)
             return
 
         cfg = MARKET_CONFIG[market]
-        _last_run[market] = now
+
+        # ── 全局并发上限（先占并发槽，被拒时不空耗配额）──
+        if not _job_semaphore.acquire(blocking=False):
+            self.send_json({
+                "done": False, "market": market,
+                "error": "服务繁忙：已达并发上限，请稍后再试",
+            }, status=429)
+            return
+
+        # ── 每日配额（放在并发之后：并发被拒时不消耗配额）──
+        if not _quota_check_and_incr():
+            _job_semaphore.release()
+            self.send_json({
+                "done": False, "market": market,
+                "error": "已达每日调用配额上限",
+            }, status=429)
+            return
 
         label_map = {"quotes": "刷新行情", "full": "更新五层筛选"}
         requested_mode = mode
@@ -733,26 +865,29 @@ a{{color:#2563eb}}
         # HK/US: 直接运行 screener 脚本即可 (数据源内部有缓存逻辑)
 
         try:
-            result = subprocess.run(
-                args, capture_output=True, text=True,
-                timeout=300, cwd=WORKDIR,
-            )
-        except subprocess.TimeoutExpired:
-            self.send_json({
-                "error": f"{fresh_label}超时(>300s)",
-                "market": market,
-                "mode": requested_mode,
-                "effective_mode": effective_mode,
-                "warnings": pre_warnings,
-            }, status=504)
-            return
-        except FileNotFoundError:
-            self.send_json({
-                "error": f"脚本未找到: {cfg['screen_script']}",
-                "market": market,
-                "source": cfg["screen_script"],
-            }, status=500)
-            return
+            try:
+                result = subprocess.run(
+                    args, capture_output=True, text=True,
+                    timeout=300, cwd=WORKDIR,
+                )
+            except subprocess.TimeoutExpired:
+                self.send_json({
+                    "error": f"{fresh_label}超时(>300s)",
+                    "market": market,
+                    "mode": requested_mode,
+                    "effective_mode": effective_mode,
+                    "warnings": pre_warnings,
+                }, status=504)
+                return
+            except FileNotFoundError:
+                self.send_json({
+                    "error": f"脚本未找到: {cfg['screen_script']}",
+                    "market": market,
+                    "source": cfg["screen_script"],
+                }, status=500)
+                return
+        finally:
+            _job_semaphore.release()
 
         latest_ts = _latest_screen_ts(market)
         status_info = _market_status(market)
@@ -770,7 +905,7 @@ a{{color:#2563eb}}
         }
         if result.returncode != 0:
             data["error"] = f"{fresh_label}失败 (exit code={result.returncode})"
-            data["stderr_tail"] = result.stderr[-500:] if result.stderr else ""
+            data["stderr_tail"] = _err_tail(result.stderr)
             data["warnings"].append(f"{cfg['label']} {fresh_label}返回非零退出码")
             status = 500
         elif status_info.get("status") != "ready":
@@ -798,16 +933,28 @@ a{{color:#2563eb}}
 
     def _api_cbond_refresh(self):
         """刷新可转债双低筛选产物。"""
-        global _last_run
-        now = time.time()
-        last = _last_run.get("cbond", 0)
-        if now - last < 5:
+        # ── 冷却（原子）──
+        remaining = _cooldown_check("cbond:refresh")
+        if remaining > 0:
             self.send_json({
                 "done": False, "cached": True,
-                "msg": "冷却中，5秒后再试",
-            })
+                "msg": f"冷却中，{int(remaining) + 1}秒后再试",
+            }, status=429)
             return
-        _last_run["cbond"] = now
+
+        # ── 全局并发上限（先占并发槽，被拒时不空耗配额）──
+        if not _job_semaphore.acquire(blocking=False):
+            self.send_json({
+                "done": False,
+                "error": "服务繁忙：已达并发上限，请稍后再试",
+            }, status=429)
+            return
+
+        # ── 每日配额（放在并发之后：并发被拒时不消耗配额）──
+        if not _quota_check_and_incr():
+            _job_semaphore.release()
+            self.send_json({"done": False, "error": "已达每日调用配额上限"}, status=429)
+            return
 
         args = [
             sys.executable,
@@ -816,13 +963,16 @@ a{{color:#2563eb}}
             "--jisilu-check",
         ]
         try:
-            result = subprocess.run(
-                args, capture_output=True, text=True,
-                timeout=180, cwd=WORKDIR,
-            )
-        except subprocess.TimeoutExpired:
-            self.send_json({"done": False, "error": "可转债双低筛选超时(>180s)"}, status=504)
-            return
+            try:
+                result = subprocess.run(
+                    args, capture_output=True, text=True,
+                    timeout=180, cwd=WORKDIR,
+                )
+            except subprocess.TimeoutExpired:
+                self.send_json({"done": False, "error": "可转债双低筛选超时(>180s)"}, status=504)
+                return
+        finally:
+            _job_semaphore.release()
 
         status_info = _cbond_status()
         data = {
@@ -836,11 +986,11 @@ a{{color:#2563eb}}
             "final_count": status_info.get("final_count", 0),
             "watch_count": status_info.get("watch_count", 0),
             "reject_count": status_info.get("reject_count", 0),
-            "output_tail": result.stdout[-500:] if result.stdout else "",
+            "output_tail": _err_tail(result.stdout),
         }
         if result.returncode != 0:
             data["error"] = f"可转债双低筛选失败 (exit code={result.returncode})"
-            data["stderr_tail"] = result.stderr[-500:] if result.stderr else ""
+            data["stderr_tail"] = _err_tail(result.stderr)
             self.send_json(data, status=500)
             return
         if status_info.get("status") != "ready":
@@ -863,6 +1013,29 @@ a{{color:#2563eb}}
             }, status=400)
             return
 
+        # ── 冷却（原子，按端点+代码维度）──
+        remaining = _cooldown_check(f"cbond_deep:{clean_code}")
+        if remaining > 0:
+            self.send_json({
+                "done": False, "cached": True, "code": clean_code,
+                "msg": f"冷却中，{int(remaining) + 1}秒后再试",
+            }, status=429)
+            return
+
+        # ── 全局并发上限（先占并发槽，被拒时不空耗配额）──
+        if not _job_semaphore.acquire(blocking=False):
+            self.send_json({
+                "done": False, "code": clean_code,
+                "error": "服务繁忙：已达并发上限，请稍后再试",
+            }, status=429)
+            return
+
+        # ── 每日配额（放在并发之后：并发被拒时不消耗配额）──
+        if not _quota_check_and_incr():
+            _job_semaphore.release()
+            self.send_json({"done": False, "code": clean_code, "error": "已达每日调用配额上限"}, status=429)
+            return
+
         args = [
             sys.executable,
             os.path.join(WORKDIR, "cbond_deep_dive.py"),
@@ -872,38 +1045,44 @@ a{{color:#2563eb}}
             args.append("--ai-only")
 
         try:
-            result = subprocess.run(
-                args, capture_output=True, text=True,
-                timeout=240, cwd=WORKDIR,
-            )
-        except subprocess.TimeoutExpired:
-            self.send_json({
-                "error": f"{clean_code} 可转债深度分析超时(>240s)",
-                "code": clean_code,
-            }, status=504)
-            return
+            try:
+                result = subprocess.run(
+                    args, capture_output=True, text=True,
+                    timeout=240, cwd=WORKDIR,
+                )
+            except subprocess.TimeoutExpired:
+                self.send_json({
+                    "error": f"{clean_code} 可转债深度分析超时(>240s)",
+                    "code": clean_code,
+                }, status=504)
+                return
+        finally:
+            _job_semaphore.release()
 
         data = {
             "done": result.returncode == 0,
             "code": clean_code,
             "href": f"cbond_deep/report.html?code={clean_code}",
-            "output_tail": result.stdout[-500:] if result.stdout else "",
+            "output_tail": _err_tail(result.stdout),
         }
         if result.returncode != 0:
             data["error"] = f"{clean_code} 可转债深度分析失败 (exit code={result.returncode})"
-            data["stderr_tail"] = result.stderr[-500:] if result.stderr else ""
+            data["stderr_tail"] = _err_tail(result.stderr)
             self.send_json(data, status=500)
             return
         self.send_json(data)
 
     # ── API: /api/deep ───────────────────────────────
 
-    def _api_deep(self, market: str, code: str):
+    def _api_deep(self, market: str, code: str, ai_only: bool = False):
         """为指定股票生成深度研报。
 
         Args:
             market: cn/hk/us。
             code: 股票代码。
+            ai_only: 是否强制只补 AI（?ai_only=1）。默认 False：
+                     仅当已有 JSON 且数据仍新鲜时才自动加 --ai-only，
+                     否则重抓量化数据，避免拿陈旧行情做定性分析。
         """
         cfg = MARKET_CONFIG[market]
 
@@ -930,6 +1109,33 @@ a{{color:#2563eb}}
             }, status=501)
             return
 
+        # ── 冷却（原子，按市场+代码维度）──
+        remaining = _cooldown_check(f"deep:{market}:{clean_code}")
+        if remaining > 0:
+            self.send_json({
+                "done": False, "cached": True,
+                "market": market, "code": clean_code,
+                "msg": f"冷却中，{int(remaining) + 1}秒后再试",
+            }, status=429)
+            return
+
+        # ── 全局并发上限（先占并发槽，被拒时不空耗配额）──
+        if not _job_semaphore.acquire(blocking=False):
+            self.send_json({
+                "done": False, "market": market, "code": clean_code,
+                "error": "服务繁忙：已达并发上限，请稍后再试",
+            }, status=429)
+            return
+
+        # ── 每日配额（放在并发之后：并发被拒时不消耗配额）──
+        if not _quota_check_and_incr():
+            _job_semaphore.release()
+            self.send_json({
+                "done": False, "market": market, "code": clean_code,
+                "error": "已达每日调用配额上限",
+            }, status=429)
+            return
+
         args = [
             sys.executable,
             os.path.join(WORKDIR, cfg["deep_script"]),
@@ -937,31 +1143,35 @@ a{{color:#2563eb}}
         ]
         if market != "cn":
             args.extend(["--market", market])
-        if _deep_json_exists(clean_code, market):
+        # 仅当显式 ai_only 或已有 JSON 且数据新鲜时才复用旧数据，否则重抓。
+        if _deep_json_exists(clean_code, market) and (ai_only or _deep_json_fresh(clean_code, market)):
             args.append("--ai-only")
 
         try:
-            result = subprocess.run(
-                args, capture_output=True, text=True,
-                timeout=180, cwd=WORKDIR,
-            )
-        except subprocess.TimeoutExpired:
-            self.send_json({
-                "error": f"{clean_code} 研报生成超时(>180s)",
-                "market": market, "code": clean_code,
-            }, status=504)
-            return
+            try:
+                result = subprocess.run(
+                    args, capture_output=True, text=True,
+                    timeout=180, cwd=WORKDIR,
+                )
+            except subprocess.TimeoutExpired:
+                self.send_json({
+                    "error": f"{clean_code} 研报生成超时(>180s)",
+                    "market": market, "code": clean_code,
+                }, status=504)
+                return
+        finally:
+            _job_semaphore.release()
 
         data = {
             "done": result.returncode == 0,
             "market": market,
             "code": clean_code,
-            "output_tail": result.stdout[-500:] if result.stdout else "",
+            "output_tail": _err_tail(result.stdout),
             "warnings": [],
         }
         if result.returncode != 0:
             data["error"] = f"{clean_code} 研报生成失败 (exit code={result.returncode})"
-            data["stderr_tail"] = result.stderr[-500:] if result.stderr else ""
+            data["stderr_tail"] = _err_tail(result.stderr)
             self.send_json(data, status=500)
             return
 
@@ -1015,17 +1225,25 @@ a{{color:#2563eb}}
             })
             return
 
-        before = _count_deep_existing(market)
-
+        # 进度改用本任务专属的代码集合计数，避免与其它并发深研 subprocess
+        # 共享 data 目录时用全局文件数导致串味/虚高。
         with _job_lock:
             _jobs[job_key] = {
                 "status": "running", "tier": tier,
                 "started": time.time(), "target": total,
-                "done": 0, "before": before,
+                "done": 0, "codes": list(tier_codes),
             }
 
         def _run_layer4():
             exit_code = 0
+            # 全局并发上限：拿不到信号量则不启动 subprocess，标记失败。
+            if not _job_semaphore.acquire(blocking=False):
+                with _job_lock:
+                    _jobs[job_key]["status"] = "failed"
+                    _jobs[job_key]["exit_code"] = 1
+                    _jobs[job_key]["error"] = "并发上限，稍后再试"
+                    _jobs[job_key]["market"] = market
+                return
             try:
                 args = [
                     sys.executable,
@@ -1045,6 +1263,8 @@ a{{color:#2563eb}}
                 exit_code = result.returncode
             except Exception:
                 exit_code = 1
+            finally:
+                _job_semaphore.release()
             with _job_lock:
                 _jobs[job_key]["status"] = "done" if exit_code == 0 else "failed"
                 _jobs[job_key]["done"] = _jobs[job_key]["target"] if exit_code == 0 else _jobs[job_key]["done"]
@@ -1097,9 +1317,11 @@ a{{color:#2563eb}}
         progress = None
         job = jobs_snapshot.get(market, {})
         if job.get("status") == "running":
-            current = deep_count
-            delta = current - job.get("before", 0)
-            job["done"] = max(job.get("done", 0), delta)
+            # 只统计本任务专属代码集合中已生成 JSON 的数量，避免与其它
+            # 并发深研 subprocess 共享 data 目录时被无关文件计数污染。
+            job_codes = job.get("codes") or []
+            done_now = sum(1 for c in job_codes if _deep_json_exists(c, market))
+            job["done"] = max(job.get("done", 0), done_now)
             elapsed = time.time() - job["started"]
             if job["done"] > 0 and elapsed > 2:
                 eta = int((job["target"] - job["done"]) * elapsed / job["done"]) if job["done"] > 0 else 0
@@ -1152,6 +1374,34 @@ a{{color:#2563eb}}
 
         self.send_json(data)
 
+    # ── 安全响应头 ────────────────────────────────────
+
+    def _send_cors_header(self):
+        """按白名单收紧 CORS：仅当请求 Origin 在白名单时回显该 Origin，
+        否则不下发 Access-Control-Allow-Origin（默认同源）。"""
+        origin = self.headers.get("Origin", "").strip()
+        if origin and origin in CORS_ORIGINS:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
+
+    def _send_security_headers(self):
+        """通用安全响应头。"""
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        # 基本 CSP：允许内联脚本/样式（页面依赖内联），禁止外链对象与框架。
+        self.send_header(
+            "Content-Security-Policy",
+            "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+            "connect-src 'self'; object-src 'none'; frame-ancestors 'none'; "
+            "base-uri 'self'",
+        )
+
+    def end_headers(self):
+        # 对所有响应（含静态文件）统一附加安全头。
+        self._send_security_headers()
+        super().end_headers()
+
     # ── JSON 响应工具 ────────────────────────────────
 
     def send_json(self, data: dict, status: int = 200):
@@ -1159,7 +1409,7 @@ a{{color:#2563eb}}
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self._send_cors_header()
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         try:

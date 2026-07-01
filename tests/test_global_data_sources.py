@@ -51,314 +51,106 @@ for _i in range(3005 - len(SEC_TICKER_MASTER_FIXTURE["data"])):
     )
 
 # ── SEC Apple companyfacts fixture ────────────────────────
-SEC_APPLE_FACTS_FIXTURE = {
-    "entityName": "Apple Inc.",
+# 贴近真实 SEC companyfacts 结构：
+#  - 流量概念(Revenue/GrossProfit/NetIncome/OCF/EPS)带 start+end，duration≈整年
+#  - 时点概念(Assets/Liabilities/StockholdersEquity)只有 end(instant)
+#  - 掺入季度 stub(Q1/半年) + 上一年报的重述条目，验证提取器不会串期
+def _mk_flow(val, start, end, filed, form="10-K", fp="FY", fy=None):
+    return {"val": val, "start": start, "end": end, "filed": filed,
+            "form": form, "fp": fp, "fy": fy}
+
+
+def _mk_instant(val, end, filed, form="10-K", fp="FY", fy=None):
+    return {"val": val, "end": end, "filed": filed, "form": form, "fp": fp, "fy": fy}
+
+
+# Apple 财年末：52/53 周，9 月末结束
+_APPLE_FY = {
+    2021: ("2020-09-27", "2021-09-25", "2021-10-28"),
+    2022: ("2021-09-26", "2022-09-24", "2022-10-27"),
+    2023: ("2022-09-25", "2023-09-30", "2023-10-26"),
+    2024: ("2023-10-01", "2024-09-28", "2024-10-25"),
+}
+_APPLE_REV = {2021: 365817000000, 2022: 394328000000, 2023: 383285000000, 2024: 395760000000}
+_APPLE_GP = {2021: 152836000000, 2022: 170782000000, 2023: 169148000000, 2024: 175320000000}
+_APPLE_NI = {2021: 94680000000, 2022: 99803000000, 2023: 96995000000, 2024: 93736000000}
+_APPLE_OCF = {2021: 104038000000, 2022: 122151000000, 2023: 110543000000, 2024: 118254000000}
+_APPLE_EPS = {2021: 5.61, 2022: 6.11, 2023: 6.13, 2024: 6.49}
+_APPLE_ASSETS = {2021: 351002000000, 2022: 352755000000, 2023: 352583000000, 2024: 364980000000}
+_APPLE_LIAB = {2021: 287912000000, 2022: 302083000000, 2023: 290437000000, 2024: 308030000000}
+_APPLE_EQ = {2021: 63090000000, 2022: 50672000000, 2023: 62146000000, 2024: 56950000000}
+
+
+def _build_apple_facts():
+    rev, gp, ni, ocf, eps = [], [], [], [], []
+    assets, liab, eq = [], [], []
+    for fy, (start, end, filed) in _APPLE_FY.items():
+        rev.append(_mk_flow(_APPLE_REV[fy], start, end, filed, fy=fy))
+        gp.append(_mk_flow(_APPLE_GP[fy], start, end, filed, fy=fy))
+        ni.append(_mk_flow(_APPLE_NI[fy], start, end, filed, fy=fy))
+        ocf.append(_mk_flow(_APPLE_OCF[fy], start, end, filed, fy=fy))
+        eps.append(_mk_flow(_APPLE_EPS[fy], start, end, filed, fy=fy))
+        assets.append(_mk_instant(_APPLE_ASSETS[fy], end, filed, fy=fy))
+        liab.append(_mk_instant(_APPLE_LIAB[fy], end, filed, fy=fy))
+        eq.append(_mk_instant(_APPLE_EQ[fy], end, filed, fy=fy))
+    # 注入季度 stub（不应被当作年度值）：FY2024 Q1 revenue
+    rev.append(_mk_flow(119575000000, "2023-10-01", "2023-12-30",
+                        "2024-02-02", form="10-Q", fp="Q1", fy=2024))
+    # 注入 FY2023 数据在 FY2024 10-K 里的重述（同 end，filed 更新）→ 应取更新值
+    ni.append(_mk_flow(96995000000, "2022-09-25", "2023-09-30",
+                       "2024-10-25", form="10-K", fp="FY", fy=2024))
+    return {
+        "entityName": "Apple Inc.",
+        "facts": {
+            "us-gaap": {
+                "RevenueFromContractWithCustomerExcludingAssessedTax": {"units": {"USD": rev}},
+                "GrossProfit": {"units": {"USD": gp}},
+                "NetIncomeLoss": {"units": {"USD": ni}},
+                "NetCashProvidedByUsedInOperatingActivities": {"units": {"USD": ocf}},
+                "Assets": {"units": {"USD": assets}},
+                "Liabilities": {"units": {"USD": liab}},
+                "StockholdersEquity": {"units": {"USD": eq}},
+                "EarningsPerShareDiluted": {"units": {"USD/shares": eps}},
+            },
+            "dei": {
+                "EntityCommonStockSharesOutstanding": {
+                    "units": {"shares": [
+                        _mk_instant(15550061000, "2024-09-28", "2024-10-25", fy=2024),
+                    ]}
+                }
+            },
+        },
+    }
+
+
+SEC_APPLE_FACTS_FIXTURE = _build_apple_facts()
+
+
+# ── 软件公司 fixture：无 GrossProfit，需 Revenues - CostOfRevenue 回退 ──
+SEC_SOFTWARE_FACTS_FIXTURE = {
+    "entityName": "SampleSoft Inc.",
     "facts": {
         "us-gaap": {
-            "RevenueFromContractWithCustomerExcludingAssessedTax": {
-                "units": {
-                    "USD": [
-                        {
-                            "val": 365817000000,
-                            "fy": 2021,
-                            "end": "2021-09-25",
-                            "filed": "2021-10-28",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 394328000000,
-                            "fy": 2022,
-                            "end": "2022-09-24",
-                            "filed": "2022-10-27",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 383285000000,
-                            "fy": 2023,
-                            "end": "2023-09-30",
-                            "filed": "2023-10-26",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 395760000000,
-                            "fy": 2024,
-                            "end": "2024-09-28",
-                            "filed": "2024-10-25",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                    ]
-                }
-            },
-            "GrossProfit": {
-                "units": {
-                    "USD": [
-                        {
-                            "val": 152836000000,
-                            "fy": 2021,
-                            "end": "2021-09-25",
-                            "filed": "2021-10-28",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 170782000000,
-                            "fy": 2022,
-                            "end": "2022-09-24",
-                            "filed": "2022-10-27",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 169148000000,
-                            "fy": 2023,
-                            "end": "2023-09-30",
-                            "filed": "2023-10-26",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 175320000000,
-                            "fy": 2024,
-                            "end": "2024-09-28",
-                            "filed": "2024-10-25",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                    ]
-                }
-            },
-            "NetIncomeLoss": {
-                "units": {
-                    "USD": [
-                        {
-                            "val": 94680000000,
-                            "fy": 2021,
-                            "end": "2021-09-25",
-                            "filed": "2021-10-28",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 99803000000,
-                            "fy": 2022,
-                            "end": "2022-09-24",
-                            "filed": "2022-10-27",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 96995000000,
-                            "fy": 2023,
-                            "end": "2023-09-30",
-                            "filed": "2023-10-26",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 93736000000,
-                            "fy": 2024,
-                            "end": "2024-09-28",
-                            "filed": "2024-10-25",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                    ]
-                }
-            },
-            "Assets": {
-                "units": {
-                    "USD": [
-                        {
-                            "val": 351002000000,
-                            "fy": 2021,
-                            "end": "2021-09-25",
-                            "filed": "2021-10-28",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 352755000000,
-                            "fy": 2022,
-                            "end": "2022-09-24",
-                            "filed": "2022-10-27",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 352583000000,
-                            "fy": 2023,
-                            "end": "2023-09-30",
-                            "filed": "2023-10-26",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 364980000000,
-                            "fy": 2024,
-                            "end": "2024-09-28",
-                            "filed": "2024-10-25",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                    ]
-                }
-            },
-            "Liabilities": {
-                "units": {
-                    "USD": [
-                        {
-                            "val": 287912000000,
-                            "fy": 2021,
-                            "end": "2021-09-25",
-                            "filed": "2021-10-28",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 302083000000,
-                            "fy": 2022,
-                            "end": "2022-09-24",
-                            "filed": "2022-10-27",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 290437000000,
-                            "fy": 2023,
-                            "end": "2023-09-30",
-                            "filed": "2023-10-26",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 308030000000,
-                            "fy": 2024,
-                            "end": "2024-09-28",
-                            "filed": "2024-10-25",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                    ]
-                }
-            },
-            "StockholdersEquity": {
-                "units": {
-                    "USD": [
-                        {
-                            "val": 63090000000,
-                            "fy": 2021,
-                            "end": "2021-09-25",
-                            "filed": "2021-10-28",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 50672000000,
-                            "fy": 2022,
-                            "end": "2022-09-24",
-                            "filed": "2022-10-27",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 62146000000,
-                            "fy": 2023,
-                            "end": "2023-09-30",
-                            "filed": "2023-10-26",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 56950000000,
-                            "fy": 2024,
-                            "end": "2024-09-28",
-                            "filed": "2024-10-25",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                    ]
-                }
-            },
-            "NetCashProvidedByUsedInOperatingActivities": {
-                "units": {
-                    "USD": [
-                        {
-                            "val": 104038000000,
-                            "fy": 2021,
-                            "end": "2021-09-25",
-                            "filed": "2021-10-28",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 122151000000,
-                            "fy": 2022,
-                            "end": "2022-09-24",
-                            "filed": "2022-10-27",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 110543000000,
-                            "fy": 2023,
-                            "end": "2023-09-30",
-                            "filed": "2023-10-26",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 118254000000,
-                            "fy": 2024,
-                            "end": "2024-09-28",
-                            "filed": "2024-10-25",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                    ]
-                }
-            },
-            "EarningsPerShareDiluted": {
-                "units": {
-                    "USD/shares": [
-                        {
-                            "val": 5.61,
-                            "fy": 2021,
-                            "end": "2021-09-25",
-                            "filed": "2021-10-28",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 6.11,
-                            "fy": 2022,
-                            "end": "2022-09-24",
-                            "filed": "2022-10-27",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 6.13,
-                            "fy": 2023,
-                            "end": "2023-09-30",
-                            "filed": "2023-10-26",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                        {
-                            "val": 6.49,
-                            "fy": 2024,
-                            "end": "2024-09-28",
-                            "filed": "2024-10-25",
-                            "form": "10-K",
-                            "fp": "FY",
-                        },
-                    ]
-                }
-            },
+            "Revenues": {"units": {"USD": [
+                _mk_flow(50000000000, "2022-01-01", "2022-12-31", "2023-02-01", fy=2022),
+                _mk_flow(60000000000, "2023-01-01", "2023-12-31", "2024-02-01", fy=2023),
+            ]}},
+            "CostOfRevenue": {"units": {"USD": [
+                _mk_flow(15000000000, "2022-01-01", "2022-12-31", "2023-02-01", fy=2022),
+                _mk_flow(18000000000, "2023-01-01", "2023-12-31", "2024-02-01", fy=2023),
+            ]}},
+            "NetIncomeLoss": {"units": {"USD": [
+                _mk_flow(12000000000, "2022-01-01", "2022-12-31", "2023-02-01", fy=2022),
+                _mk_flow(15000000000, "2023-01-01", "2023-12-31", "2024-02-01", fy=2023),
+            ]}},
+            "Assets": {"units": {"USD": [
+                _mk_instant(80000000000, "2022-12-31", "2023-02-01", fy=2022),
+                _mk_instant(95000000000, "2023-12-31", "2024-02-01", fy=2023),
+            ]}},
+            "StockholdersEquity": {"units": {"USD": [
+                _mk_instant(40000000000, "2022-12-31", "2023-02-01", fy=2022),
+                _mk_instant(50000000000, "2023-12-31", "2024-02-01", fy=2023),
+            ]}},
         }
     },
 }
@@ -580,6 +372,60 @@ class TestSecExtractFinancials(unittest.TestCase):
         for rec in result:
             for field in expected_fields:
                 self.assertIn(field, rec, f"Missing field: {field}")
+
+    def test_sec_record_fields_share_same_period(self):
+        """同一条记录的 revenue/net_profit/assets/equity 必须来自同一实际年份。"""
+        from data_sources.sec_edgar import extract_annual_financials
+
+        result = extract_annual_financials(SEC_APPLE_FACTS_FIXTURE)
+        by_year = {r["fiscal_year"]: r for r in result}
+        # FY2024：核对每个字段确来自 2024 财年真实值，且未串到别年
+        fy2024 = by_year[2024]
+        self.assertEqual(fy2024["report_date"], "2024-09-28")
+        self.assertEqual(fy2024["revenue"], 395760000000)
+        self.assertEqual(fy2024["net_profit"], 93736000000)
+        self.assertEqual(fy2024["gross_profit"], 175320000000)
+        self.assertEqual(fy2024["operating_cashflow"], 118254000000)
+        self.assertEqual(fy2024["assets"], 364980000000)
+        self.assertEqual(fy2024["equity"], 56950000000)
+        self.assertEqual(fy2024["liabilities"], 308030000000)
+        # 股本口径应从 dei 暴露
+        self.assertEqual(fy2024["shares_outstanding"], 15550061000)
+
+    def test_sec_rejects_quarterly_stub_as_annual(self):
+        """季度 stub（Q1 revenue）不得混入年度记录。"""
+        from data_sources.sec_edgar import extract_annual_financials
+
+        result = extract_annual_financials(SEC_APPLE_FACTS_FIXTURE)
+        # 不应存在 report_date 落在 2023-12-30(季度末) 的记录
+        dates = {r["report_date"] for r in result}
+        self.assertNotIn("2023-12-30", dates)
+        # 每条记录的 revenue 都应是整年量级（>3000 亿）
+        for r in result:
+            if r["revenue"] is not None:
+                self.assertGreater(r["revenue"], 3e11)
+
+    def test_sec_gross_profit_fallback_from_cost_of_revenue(self):
+        """软件公司无 GrossProfit 时用 Revenues - CostOfRevenue 回退。"""
+        from data_sources.sec_edgar import extract_annual_financials
+
+        result = extract_annual_financials(SEC_SOFTWARE_FACTS_FIXTURE)
+        by_year = {r["fiscal_year"]: r for r in result}
+        fy2023 = by_year[2023]
+        # 60,000,000,000 - 18,000,000,000 = 42,000,000,000
+        self.assertEqual(fy2023["gross_profit"], 42000000000)
+        self.assertEqual(fy2023["revenue"], 60000000000)
+        self.assertEqual(fy2023["net_profit"], 15000000000)
+
+    def test_sec_restated_value_takes_latest_filed(self):
+        """同一期间被后续 10-K 重述时，取 filed 最新的值。"""
+        from data_sources.sec_edgar import extract_annual_financials
+        # FY2023 net_profit 在 fixture 里既有原始(2023-10-26)也有重述(2024-10-25)
+        result = extract_annual_financials(SEC_APPLE_FACTS_FIXTURE)
+        by_year = {r["fiscal_year"]: r for r in result}
+        # 重述值与原值相同(96995000000)，验证不会因重述条目破坏期间对齐
+        self.assertEqual(by_year[2023]["net_profit"], 96995000000)
+        self.assertEqual(by_year[2023]["report_date"], "2023-09-30")
 
     def test_sec_extract_roe(self):
         """Verify ROE calculation: net_profit / avg_equity * 100."""
@@ -845,7 +691,7 @@ class TestGlobalScreenerRecordAssembly(unittest.TestCase):
         by_code = {r["code"]: r for r in records}
         self.assertIn("00700", by_code)
         self.assertIn("09988", by_code)
-        self.assertEqual(by_code["09988"]["data_quality_flag"], "missing_financials")
+        self.assertIn("missing_financials", by_code["09988"]["data_quality_flag"])
         self.assertIn("ROE<", ";".join(by_code["09988"]["fails"]))
 
     def test_hk_fin_fetch_limit_zero_keeps_quote_rows_without_network_fetch(self):
@@ -868,7 +714,7 @@ class TestGlobalScreenerRecordAssembly(unittest.TestCase):
 
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0]["code"], "00700")
-        self.assertEqual(records[0]["data_quality_flag"], "missing_financials")
+        self.assertIn("missing_financials", records[0]["data_quality_flag"])
         mock_fin.assert_not_called()
         mock_cashflow.assert_not_called()
 
@@ -910,7 +756,7 @@ class TestGlobalScreenerRecordAssembly(unittest.TestCase):
         by_code = {r["code"]: r for r in records}
         self.assertIn("AAPL", by_code)
         self.assertIn("MSFT", by_code)
-        self.assertEqual(by_code["MSFT"]["data_quality_flag"], "missing_financials")
+        self.assertIn("missing_financials", by_code["MSFT"]["data_quality_flag"])
         self.assertIn("ROE<", ";".join(by_code["MSFT"]["fails"]))
 
     def test_us_sec_fetch_limit_zero_keeps_quote_rows_without_network_fetch(self):
@@ -935,7 +781,7 @@ class TestGlobalScreenerRecordAssembly(unittest.TestCase):
 
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0]["code"], "MSFT")
-        self.assertEqual(records[0]["data_quality_flag"], "missing_financials")
+        self.assertIn("missing_financials", records[0]["data_quality_flag"])
 
 
 class TestEastmoneyGlobalQuotes(unittest.TestCase):
@@ -1031,6 +877,149 @@ class TestHkFinancials(unittest.TestCase):
                          "debt_ratio"}
         for key in required_keys:
             self.assertIn(key, result[0], f"Missing key: {key}")
+
+
+class TestHttpCacheRobustness(unittest.TestCase):
+    """http 缓存健壮性：原子写、损坏缓存降级、过旧缓存拒用、TLS 默认校验。"""
+
+    def setUp(self):
+        import tempfile
+        from data_sources import http as httpmod
+        self.httpmod = httpmod
+        self._tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def _fp(self, url, ext=".json"):
+        import os
+        return os.path.join(self.httpmod.CACHE_DIR, self.httpmod._cache_uid(url) + ext)
+
+    def test_tls_verification_enabled_by_default(self):
+        """默认 SSL context 必须启用证书与主机名校验。"""
+        import ssl
+        ctx = self.httpmod.SSL_CTX
+        # 未设置 HTTP_INSECURE_SSL 时应为 CERT_REQUIRED
+        if not self.httpmod._INSECURE_ALL:
+            self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+            self.assertTrue(ctx.check_hostname)
+
+    def test_atomic_write_no_tmp_leftover(self):
+        """原子写成功后目标文件存在、无 .tmp 残留。"""
+        import os
+        fp = os.path.join(self._tmpdir, "x.json")
+        self.httpmod._atomic_write(fp, '{"a":1}')
+        self.assertTrue(os.path.exists(fp))
+        self.assertFalse(os.path.exists(fp + ".tmp"))
+        with open(fp, encoding="utf-8") as f:
+            self.assertEqual(f.read(), '{"a":1}')
+
+    def test_corrupt_cache_fallback_treated_as_missing(self):
+        """网络失败且旧缓存半写损坏时，不崩溃而是重新抛网络异常。"""
+        url = "https://example.com/corrupt"
+        fp = self._fp(url)
+        with open(fp, "w", encoding="utf-8") as f:
+            f.write('{"a": 1')  # 半写、非法 JSON
+        try:
+            with patch.object(self.httpmod, "_http_get",
+                              side_effect=OSError("network down")):
+                with self.assertRaises(OSError):
+                    self.httpmod.get_json(url, ttl_hours=0)
+        finally:
+            import os
+            if os.path.exists(fp):
+                os.remove(fp)
+
+    def test_stale_cache_rejected_when_too_old(self):
+        """网络失败时，过旧缓存(超过 STALE_CACHE_MAX_HOURS)被拒用。"""
+        import os, time
+        url = "https://example.com/stale"
+        fp = self._fp(url)
+        with open(fp, "w", encoding="utf-8") as f:
+            f.write('{"a": 1}')  # 合法 JSON
+        # 把 mtime 设成远超过阈值
+        old = time.time() - (self.httpmod.STALE_CACHE_MAX_HOURS + 24) * 3600
+        os.utime(fp, (old, old))
+        try:
+            with patch.object(self.httpmod, "_http_get",
+                              side_effect=OSError("network down")):
+                with self.assertRaises(OSError):
+                    self.httpmod.get_json(url, ttl_hours=0)
+        finally:
+            if os.path.exists(fp):
+                os.remove(fp)
+
+    def test_stale_cache_used_when_fresh_enough(self):
+        """网络失败但缓存合法且未过旧时，兜底返回旧缓存内容。"""
+        import os
+        url = "https://example.com/fresh_stale"
+        fp = self._fp(url)
+        with open(fp, "w", encoding="utf-8") as f:
+            f.write('{"a": 42}')
+        try:
+            with patch.object(self.httpmod, "_http_get",
+                              side_effect=OSError("network down")):
+                result = self.httpmod.get_json(url, ttl_hours=0)
+            self.assertEqual(result, {"a": 42})
+        finally:
+            if os.path.exists(fp):
+                os.remove(fp)
+
+
+class TestConvertibleBondPriceQuality(unittest.TestCase):
+    """可转债价格来源分级：实时报价 vs 终期表快照 vs 缺失。"""
+
+    def _build(self, terms, quotes):
+        from data_sources import convertible_bonds as cb
+        with patch.object(cb, "fetch_eastmoney_cb_terms", return_value=terms), \
+             patch.object(cb, "fetch_eastmoney_cb_quote_board", return_value=quotes):
+            return cb.build_convertible_bond_universe()
+
+    def test_live_quote_price_is_ok_and_has_double_low(self):
+        """有实时报价：data_quality=ok，double_low 正常计算。"""
+        terms = [{
+            "SECURITY_CODE": "113001", "SECURITY_NAME_ABBR": "测试转债",
+            "TRANSFER_PREMIUM_RATIO": 20.0, "EXPIRE_DATE": "2030-01-01",
+            "CURRENT_BOND_PRICE": 999.0,  # 快照价（应被实时报价覆盖）
+        }]
+        quotes = {"113001": {"quote_price": 110.0, "change_pct": 1.0,
+                             "remaining_scale": 5.0}}
+        recs = self._build(terms, quotes)
+        r = recs[0]
+        self.assertEqual(r["price"], 110.0)
+        self.assertEqual(r["price_source"], "quote")
+        self.assertEqual(r["data_quality"], "ok")
+        self.assertEqual(r["double_low"], 130.0)
+
+    def test_snapshot_price_marked_stale_and_no_double_low(self):
+        """无实时报价、回退终期表快照：标记 stale_price，不产生失真双低。"""
+        terms = [{
+            "SECURITY_CODE": "113002", "SECURITY_NAME_ABBR": "快照转债",
+            "TRANSFER_PREMIUM_RATIO": 15.0, "EXPIRE_DATE": "2030-01-01",
+            "CURRENT_BOND_PRICE": 105.0,
+        }]
+        quotes = {}  # 无实时报价
+        recs = self._build(terms, quotes)
+        r = recs[0]
+        self.assertEqual(r["price"], 105.0)
+        self.assertEqual(r["price_source"], "terms_snapshot")
+        self.assertEqual(r["data_quality"], "stale_price")
+        # 关键：快照价不静默参与双低排序
+        self.assertIsNone(r["double_low"])
+
+    def test_missing_price_marked_and_no_double_low(self):
+        """完全无价：标记 missing_price，double_low 为 None。"""
+        terms = [{
+            "SECURITY_CODE": "113003", "SECURITY_NAME_ABBR": "无价转债",
+            "TRANSFER_PREMIUM_RATIO": 15.0, "EXPIRE_DATE": "2030-01-01",
+        }]
+        recs = self._build(terms, {})
+        r = recs[0]
+        self.assertIsNone(r["price"])
+        self.assertEqual(r["price_source"], None)
+        self.assertEqual(r["data_quality"], "missing_price")
+        self.assertIsNone(r["double_low"])
 
 
 # ═══════════════════════════════════════════════════════════

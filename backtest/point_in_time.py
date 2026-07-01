@@ -1,8 +1,17 @@
 """
 Minimal point-in-time backtest framework for multi-market five-layer screening.
 
-Phase 3 v0: Fixed-sample smoke test with mock data.
-Does NOT pull live network data; uses cached/fixture data.
+Phase 3 v0: Fixed-sample smoke test with MOCK data. 占位实现，非真实回测。
+
+⚠️ 严重局限（绝对不可用于策略评估）：
+  - 价格是 random-walk 合成数据，不是真实行情。
+  - 财报是硬编码假数据，选股规则只是玩具 (roe>15)，未复用五层选股逻辑。
+  - 样本极小：仅 7 只大盘股 / 5 个年度调仓期。
+  - 不处理分红、停牌、涨跌停、交易成本、滑点。
+  - 存在幸存者偏差（只用当前 universe）。
+  - 没有真实基准数据，不输出 alpha/超额收益。
+本模块仅用于验证 signal → equity curve → metrics 管道结构是否跑通，
+所有数值均为 mock，绝不可用于任何真实策略评估或对外展示。
 """
 
 from __future__ import annotations
@@ -16,13 +25,11 @@ def fixed_sample_v0(
     output_dir: str = "results/backtest",
     rebalance_frequency: str = "annual",
 ) -> dict[str, Any]:
-    """Run backtest v0 on a fixed sample of 7 stocks.
+    """Run MOCK backtest v0 on a fixed sample of 7 stocks.
 
-    Returns a dict with: cagr, max_drawdown, sharpe, win_rate, turnover,
-    annual_returns, benchmark_cagr, report_path.
-
-    Uses the earliest available price data and fundamental data to avoid
-    survivorship bias, but explicitly marks this as exploratory.
+    ⚠️ 全 mock 占位实现：价格为合成 random-walk，财报为硬编码，选股规则为玩具。
+    返回的所有指标 (mock_cagr_pct / mock_sharpe 等) 均为 mock，仅验证管道结构，
+    绝不可用于策略评估。meta.is_mock=True。不输出真实基准/alpha。
     """
     import time as _time
 
@@ -42,9 +49,20 @@ def fixed_sample_v0(
 
     results: dict[str, Any] = {
         "meta": {
-            "version": "v0-fixed-sample",
+            "version": "v0-fixed-sample-mock",
+            "is_mock": True,
             "survivorship_bias": True,
-            "warning": "Uses current universe only; NOT suitable for strategy evaluation. Use v2 (PIT universe) for research.",
+            "warning": "MOCK 占位实现：价格为合成 random-walk、财报硬编码、选股为玩具规则、样本仅 7 股/5 期，"
+                       "不处理分红/停牌/涨跌停/交易成本，且仅用当前 universe（幸存者偏差）。"
+                       "所有 mock_* 指标绝不可用于策略评估。",
+            "limitations": [
+                "价格为合成 random-walk，非真实行情",
+                "财报硬编码，选股规则未复用五层选股逻辑",
+                "样本极小：7 只大盘股 / 5 个年度调仓期",
+                "不处理分红、停牌、涨跌停、交易成本、滑点",
+                "存在幸存者偏差（仅当前 universe）",
+                "无真实基准数据，不输出 alpha/超额收益",
+            ],
             "generated": _time.strftime("%Y-%m-%d %H:%M:%S"),
         },
         "sample": samples,
@@ -142,9 +160,10 @@ def _get_rebalance_dates(price_data, frequency="annual"):
 
 
 def _generate_signals(rebalance_dates, samples, financials):
-    """Generate buy/sell signals at each rebalance date using mock screening.
+    """Generate buy/sell signals at each rebalance date using MOCK screening.
 
-    In production, this would run the five-layer pipeline on point-in-time data.
+    ⚠️ 玩具规则：仅 roe>15 就买，未复用五层选股逻辑（排雷/质量/估值/毛估估/定性）。
+    生产版本应在 point-in-time 数据上跑完整五层管道。
     """
     signals = {}
     holdings_log = defaultdict(list)
@@ -238,9 +257,11 @@ def _compute_metrics(equity_curve, daily_returns, signals):
 
     if not equity_curve or not daily_returns:
         return {
-            "cagr": 0.0, "max_drawdown": 0.0, "sharpe": 0.0,
-            "win_rate": 0.0, "turnover": 0.0, "annual_returns": {},
-            "benchmark_cagr": 0.0, "note": "insufficient data",
+            "is_mock": True,
+            "mock_cagr_pct": 0.0, "mock_max_drawdown_pct": 0.0, "mock_sharpe": 0.0,
+            "mock_win_rate_pct": 0.0, "mock_turnover_per_year": 0.0,
+            "portfolio_values": {},
+            "note": "insufficient data — mock 管道占位，无真实数据",
         }
 
     start_val = equity_curve[0]["value"]
@@ -276,19 +297,20 @@ def _compute_metrics(equity_curve, daily_returns, signals):
     n_rebalances = len(signals)
     turnover = n_rebalances / years if years > 0 else 0
 
-    # Annual returns by year
-    annual_returns = defaultdict(float)
+    # 期末组合绝对市值（按年）——注意：这是市值不是收益率，故命名 portfolio_values
+    portfolio_values = defaultdict(float)
     for point in equity_curve:
         year = point["date"][:4]
-        annual_returns[year] = point["value"]
+        portfolio_values[year] = point["value"]
 
+    # 全 mock：所有指标加 mock_ 前缀，避免被误当真；无真实基准数据，不输出 alpha/benchmark。
     return {
-        "cagr_pct": round(cagr, 2),
-        "max_drawdown_pct": round(max_dd * 100, 2),
-        "sharpe": round(sharpe, 2),
-        "win_rate_pct": round(win_rate, 2),
-        "turnover_per_year": round(turnover, 2),
-        "annual_returns": {k: round(v, 2) for k, v in sorted(annual_returns.items())},
-        "benchmark_cagr_pct": round(cagr * 0.9, 2),  # placeholder
-        "note": "Mock data — v0 smoke test only. NOT for strategy evaluation.",
+        "is_mock": True,
+        "mock_cagr_pct": round(cagr, 2),
+        "mock_max_drawdown_pct": round(max_dd * 100, 2),
+        "mock_sharpe": round(sharpe, 2),
+        "mock_win_rate_pct": round(win_rate, 2),
+        "mock_turnover_per_year": round(turnover, 2),
+        "portfolio_values": {k: round(v, 2) for k, v in sorted(portfolio_values.items())},
+        "note": "MOCK 数据 — v0 管道占位，绝不可用于策略评估。无真实基准，不输出 alpha/超额。",
     }

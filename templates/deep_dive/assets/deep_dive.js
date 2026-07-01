@@ -172,7 +172,12 @@ function renderReport(data){
   renderFinancialRows(financials);
   renderPeers(data);
   renderAnalysis(data);
-  $("footer").textContent="数据来源："+mm.source+" · AI分析由 DeepSeek 生成，仅供参考不构成投资建议 · 生成于 "+(meta.generated_at||"");
+  var dataTs=meta.data_generated_at||meta.generated_at||"";
+  var aiTs=meta.analysis_generated_at||"";
+  var tsText="";
+  if(dataTs)tsText+=" · 量化数据截至 "+dataTs;
+  if(aiTs)tsText+=" · AI 分析于 "+aiTs;
+  $("footer").textContent="数据来源："+mm.source+" · AI分析由 DeepSeek 生成，仅供参考不构成投资建议"+tsText;
   bindKlineButtons();
   drawKline();
   setupKlineInteraction();

@@ -537,7 +537,8 @@ def fetch_eastmoney_hk_financials(code):
         records.append({
             "report_date": date_part,
             "notice_date": str(row.get("NOTICE_DATE") or "").strip().split(" ")[0],
-            "currency": str(row.get("CURRENCY") or "CNY").strip(),
+            # 报表币种缺失时默认 HKD（港股主板本币），不静默当 CNY
+            "currency": str(row.get("CURRENCY") or "HKD").strip(),
             "revenue": _fnum(row.get("OPERATE_INCOME")),
             "gross_profit": _fnum(row.get("GROSS_PROFIT")),
             "net_profit": _fnum(row.get("HOLDER_PROFIT")),

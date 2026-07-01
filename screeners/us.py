@@ -196,6 +196,37 @@ def compute_growth(financials: list[dict], year: int) -> tuple[float | None, flo
     return yoy, cagr
 
 
+# 行业桶最小样本数：桶内样本 < 此值时并入共享兜底桶，避免 peer-PE 退化
+MIN_INDUSTRY_BUCKET = 5
+THIN_INDUSTRY_BUCKET_NAME = "美股·其它(样本不足)"
+
+
+def _apply_thin_industry_guard(records: list[dict], min_bucket: int = MIN_INDUSTRY_BUCKET):
+    """薄样本行业守卫：桶内有正 PE 的样本 < min_bucket 时并入共享兜底桶。
+
+    与港股同构：SIC 行业里样本极少的桶做 peer-PE 判定没有统计意义，统一并入共享
+    兜底桶一起算中位数，并打 thin_industry_bucket 数据质量标记。原地修改 records。
+    """
+    pe_counts: dict[str, int] = {}
+    for r in records:
+        pe = r.get("pe_ttm")
+        ind = r.get("industry") or ""
+        if pe is not None and pe > 0 and ind:
+            pe_counts[ind] = pe_counts.get(ind, 0) + 1
+
+    for r in records:
+        ind = r.get("industry") or ""
+        if not ind or ind == THIN_INDUSTRY_BUCKET_NAME:
+            continue
+        if pe_counts.get(ind, 0) < min_bucket:
+            r["industry"] = THIN_INDUSTRY_BUCKET_NAME
+            flag = r.get("data_quality_flag") or ""
+            if "thin_industry_bucket" not in flag:
+                r["data_quality_flag"] = (
+                    f"{flag};thin_industry_bucket" if flag else "thin_industry_bucket"
+                )
+
+
 def _fetch_cached_company_facts(cik: int | str) -> dict:
     """带本地缓存的 SEC companyfacts 抓取。
 
@@ -474,9 +505,10 @@ def build_us_records(year: int = 2025) -> list[dict]:
         # 提取行业与 SIC
         sic = fin.get("sic", "") if fin else ""
         industry = str(sic).strip() if sic else ""
-        # 尝试从 Nasdaq 名称或 SIC 描述提取更好的行业名
+        # SIC 缺失时退化为共享兜底桶「美股」，切勿用公司名，否则每股独占一桶
+        # 使「PE≤行业中位」退化。
         if not industry:
-            industry = r.get("name", "美股")
+            industry = "美股"
 
         # 过滤金融股
         if _is_financial_stock(industry_name=industry, sic_code=sic):
@@ -527,11 +559,21 @@ def build_us_records(year: int = 2025) -> list[dict]:
     elapsed = time.time() - t0
     print(f"  组装: {len(records)} 只归一化记录 ({elapsed:.1f}s)")
 
+    # ── 行业桶薄样本守卫（与港股一致） ──
+    _apply_thin_industry_guard(records)
+
+    # ── 五层流水线打分（与 hk/cn 对齐，避免经 global_screener 跑出全员空 tier） ──
+    records, total_eval, tier_counts = run_full_pipeline(
+        records, config=DEFAULT_CONFIG, market=MARKET_US
+    )
+    records.sort(key=lambda r: r.get("score", 0), reverse=True)
+
     # 汇总
     print("\n  跳过统计:")
     print(f"    无 SEC CIK: {skipped_no_cik}")
     print(f"    无行情数据: {skipped_no_spot}")
     print(f"    无财务数据: {skipped_no_fin}")
+    print(f"    评估通过: {total_eval} 只")
 
     return records
 
@@ -923,7 +965,7 @@ renderFunnel();renderLB();drawScoreChart();drawIndChart();
 window.addEventListener("resize",function(){drawScoreChart();drawIndChart()});
 
 // ---- Table ----
-var sel=document.getElementById("ind");sel.innerHTML='<option value="">全部行业</option>'+INDS.map(function(x){return '<option>'+x+'</option>'}).join("");
+var sel=document.getElementById("ind");sel.innerHTML='<option value="">全部行业</option>'+INDS.map(function(x){return '<option>'+esc(x)+'</option>'}).join("");
 function head(){document.getElementById("head").innerHTML=COLS.map(function(c){
  var ar=state.sk===c[0]?(state.sd<0?" ▼":" ▲"):"";
  var cl=c[2]==="s"?"l":"";return '<th class="'+cl+'" data-k="'+c[0]+'">'+c[1]+ar+'</th>'}).join("")}
@@ -962,10 +1004,10 @@ function rowHTML(r){
   if(k==="tier")return '<td>'+tierBadge(v)+'</td>';
   if(k==="code")return '<td class="l"><a class="code" href="deep_dives/report.html?market=us&code='+esc(r.code)+'">'+esc(v)+'</a></td>';
   if(k==="name")return '<td class="l"><a class="name-link" href="deep_dives/report.html?market=us&code='+esc(r.code)+'">'+esc(v)+'</a></td>';
-  if(k==="ind")return '<td class="l">'+fmt(v)+'</td>';
-  if(k==="note")return '<td class="note">'+fmt(v)+'</td>';
-  if(k==="disc"){var cls=v>0?"pos":(v<0?"neg":"");return '<td class="'+cls+'">'+fmt(v)+'</td>'}
-  return '<td>'+fmt(v)+'</td>'}).join("");
+  if(k==="ind")return '<td class="l">'+esc(v)+'</td>';
+  if(k==="note")return '<td class="note">'+esc(v)+'</td>';
+  if(k==="disc"){var cls=v>0?"pos":(v<0?"neg":"");return '<td class="'+cls+'">'+esc(v)+'</td>'}
+  return '<td>'+esc(v)+'</td>'}).join("");
  return '<tr>'+cells+'</tr>'}
 function render(){
  var q=state.q.trim().toLowerCase();
@@ -1224,7 +1266,7 @@ def test_us_screener(
         if fin is None:
             continue
         sic = fin.get("sic", "")
-        industry = str(sic) if sic else r.get("name", "美股")
+        industry = str(sic).strip() if sic else "美股"
         if _is_financial_stock(industry_name=industry, sic_code=sic):
             continue
         latest = fin.get("latest")
@@ -1249,8 +1291,13 @@ def test_us_screener(
         )
         records_raw.append(record)
 
-    # 评分
-    records, total_eval, _ = run_full_pipeline(records_raw, config=DEFAULT_CONFIG)
+    # 薄样本行业守卫：与生产 build_us_records 路径口径一致，避免抽样模式下
+    # 每个行业样本极少导致 peer-PE 判定失真
+    _apply_thin_industry_guard(records_raw)
+    # 评分（补上 market=MARKET_US，使行业中位数按美股同市场计算）
+    records, total_eval, _ = run_full_pipeline(
+        records_raw, config=DEFAULT_CONFIG, market=MARKET_US
+    )
     tier_counts = dict(Counter(r.get("tier", "-") for r in records))
 
     print(f"\n{'='*60}")
@@ -1303,10 +1350,9 @@ def main():
     if sample_mode:
         records, tier_counts = test_us_screener(year=args.year, max_stocks=args.test)
     else:
+        # build_us_records 内部已完成五层打分（与 hk/cn 对齐），此处不再重复调用
         records = build_us_records(args.year)
-        if records:
-            records, total_eval, tier_counts = run_full_pipeline(records, config=DEFAULT_CONFIG)
-        else:
+        if not records:
             return
 
     if records and not args.no_html and sample_mode and args.output_dir is None:

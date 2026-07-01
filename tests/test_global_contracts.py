@@ -73,8 +73,9 @@ class TestScreeningRecord(unittest.TestCase):
         # fair_mktcap = ttm_netp * fair_pe = 10B * 12 = 120B
         self.assertEqual(record["fair_mktcap"], 120000000000.0)
 
-        # discount = market_cap / fair_mktcap = 150B / 120B = 1.25
-        self.assertAlmostEqual(record["discount"], 1.25, places=4)
+        # discount = 1 - market_cap / fair_mktcap = 1 - 150B/120B = -0.25（正=便宜；
+        # 此处市值高于合理市值 → 负折让=偏贵，与 astock_screener 口径一致）
+        self.assertAlmostEqual(record["discount"], -0.25, places=4)
 
     def test_make_screening_record_g_fallback(self):
         """g field falls back to yoy or cagr when one is None."""
@@ -288,6 +289,102 @@ class TestLotSize(unittest.TestCase):
         price = 195.0
         min_buy = price  # 1 share
         self.assertEqual(min_buy, 195.0)
+
+
+class TestThinIndustryGuard(unittest.TestCase):
+    """Tests for thin-industry-bucket guard in hk.py / us.py.
+
+    桶内有正 PE 的样本 < MIN_INDUSTRY_BUCKET 时，应把记录并入共享兜底桶，
+    并打 thin_industry_bucket 标记；样本充足的桶保持原样。
+    """
+
+    def _mk(self, code, industry, pe):
+        return {
+            "code": code, "industry": industry, "pe_ttm": pe,
+            "data_quality_flag": "",
+        }
+
+    def test_hk_thin_bucket_reassigned_and_flagged(self):
+        from screeners.hk import (
+            _apply_thin_industry_guard, THIN_INDUSTRY_BUCKET_NAME,
+        )
+        records = [self._mk(f"h{i}", "银行", 10.0 + i) for i in range(6)]
+        records.append(self._mk("h_thin", "冷门行业", 12.0))
+        _apply_thin_industry_guard(records, min_bucket=5)
+
+        # 大桶保持不变
+        for r in records[:6]:
+            self.assertEqual(r["industry"], "银行")
+            self.assertNotIn("thin_industry_bucket", r["data_quality_flag"])
+        # 薄桶被并入兜底桶并打标
+        thin = records[-1]
+        self.assertEqual(thin["industry"], THIN_INDUSTRY_BUCKET_NAME)
+        self.assertIn("thin_industry_bucket", thin["data_quality_flag"])
+
+    def test_hk_thin_bucket_preserves_existing_flag(self):
+        from screeners.hk import _apply_thin_industry_guard
+        r = self._mk("x", "冷门", 12.0)
+        r["data_quality_flag"] = "missing_financials"
+        _apply_thin_industry_guard([r], min_bucket=5)
+        self.assertIn("missing_financials", r["data_quality_flag"])
+        self.assertIn("thin_industry_bucket", r["data_quality_flag"])
+
+    def test_us_thin_bucket_reassigned(self):
+        from screeners.us import (
+            _apply_thin_industry_guard, THIN_INDUSTRY_BUCKET_NAME,
+        )
+        records = [self._mk(f"u{i}", "3571", 10.0 + i) for i in range(5)]
+        records.append(self._mk("u_thin", "9999", 15.0))
+        _apply_thin_industry_guard(records, min_bucket=5)
+        for r in records[:5]:
+            self.assertEqual(r["industry"], "3571")
+        self.assertEqual(records[-1]["industry"], THIN_INDUSTRY_BUCKET_NAME)
+
+    def test_thin_guard_ignores_records_without_positive_pe(self):
+        """无正 PE 的记录不计入桶样本数；不应因它们把大桶算薄。"""
+        from screeners.hk import _apply_thin_industry_guard
+        records = [self._mk(f"h{i}", "银行", 10.0) for i in range(5)]
+        # 追加两只同行业但 PE 缺失/非正的股票
+        records.append(self._mk("hn1", "银行", None))
+        records.append(self._mk("hn2", "银行", -3.0))
+        _apply_thin_industry_guard(records, min_bucket=5)
+        # 银行桶有 5 个正 PE 样本，达到阈值，整桶保持
+        for r in records:
+            self.assertEqual(r["industry"], "银行")
+
+
+class TestHkCurrencyExclusion(unittest.TestCase):
+    """港股跨货币处理：异种货币(USD)排除；HKD/CNY/RMB(比率安全)保留。
+
+    build_hk_records 的排除条件为：报表货币非空、且不属于比率安全集
+    {HKD,CNY,RMB}、且与行情货币 HKD 不匹配 → 排除。
+    """
+
+    RATIO_SAFE = {"HKD", "CNY", "RMB"}
+
+    def _excluded(self, report_ccy):
+        from screeners.hk import _currency_code
+        code = _currency_code(report_ccy)
+        return (
+            bool(code)
+            and code not in self.RATIO_SAFE
+            and not check_currency_match("HKD", code)
+        )
+
+    def test_hkd_report_not_excluded(self):
+        self.assertFalse(self._excluded("HKD"))
+        self.assertFalse(self._excluded("港元"))
+
+    def test_cny_report_not_excluded(self):
+        # 人民币列报的港股（H股/港股通）比率口径安全，保留
+        self.assertFalse(self._excluded("CNY"))
+        self.assertFalse(self._excluded("人民币"))
+        self.assertFalse(self._excluded("RMB"))
+
+    def test_usd_report_excluded(self):
+        # 美元列报缺乏 FX 换算，排除
+        self.assertTrue(self._excluded("USD"))
+        self.assertTrue(self._excluded("美元"))
 
 
 if __name__ == "__main__":

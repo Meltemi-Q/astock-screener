@@ -37,6 +37,7 @@ from stock_deep_dive import (
     DEEPSEEK_MODEL,
     DEEPSEEK_RETRIES,
     SSL_CTX,
+    atomic_write_json,
     ensure_deep_dive_app,
 )
 
@@ -492,6 +493,7 @@ def analyze_with_deepseek(stock: dict, financials: list[dict]):
 
 def build_payload(stock: dict, financials: list[dict], analysis) -> dict:
     mktcap = stock.get("mktcap")
+    now = time.strftime("%Y-%m-%d %H:%M")
     return {
         "meta": {
             "market": stock["market"],
@@ -501,7 +503,10 @@ def build_payload(stock: dict, financials: list[dict], analysis) -> dict:
             "industry": stock.get("industry") or "",
             "currency": stock.get("currency") or MARKETS[stock["market"]]["currency"],
             "screen_ts": stock.get("screen_ts") or time.strftime("%Y%m%d"),
-            "generated_at": time.strftime("%Y-%m-%d %H:%M"),
+            # generated_at 保留作向后兼容；量化数据与 AI 分析各自独立时间戳
+            "generated_at": now,
+            "data_generated_at": now,
+            "analysis_generated_at": now if analysis else None,
         },
         "quote": {
             "price": stock.get("price"),
@@ -523,9 +528,7 @@ def build_payload(stock: dict, financials: list[dict], analysis) -> dict:
 def write_payload(stock: dict, financials: list[dict], analysis) -> str:
     ensure_deep_dive_app(OUT_DIR)
     path = payload_path(stock["market"], stock["code"])
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(build_payload(stock, financials, analysis), f, ensure_ascii=False, separators=(",", ":"))
+    atomic_write_json(path, build_payload(stock, financials, analysis))
     return path
 
 
@@ -547,9 +550,11 @@ def run_ai_only(market: str, code: str) -> bool:
     if not analysis:
         return False
     payload["analysis"] = analysis
-    payload.setdefault("meta", {})["generated_at"] = time.strftime("%Y-%m-%d %H:%M")
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
+    # --ai-only 只刷新 AI 分析时间戳，量化数据抓取时间 data_generated_at 保持不变
+    meta = payload.setdefault("meta", {})
+    meta["analysis_generated_at"] = time.strftime("%Y-%m-%d %H:%M")
+    meta.setdefault("data_generated_at", meta.get("generated_at"))
+    atomic_write_json(path, payload)
     ensure_deep_dive_app(OUT_DIR)
     return True
 

@@ -42,6 +42,18 @@ EOF
 PY=$(command -v python3 || true)
 if [ -z "$PY" ]; then echo "❌ 未找到 python3"; exit 1; fi
 
+# ── 缓存清理 ──
+# 公开部署（market.meltemi.vip）长期运行会持续写 cache/，需定期清理老文件
+# 避免磁盘写满。默认清理 14 天前的缓存文件，可用 CACHE_MAX_AGE_DAYS 覆盖。
+# 常驻部署建议改用 systemd（见 deploy/screener.service，Restart=on-failure）+
+# cron 定时清理（见 deploy/cache-cleanup.cron），而非本脚本前台 wait。
+CACHE_MAX_AGE_DAYS="${CACHE_MAX_AGE_DAYS:-14}"
+clean_stale_cache() {
+  [ -d cache ] || return 0
+  find cache -type f -mtime +"$CACHE_MAX_AGE_DAYS" -delete 2>/dev/null || true
+}
+clean_stale_cache
+
 # ── 解析参数 ──
 SCREENER_ARGS=()
 DEEP_ARGS=()

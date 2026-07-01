@@ -4,6 +4,8 @@ Per PRD section 8.4. Tests market-switching API behavior, error responses,
 and backward compatibility with A-share-only endpoints.
 """
 
+from __future__ import annotations
+
 import sys
 import tempfile
 import unittest
@@ -21,8 +23,12 @@ import server
 #  Helpers
 # ═══════════════════════════════════════════════════════════
 
-def _make_handler():
-    """Create a ScreenerHandler with captured send_json output."""
+def _make_handler(path: str = "/", headers: dict | None = None):
+    """Create a ScreenerHandler with captured send_json output.
+
+    Sets ``path``/``headers`` so real routing methods (_handle_api,
+    _check_auth) can run without a live socket.
+    """
     handler = server.ScreenerHandler.__new__(server.ScreenerHandler)
     captured = {}
 
@@ -31,6 +37,16 @@ def _make_handler():
         captured["status"] = status
 
     handler.send_json = send_json
+    handler.path = path
+
+    class _Headers(dict):
+        def get(self, key, default=""):
+            for k, v in self.items():
+                if k.lower() == key.lower():
+                    return v
+            return default
+
+    handler.headers = _Headers(headers or {})
     return handler, captured
 
 
@@ -82,16 +98,13 @@ class TestApiStatus(unittest.TestCase):
             server.RESULTS_DIR = old_results
 
     def test_api_status_invalid_market(self):
-        """/api/status?market=zzz returns 400."""
-        handler, captured = _make_handler()
-        # Simulate what _handle_api does for invalid market
-        handler.send_json(
-            {"error": "无效 market 参数: zzz，有效值: cn, hk, us, all"},
-            status=400,
-        )
+        """/api/status?market=zzz returns 400 via real routing."""
+        handler, captured = _make_handler(path="/api/status?market=zzz")
+        handler._handle_api()
 
         self.assertEqual(captured["status"], 400)
         self.assertIn("error", captured["data"])
+        self.assertIn("zzz", captured["data"]["error"])
 
     def test_api_status_defaults_to_cn(self):
         """/api/status (no market) works and returns cn data."""
@@ -181,13 +194,11 @@ class TestApiRefresh(unittest.TestCase):
     """Tests for /api/refresh endpoint."""
 
     def test_api_refresh_invalid_market(self):
-        """/api/refresh?market=zzz returns 400."""
-        handler, captured = _make_handler()
-        handler.send_json(
-            {"error": "无效 market 参数: zzz，有效值: cn, hk, us"},
-            status=400,
-        )
+        """/api/refresh?market=zzz returns 400 via real routing."""
+        handler, captured = _make_handler(path="/api/refresh?market=zzz")
+        handler._handle_api()
         self.assertEqual(captured["status"], 400)
+        self.assertIn("error", captured["data"])
 
     def test_api_refresh_hk_quotes(self):
         """/api/refresh?market=hk&mode=quotes works (use mock subprocess)."""
@@ -330,56 +341,34 @@ class TestApiLayer4(unittest.TestCase):
 
 
 class TestApiErrorStructure(unittest.TestCase):
-    """Tests for error response structure."""
+    """Tests for error response structure (real routing)."""
 
-    def test_api_error_structure(self):
-        """Error responses have market + source + retryable fields."""
-
-        # Test a sample error shape from /api/refresh
-        error_response = {
-            "done": False,
-            "error": "刷新行情超时(>300s)",
-            "market": "hk",
-            "mode": "quotes",
-            "source": "screeners/hk.py",
-            "retryable": True,
-            "warnings": ["港股 刷新行情超时"],
-        }
-
-        self.assertIn("market", error_response)
-        self.assertIn("error", error_response)
-        # The server includes market in all API responses
-        self.assertEqual(error_response["market"], "hk")
+    def test_api_unknown_endpoint(self):
+        """Unknown /api/* path returns 404 via real routing."""
+        handler, captured = _make_handler(path="/api/nope")
+        handler._handle_api()
+        self.assertEqual(captured["status"], 404)
+        self.assertIn("error", captured["data"])
 
     def test_api_invalid_market_response_structure(self):
-        """Invalid market responses include market parameter hint."""
-        handler, captured = _make_handler()
-        handler.send_json(
-            {"error": "无效 market 参数: zzz，有效值: cn, hk, us, all"},
-            status=400,
-        )
+        """Invalid market responses list valid options via real routing."""
+        handler, captured = _make_handler(path="/api/status?market=zzz")
+        handler._handle_api()
         data = captured["data"]
+        self.assertEqual(captured["status"], 400)
         self.assertIn("error", data)
-        self.assertIn("cn", data["error"].lower() or "")
-        self.assertIn("hk", data["error"].lower() or "")
-        # Error must include valid market options
-        valid_options = data.get("valid", ["cn", "hk", "us", "all"])
-        if not valid_options:
-            # Check that error message contains valid options
-            self.assertTrue(
-                any(m in data["error"] for m in ("cn", "hk", "us")),
-                "Error message should list valid market options",
-            )
+        self.assertTrue(
+            all(m in data["error"] for m in ("cn", "hk", "us")),
+            "Error message should list valid market options",
+        )
 
     def test_api_missing_code_error(self):
-        """Missing code parameter returns structured error."""
-        handler, captured = _make_handler()
-        handler.send_json(
-            {"error": "缺少 code 参数", "market": "cn"},
-            status=400,
-        )
+        """Missing code parameter returns structured 400 via real routing."""
+        handler, captured = _make_handler(path="/api/deep?market=cn")
+        handler._handle_api()
         self.assertEqual(captured["status"], 400)
         self.assertIn("error", captured["data"])
+        self.assertEqual(captured["data"]["market"], "cn")
 
 
 class TestMarketConfig(unittest.TestCase):
@@ -421,6 +410,113 @@ class TestMarketConfig(unittest.TestCase):
         self.assertTrue(cfg["code_pattern"].match("A"))
         self.assertFalse(cfg["code_pattern"].match(""))
         self.assertFalse(cfg["code_pattern"].match("AAPLED"))
+
+
+class TestPublicDeploySecurity(unittest.TestCase):
+    """Tests for public-deploy hardening: auth, cooldown, XSS, quota."""
+
+    def setUp(self):
+        # 每个用例前重置全局状态，避免相互影响。
+        server._last_run = {}
+        with server._quota_lock:
+            server._quota_state["day"] = ""
+            server._quota_state["count"] = 0
+
+    def test_billing_endpoint_requires_token_when_configured(self):
+        """Setting SCREENER_TOKEN gates billing endpoints with 401."""
+        old = server.AUTH_TOKEN
+        try:
+            server.AUTH_TOKEN = "secret123"
+            handler, captured = _make_handler(path="/api/refresh?market=cn")
+            handler._handle_api()
+            self.assertEqual(captured["status"], 401)
+
+            # Wrong token still 401.
+            handler, captured = _make_handler(
+                path="/api/refresh?market=cn",
+                headers={"X-Auth-Token": "wrong"},
+            )
+            handler._handle_api()
+            self.assertEqual(captured["status"], 401)
+        finally:
+            server.AUTH_TOKEN = old
+
+    def test_status_endpoint_not_gated_by_token(self):
+        """Read-only /api/status stays open even with token set."""
+        old = server.AUTH_TOKEN
+        old_results = server.RESULTS_DIR
+        try:
+            server.AUTH_TOKEN = "secret123"
+            with tempfile.TemporaryDirectory() as td:
+                server.RESULTS_DIR = str(Path(td))
+                handler, captured = _make_handler(path="/api/status?market=cn")
+                handler._handle_api()
+                self.assertEqual(captured["status"], 200)
+        finally:
+            server.AUTH_TOKEN = old
+            server.RESULTS_DIR = old_results
+
+    def test_correct_token_via_query_passes_auth(self):
+        """Correct ?token= passes the auth gate (reaches format validation)."""
+        old = server.AUTH_TOKEN
+        try:
+            server.AUTH_TOKEN = "secret123"
+            # deep with bad code but valid token → 400 (format), not 401.
+            handler, captured = _make_handler(
+                path="/api/deep?market=cn&code=abc&token=secret123"
+            )
+            handler._handle_api()
+            self.assertEqual(captured["status"], 400)
+        finally:
+            server.AUTH_TOKEN = old
+
+    def test_deep_cooldown_returns_429_on_rapid_repeat(self):
+        """Second deep call for same code within cooldown returns 429."""
+        import subprocess
+
+        ok = subprocess.CompletedProcess(
+            args=["deep"], returncode=0, stdout="ok", stderr=""
+        )
+        with patch.object(server.subprocess, "run", return_value=ok):
+            handler, captured = _make_handler()
+            handler._api_deep("cn", "600519")
+            self.assertEqual(captured["status"], 200)
+
+            handler2, captured2 = _make_handler()
+            handler2._api_deep("cn", "600519")
+            self.assertEqual(captured2["status"], 429)
+            self.assertTrue(captured2["data"].get("cached"))
+
+    def test_unified_screen_html_escapes_script_close_tag(self):
+        """Injected JSON escapes </ so a market label can't break out."""
+        old_results = server.RESULTS_DIR
+        old_template = server.TEMPLATE_SCREEN
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                server.RESULTS_DIR = str(Path(td))
+                server.TEMPLATE_SCREEN = str(Path(td) / "nonexistent.html")
+                with patch.object(
+                    server, "_market_status",
+                    return_value={"latest_ts": "</script><script>alert(1)</script>",
+                                  "file_count": 0},
+                ):
+                    body = server._build_unified_screen_html().decode("utf-8")
+                self.assertNotIn("</script><script>alert", body)
+                self.assertIn("<\\/script>", body)
+        finally:
+            server.RESULTS_DIR = old_results
+            server.TEMPLATE_SCREEN = old_template
+
+    def test_err_tail_hidden_unless_debug(self):
+        """_err_tail returns empty unless SCREENER_DEBUG on."""
+        old = server.DEBUG_ERRORS
+        try:
+            server.DEBUG_ERRORS = False
+            self.assertEqual(server._err_tail("secret path /opt/x"), "")
+            server.DEBUG_ERRORS = True
+            self.assertIn("secret", server._err_tail("secret path"))
+        finally:
+            server.DEBUG_ERRORS = old
 
 
 if __name__ == "__main__":

@@ -132,10 +132,14 @@ def metric_calcs(record) -> dict:
     resale_trigger = fnum(record.get("resale_trigger_price"))
     maturity_redeem = fnum(record.get("maturity_redeem_price"))
 
-    maturity_yield = None
+    # 说明：东方财富公开接口没有结构化的逐年票息现金流字段（只有自由文本
+    # INTEREST_RATE_EXPLAIN，且未并入记录），无法可靠还原真实 YTM。
+    # 这里只算“价格年化(不含票息)”：单纯用到期赎回价相对现价的价差做单利年化，
+    # 用于粗略衡量债性拖累，绝非真实到期收益率，标签/页面已明确标注避免误导。
+    price_annualized = None
     if price and years and years > 0:
         maturity_base = maturity_redeem if maturity_redeem else 100.0
-        maturity_yield = (maturity_base - price) / price / years * 100
+        price_annualized = (maturity_base - price) / price / years * 100
 
     call_gap = None
     if stock_price and stock_price > 0 and redeem_trigger:
@@ -152,7 +156,9 @@ def metric_calcs(record) -> dict:
         down_revision_gap = (stock_price - down_revision_line) / down_revision_line * 100
 
     return {
-        "maturity_yield_est": round_or_none(maturity_yield),
+        # 键名沿用 maturity_yield_est 以兼容 CSV/深度分析/前端契约，
+        # 但其含义是“价格年化(不含票息，非真实YTM)”，展示层已据此改标签。
+        "maturity_yield_est": round_or_none(price_annualized),
         "call_gap_pct": round_or_none(call_gap),
         "put_gap_pct": round_or_none(put_gap),
         "down_revision_gap_pct": round_or_none(down_revision_gap),
@@ -167,29 +173,33 @@ def enhanced_reasons(record, args) -> list[str]:
     years = fnum(record.get("remaining_years"))
     maturity_redeem = fnum(record.get("maturity_redeem_price"))
     metrics = metric_calcs(record)
-    ytm = metrics["maturity_yield_est"]
+    # 注意：该值是“价格年化(不含票息，非真实YTM)”，不能当作真实到期收益率解读。
+    price_ann = metrics["maturity_yield_est"]
     call_gap = metrics["call_gap_pct"]
     put_gap = metrics["put_gap_pct"]
     down_gap = metrics["down_revision_gap_pct"]
     has_resale = str(record.get("has_conditional_resale")).lower() in ("1", "true", "yes", "y")
 
-    if ytm is not None:
-        if ytm < -8:
-            reasons.append(f"到期收益估算{ytm:.2f}%/年，临近到期价格拖累明显")
-        elif ytm < 0:
-            reasons.append(f"到期收益估算{ytm:.2f}%/年，为负")
-        elif ytm >= 4:
-            reasons.append(f"到期收益估算{ytm:.2f}%/年，有债性缓冲")
+    if price_ann is not None:
+        # 价格年化仅衡量价差拖累、不含票息，故文案强调"含票息后可能仍为正"；
+        # 但在 enhanced_status_for 的档位决策里，价格年化为负仍作为"降级观察"的严重信号之一。
+        if price_ann < -8:
+            reasons.append(f"价格年化(不含票息){price_ann:.2f}%/年，价高债性保护偏弱")
+        elif price_ann < 0:
+            reasons.append(f"价格年化(不含票息){price_ann:.2f}%/年，为负（含票息后可能仍为正）")
+        elif price_ann >= 4:
+            reasons.append(f"价格年化(不含票息){price_ann:.2f}%/年，价差留有债性缓冲")
 
     if price is not None and maturity_redeem is not None and years is not None:
         if years <= 1.0 and price > maturity_redeem + 3:
             reasons.append(f"剩余期限{years:.2f}年且价格高于到期赎回价{maturity_redeem:.2f}")
 
     if call_gap is not None:
+        # 仅基于单日快照价，未反映 15/30 日连续触发计数，接近强赎识别偏弱。
         if call_gap <= 0:
-            reasons.append("正股已高于强赎触发价，需核对连续交易日与公告")
+            reasons.append("正股已高于强赎触发价(仅单日快照，未计连续触发天数)，需核对连续交易日与公告")
         elif call_gap <= 8:
-            reasons.append(f"距强赎触发价约{call_gap:.2f}%，上涨空间可能被封顶")
+            reasons.append(f"距强赎触发价约{call_gap:.2f}%(仅单日快照，未计连续触发天数)，上涨空间可能被封顶")
 
     if has_resale:
         if put_gap is not None and put_gap <= 0:
@@ -223,9 +233,36 @@ def enhanced_status_for(record, basic_status: str) -> tuple[str, str, list[str]]
         return "增强观察", "观察", reasons
 
     reasons = enhanced_reasons(record, None)
-    risk_text = "；".join(reasons)
-    severe = any(k in risk_text for k in ("强赎", "到期收益估算-", "高于到期赎回价", "价格"))
-    supportive = any(k in risk_text for k in ("有债性缓冲", "回售公告窗口", "下修压力"))
+
+    # 用结构化数值阈值判严重度，替代脆弱的中文关键词 in 匹配。
+    metrics = metric_calcs(record)
+    price = fnum(record.get("price"))
+    price_ann = metrics["maturity_yield_est"]  # 价格年化(不含票息)
+    call_gap = metrics["call_gap_pct"]
+    put_gap = metrics["put_gap_pct"]
+    down_gap = metrics["down_revision_gap_pct"]
+
+    # 硬排除：正股已站上/贴近强赎触发价且转债价高——强赎砸盘风险实打实。
+    # call_gap<=0 表示正股已高于触发价；配合价格>=118 判定为不可持有。
+    above_call_trigger = call_gap is not None and call_gap <= 0
+    high_price = price is not None and price >= 118
+    # 价格年化深度为负且转债价高，价差侧几乎没有债性保护垫。
+    deep_negative_ann = price_ann is not None and price_ann <= -8
+    if (above_call_trigger and high_price) or (deep_negative_ann and high_price):
+        return "增强排除", "排除", reasons
+
+    # 严重（降级观察）：贴近强赎触发线，或价格年化为负，或价格偏高。
+    severe = (
+        (call_gap is not None and call_gap <= 8)
+        or (price_ann is not None and price_ann < 0)
+        or (price is not None and price > 125)
+    )
+    # 支撑（可小仓试跑）：价差留有债性缓冲、临近回售窗口、或有下修压力催化。
+    supportive = (
+        (price_ann is not None and price_ann >= 4)
+        or (put_gap is not None and 0 < put_gap <= 8)
+        or (down_gap is not None and down_gap <= -12)
+    )
     if severe:
         return "增强观察", "观察", reasons
     if supportive or not reasons:
@@ -357,10 +394,13 @@ def classify_records(records, args, today: date):
 
 def summarize(records):
     total = len(records)
-    buy = [r for r in records if r["status"] in ("基础候选", "买入候选")]
+    # basic_status 仅取值 基础候选/观察/剔除；不存在“买入候选”这一状态，故不再匹配它。
+    # 增强风控硬升级为“排除”的基础候选不再算作可买候选。
+    buy = [r for r in records if r["status"] == "基础候选" and r.get("final_action") != "排除"]
     final = [r for r in records if r.get("final_action") == "小仓试跑"]
     watch = [r for r in records if r["status"] == "观察"]
-    reject = [r for r in records if r["status"] == "剔除"]
+    # 增强风控可把基础候选硬升级为“排除”，这些应计入剔除口径展示。
+    reject = [r for r in records if r["status"] == "剔除" or r.get("final_action") == "排除"]
     low_pool = [r for r in records if r.get("double_low") is not None][:30]
     return {
         "total": total,
@@ -390,7 +430,11 @@ def rows_html(rows, limit=None):
     rows = rows[:limit] if limit else rows
     out = []
     for r in rows:
-        cls = {"基础候选": "buy", "买入候选": "buy", "观察": "watch", "剔除": "reject"}.get(r.get("status"), "")
+        # 增强风控把基础候选硬升级为“排除”时，行样式跟随最终动作显示为剔除，避免误导。
+        if r.get("final_action") == "排除":
+            cls = "reject"
+        else:
+            cls = {"基础候选": "buy", "观察": "watch", "剔除": "reject"}.get(r.get("status"), "")
         reason = r.get("enhanced_reasons") or r.get("risk_reasons") or ""
         out.append(
             "<tr class=\"%s\">"
@@ -425,7 +469,7 @@ def write_html(path, records, summary, args, generated_at):
     low_pool = summary["low_pool"]
     conclusion = f"基础双低规则筛出 {len(buy)} 只基础候选；增强风控后 {len(final)} 只进入小仓试跑。"
     if not final:
-        conclusion += " 当前没有同时通过到期收益、强赎/回售/下修复核的最终候选，建议只观察，不强行建仓。"
+        conclusion += " 当前没有同时通过价格年化(不含票息)、强赎/回售/下修复核的最终候选，建议只观察，不强行建仓。"
     elif len(final) < 10:
         conclusion += " 数量不足 10 只，暂不适合一次性做完整 15-30 只篮子。"
     else:
@@ -478,7 +522,7 @@ table{{width:100%;border-collapse:collapse;min-width:1120px}}th,td{{padding:9px 
 <div class="notice">
 <strong>当前结论：</strong>{html.escape(conclusion)}
 <br>基础规则：评级 ≥ {html.escape(args.min_rating)}，剩余规模 ≥ {args.min_scale:g} 亿，剩余期限 ≥ {args.min_years:g} 年，价格 ≤ {args.max_price:g}，溢价率 ≤ {args.max_premium:g}%，双低值 ≤ {args.max_double_low:g}，剔除 ST/退债/待上市/强赎执行风险。
-<br>增强规则：复核到期赎回价/到期收益估算、距强赎触发线、普通有条件回售、距回售线、常见下修压力线；有事件催化不等于直接买入。
+<br>增强规则：复核到期赎回价/价格年化(不含票息，非真实YTM)、距强赎触发线(仅单日快照，未计连续触发天数)、普通有条件回售、距回售线、常见下修压力线；有事件催化不等于直接买入。价格站上强赎触发价且价高者硬排除。
 </div>
 <section>
 <h2>基础候选 Top {min(args.basket_size, len(buy))}</h2>
@@ -539,7 +583,8 @@ def write_md(path, summary, args, generated_at):
         "- 剔除 ST/退债/待上市/强赎执行风险",
         "",
         "## 增强规则",
-        "- 复核到期赎回价/到期收益估算、距强赎触发线、普通有条件回售、距回售线、常见下修压力线",
+        "- 复核到期赎回价/价格年化(不含票息，非真实YTM)、距强赎触发线(仅单日快照，未计连续触发天数)、普通有条件回售、距回售线、常见下修压力线",
+        "- 价格站上强赎触发价且价高的转债硬排除，不进任何篮子",
         "- 下修/回售公告是事件催化，不是一票买入条件",
         "",
         "## 小仓试跑",

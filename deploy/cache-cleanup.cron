@@ -1,0 +1,13 @@
+# cron 示例 —— 定期清理 cache/ 老文件 + 磁盘监控
+#
+# 安装：crontab -e 后粘贴（按实际路径修改 /opt/economy），或放到
+#       /etc/cron.d/economy-cache（需在命令前加运行用户列，如 deploy）。
+#
+# 说明：公开长期运行会持续写 cache/（行情/财务快照等），不清理会写满磁盘。
+#       run.sh 每次启动也会清理，但常驻 systemd 部署不重跑 run.sh，故需 cron。
+
+# 每天 03:30 清理 14 天前的缓存文件
+30 3 * * * find /opt/economy/cache -type f -mtime +14 -delete 2>/dev/null
+
+# 每小时检查磁盘占用，>85% 时记一条 syslog 告警（可接 healthchecks/告警）
+0 * * * * [ "$(df -P /opt/economy | awk 'NR==2{gsub(/%/,"",$5);print $5}')" -ge 85 ] && logger -t economy "disk usage high on /opt/economy" || true

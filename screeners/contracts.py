@@ -138,8 +138,8 @@ NORMALIZED_FIELDS = [
     "eyield",       # earnings yield = 100 / pe_ttm
     "fair_pe",      # = g capped to [12, 30]
     "fair_mktcap",  # = net_profit * fair_pe
-    "discount",     # = market_cap / fair_mktcap
-    "exp_ret",      # = fair_pe / pe_ttm * g (simplified)
+    "discount",     # = 1 - market_cap / fair_mktcap (正值=便宜)
+    "exp_ret",      # = eyield + g = 100/pe_ttm + 增长率
     "ttm_netp",     # trailing net profit estimate
     # scoring
     "deepest", "tier", "score", "fails",
@@ -195,13 +195,15 @@ def make_screening_record(
     if ttm_netp is not None and fair_pe is not None:
         fair_mktcap = ttm_netp * fair_pe
 
+    # discount 与 astock_screener 一致：1 - 市值/合理市值，正值=便宜；买点需 discount ≥ 1-margin_of_safety
     discount = None
     if market_cap is not None and fair_mktcap is not None and fair_mktcap > 0:
-        discount = market_cap / fair_mktcap
+        discount = 1.0 - market_cap / fair_mktcap
 
+    # 预期年化 = 盈利收益率(1/PE) + 增长率，与方法论/astock_screener 一致
     exp_ret = None
-    if pe_ttm is not None and pe_ttm > 0 and fair_pe is not None and g is not None and g > 0:
-        exp_ret = (fair_pe / pe_ttm) * g
+    if eyield is not None and g is not None:
+        exp_ret = eyield + g
 
     return {
         "market": market, "code": code, "display_code": display_code, "name": name,

@@ -320,11 +320,26 @@ def build_convertible_bond_universe(ttl_hours=2, quote_ttl_hours=0.5, today=None
         if not code:
             continue
         q = quotes.get(code, {})
+        # 价格来源分级：实时报价 > 终期表快照 > 缺失。
+        # 无实时报价时回退到 terms 表快照会产生失真双低值，故标记 price_source，
+        # 由上层(排序/筛选)决定是否降权或跳过，而不是静默参与排序。
         price = q.get("quote_price")
+        price_source = "quote" if price is not None else None
         if price is None:
             price = fnum(row.get("CURRENT_BOND_PRICE"))
+            if price is not None:
+                price_source = "terms_snapshot"
         if price is None:
             price = fnum(row.get("CURRENT_BOND_PRICENEW"))
+            if price is not None:
+                price_source = "terms_snapshot"
+        # data_quality: 实时报价=ok；仅有快照价=stale；完全无价=missing
+        if price_source == "quote":
+            data_quality = "ok"
+        elif price_source == "terms_snapshot":
+            data_quality = "stale_price"
+        else:
+            data_quality = "missing_price"
         premium = fnum(row.get("TRANSFER_PREMIUM_RATIO"))
         remaining_years = years_until(row.get("EXPIRE_DATE"), today=today)
         remaining_scale = q.get("remaining_scale")
@@ -339,9 +354,14 @@ def build_convertible_bond_universe(ttl_hours=2, quote_ttl_hours=0.5, today=None
             "stock_code": str(row.get("CONVERT_STOCK_CODE") or "").strip(),
             "stock_name": str(row.get("SECURITY_SHORT_NAME") or "").strip(),
             "price": price,
+            "price_source": price_source,
+            "data_quality": data_quality,
             "change_pct": q.get("change_pct"),
             "premium_rt": premium,
-            "double_low": round(price + premium, 3) if price is not None and premium is not None else None,
+            # 仅当价格来自实时报价时才给出可信双低；快照/缺失价不参与失真排序
+            "double_low": (round(price + premium, 3)
+                           if price is not None and premium is not None
+                           and price_source == "quote" else None),
             "rating": normalize_rating(row.get("RATING")),
             "rating_raw": row.get("RATING"),
             "remaining_scale": remaining_scale,

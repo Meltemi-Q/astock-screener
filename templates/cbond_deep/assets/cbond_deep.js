@@ -63,7 +63,7 @@ function renderKpis(bond,quote,fy,data){
     ["",yi(bond.remaining_scale),"剩余规模"],
     ["",r(bond.remaining_years,2)+"年","剩余年限"],
     ["blue",r(bond.convert_value,2),"转股价值"],
-    ["",pct(bond.maturity_yield_est),"到期收益估算"],
+    ["",pct(bond.maturity_yield_est),"价格年化(不含票息)"],
     ["",r(quote.pe_ttm,1),"正股PE(TTM)"],
     ["green",r(fy.roe,1)+"%","正股ROE"],
     ["green",r((data.scores||{}).total,1),"综合分"]
@@ -71,20 +71,35 @@ function renderKpis(bond,quote,fy,data){
   $("kpis").innerHTML=items.map(function(x){return '<div class="kpi '+x[0]+'"><div class="val">'+x[1]+'</div><div class="lbl">'+esc(x[2])+'</div></div>'}).join("");
 }
 
+function isBuyLikeAiAction(a){return a==="篮子候选"||a==="小仓试跑"||a==="买入"||a==="加仓"||a==="买入候选"}
 function renderDecision(data){
   var bond=data.bond||{}, scores=data.scores||{};
   var aiAction=data.analysis&&data.analysis.action;
   var finalAction=bond.final_action||data.action||"观察";
-  var mainAction=aiAction?("AI建议: "+aiAction):finalAction;
-  var subAction="基础筛选 "+(bond.basic_status||bond.status||"-")+" · 增强风控 "+(bond.enhanced_status||"-")+" · 最终动作 "+finalAction;
+  // 量化 final_action 为准：以量化最终动作作为最醒目的“当前动作”。
+  var mainAction=finalAction;
+  // 量化已“排除/观察”的债，禁止把 AI 的买入类动作置顶；仅当 AI 与量化冲突时并列显著提示。
+  var quantExcludes=(finalAction==="排除"||finalAction==="观察");
+  var conflict=aiAction&&aiAction!==finalAction;
+  var conflictBanner="";
+  if(conflict){
+    if(quantExcludes&&isBuyLikeAiAction(aiAction)){
+      conflictBanner='<div class="decision-conflict warn">⚠ 量化最终动作为“'+esc(finalAction)+'”，但 AI 给出买入类建议“'+esc(aiAction)+'”。以量化为准，AI 建议仅供参考，切勿据此建仓。</div>';
+    }else{
+      conflictBanner='<div class="decision-conflict">AI 建议“'+esc(aiAction)+'”与量化最终动作“'+esc(finalAction)+'”不一致，请以量化风控为准并自行复核。</div>';
+    }
+  }
+  var subAction="基础筛选 "+(bond.basic_status||bond.status||"-")+" · 增强风控 "+(bond.enhanced_status||"-")+" · 最终动作 "+finalAction+(aiAction?" · AI建议 "+aiAction:"");
   var thesis=(data.analysis&&data.analysis.bond_thesis)||defaultThesis(data);
-  $("decisionBand").innerHTML='<div class="decision-main"><div class="decision-label">当前动作</div><div class="decision-action">'+esc(mainAction)+'</div><div class="decision-score">综合分 '+esc(r(scores.total,1))+'/100 · '+esc(subAction)+'</div></div>'
+  $("decisionBand").innerHTML='<div class="decision-main"><div class="decision-label">当前动作（以量化为准）</div><div class="decision-action">'+esc(mainAction)+'</div><div class="decision-score">综合分 '+esc(r(scores.total,1))+'/100 · '+esc(subAction)+'</div></div>'
+    +conflictBanner
     +'<div class="decision-copy">'+esc(thesis)+'</div>';
 }
 function defaultThesis(data){
   var b=data.bond||{};
   if(b.final_action==="小仓试跑")return "基础双低和增强风控通过，可作为小仓试跑或候选篮子继续复核；候选不足 10 只时不建议一次性构建完整组合。";
-  if((b.basic_status||b.status)==="基础候选"||(b.basic_status||b.status)==="买入候选")return "基础双低通过，但增强风控仍提示风险；下修/回售只能作为事件催化，不等于直接买入。";
+  if(b.final_action==="排除")return "增强风控硬排除（如价格站上强赎触发价且价高），不进任何篮子。";
+  if((b.basic_status||b.status)==="基础候选")return "基础双低通过，但增强风控仍提示风险；下修/回售只能作为事件催化，不等于直接买入。";
   if(b.status==="观察")return "未触发硬排除，但价格、溢价率或双低值不够理想，适合等待轮动机会。";
   return "触发排雷条件，暂不进入双低篮子。";
 }
@@ -101,9 +116,9 @@ function renderRiskBox(bond,data){
     ["最终动作",bond.final_action||data.action||"-"],
     ["到期日",bond.maturity_date||"-"],
     ["到期赎回价",r(bond.maturity_redeem_price,2)],
-    ["到期收益估算",pct(bond.maturity_yield_est)],
+    ["价格年化(不含票息,非真实YTM)",pct(bond.maturity_yield_est)],
     ["赎回触发价",r(bond.redeem_trigger_price,2)],
-    ["距强赎触发价",pct(bond.call_gap_pct)],
+    ["距强赎触发价(仅单日快照,未计连续触发天数)",pct(bond.call_gap_pct)],
     ["回售触发价",r(bond.resale_trigger_price,2)],
     ["距回售触发价",pct(bond.put_gap_pct)],
     ["普通有条件回售",bond.has_conditional_resale?"有":"无"],
