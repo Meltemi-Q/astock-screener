@@ -274,38 +274,59 @@ class TestApiRefresh(unittest.TestCase):
 class TestApiDeep(unittest.TestCase):
     """Tests for /api/deep endpoint."""
 
-    def test_api_deep_hk_not_implemented(self):
-        """/api/deep?market=hk returns 501 (not implemented)."""
-        handler, captured = _make_handler()
-        # Simulate the handler's check for deep_script=None
-        handler.send_json(
-            {"error": "港股市场暂不支持深度研报生成", "market": "hk"},
-            status=501,
-        )
-        self.assertEqual(captured["status"], 501)
-        self.assertIn("暂不支持", captured["data"]["error"])
+    def test_api_deep_hk_uses_global_deep_script(self):
+        """/api/deep?market=hk invokes global_deep_dive.py."""
+        import subprocess
 
-    def test_api_deep_us_not_implemented(self):
-        """/api/deep?market=us returns 501 (not implemented)."""
         handler, captured = _make_handler()
-        handler.send_json(
-            {"error": "美股市场暂不支持深度研报生成", "market": "us"},
-            status=501,
-        )
-        self.assertEqual(captured["status"], 501)
+        with patch.object(
+            server.subprocess, "run",
+            return_value=subprocess.CompletedProcess(
+                args=["global_deep_dive.py"], returncode=0, stdout="ok", stderr="",
+            ),
+        ) as run_mock:
+            handler._api_deep("hk", "01530")
+
+        self.assertEqual(captured["status"], 200)
+        self.assertTrue(captured["data"]["done"])
+        args = run_mock.call_args.args[0]
+        self.assertIn("global_deep_dive.py", args[1])
+        self.assertIn("--market", args)
+        self.assertIn("hk", args)
+
+    def test_api_deep_us_uses_global_deep_script(self):
+        """/api/deep?market=us invokes global_deep_dive.py."""
+        import subprocess
+
+        handler, captured = _make_handler()
+        with patch.object(
+            server.subprocess, "run",
+            return_value=subprocess.CompletedProcess(
+                args=["global_deep_dive.py"], returncode=0, stdout="ok", stderr="",
+            ),
+        ) as run_mock:
+            handler._api_deep("us", "calm")
+
+        self.assertEqual(captured["status"], 200)
+        self.assertTrue(captured["data"]["done"])
+        self.assertEqual(captured["data"]["code"], "CALM")
+        args = run_mock.call_args.args[0]
+        self.assertIn("--market", args)
+        self.assertIn("us", args)
 
 
 class TestApiLayer4(unittest.TestCase):
     """Tests for /api/layer4 endpoint."""
 
-    def test_api_layer4_hk_not_implemented(self):
-        """/api/layer4?market=hk returns 501 (not implemented)."""
+    def test_api_layer4_hk_supported_but_requires_tier_codes(self):
+        """/api/layer4?market=hk no longer returns not-implemented."""
         handler, captured = _make_handler()
-        handler.send_json(
-            {"error": "港股市场暂不支持批量 AI 定性分析", "market": "hk"},
-            status=501,
-        )
-        self.assertEqual(captured["status"], 501)
+        with patch.object(server, "_tier_stock_codes", return_value=[]):
+            handler._api_layer4("hk", "A")
+
+        self.assertEqual(captured["status"], 200)
+        self.assertFalse(captured["data"]["done"])
+        self.assertIn("无可用标的", captured["data"]["msg"])
 
 
 class TestApiErrorStructure(unittest.TestCase):
@@ -374,14 +395,11 @@ class TestMarketConfig(unittest.TestCase):
         cfg = server.MARKET_CONFIG["cn"]
         self.assertIsNotNone(cfg["deep_script"])
 
-    def test_hk_us_no_deep_dives(self):
-        """HK and US market configs have deep_script=None (not implemented)."""
+    def test_hk_us_support_global_deep_dives(self):
+        """HK and US market configs use the cross-market deep-dive script."""
         for m in ("hk", "us"):
             cfg = server.MARKET_CONFIG[m]
-            self.assertIsNone(
-                cfg["deep_script"],
-                f"{m} deep_script should be None (not yet implemented)",
-            )
+            self.assertEqual(cfg["deep_script"], "global_deep_dive.py")
 
     def test_cn_code_pattern_is_6_digits(self):
         """A-share code pattern matches 6 digits."""

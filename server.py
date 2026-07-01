@@ -60,7 +60,7 @@ MARKET_CONFIG = {
         "stable_name": "hkstock_screen.html",
         "screen_script": "screeners/hk.py",
         "screen_module": "screeners.hk",
-        "deep_script": None,  # 港股深度研报暂未实现
+        "deep_script": "global_deep_dive.py",
         "code_pattern": re.compile(r"^\d{5}$"),
         "code_desc": "5位数字代码",
         "tier_supported": True,
@@ -74,7 +74,7 @@ MARKET_CONFIG = {
         "stable_name": "usstock_screen.html",
         "screen_script": "screeners/us.py",
         "screen_module": "screeners.us",
-        "deep_script": None,  # 美股深度研报暂未实现
+        "deep_script": "global_deep_dive.py",
         "code_pattern": re.compile(r"^[A-Za-z]{1,5}$"),
         "code_desc": "1-5位字母代码",
         "tier_supported": True,
@@ -200,26 +200,42 @@ def _market_status(market: str) -> dict:
     }
 
 
-def _count_deep_existing() -> int:
-    """统计 A 股深度研报已有数量 (仅 CN 市场)。"""
+def _deep_payload_filename(market: str, code: str) -> str:
+    """Return the JSON payload filename for one market/code pair."""
+    code = code.strip()
+    if market == "cn":
+        return f"{code}.json"
+    if market == "us":
+        code = code.upper()
+    return f"{market}_{code}.json"
+
+
+def _count_deep_existing(market: str = "cn") -> int:
+    """统计指定市场深度研报已有数量。"""
     if not os.path.isdir(DEEP_DIR):
         return 0
     data_dir = os.path.join(DEEP_DIR, "data")
     if os.path.isdir(data_dir):
-        return len([f for f in os.listdir(data_dir)
-                    if len(f) == 11 and f.endswith(".json") and f[:6].isdigit()])
+        files = os.listdir(data_dir)
+        if market == "cn":
+            return len([f for f in files
+                        if len(f) == 11 and f.endswith(".json") and f[:6].isdigit()])
+        prefix = f"{market}_"
+        return len([f for f in files if f.startswith(prefix) and f.endswith(".json")])
+    if market != "cn":
+        return 0
     return len([f for f in os.listdir(DEEP_DIR)
                 if len(f) == 11 and f.endswith(".html") and f[:6].isdigit()])
 
 
-def _deep_json_exists(code: str) -> bool:
-    """检查 A 股深度研报 JSON 数据文件是否存在。"""
-    return os.path.exists(os.path.join(DEEP_DIR, "data", f"{code}.json"))
+def _deep_json_exists(code: str, market: str = "cn") -> bool:
+    """检查深度研报 JSON 数据文件是否存在。"""
+    return os.path.exists(os.path.join(DEEP_DIR, "data", _deep_payload_filename(market, code)))
 
 
-def _all_deep_json_exist(codes: list[str]) -> bool:
+def _all_deep_json_exist(codes: list[str], market: str = "cn") -> bool:
     """检查给定代码列表中是否全部已有深度研报数据文件。"""
-    return bool(codes) and all(_deep_json_exists(c) for c in codes)
+    return bool(codes) and all(_deep_json_exists(c, market) for c in codes)
 
 
 def _tier_stock_codes(market: str, tier: str) -> list[str]:
@@ -240,7 +256,9 @@ def _tier_stock_codes(market: str, tier: str) -> list[str]:
     with open(os.path.join(RESULTS_DIR, csvs[0]), encoding="utf-8-sig") as f:
         import csv
         for r in csv.DictReader(f):
-            if target is None or r.get("tier", "") == target:
+            row_tier = r.get("tier", "")
+            row_short = {"A_可买入": "A", "B_优质待跌": "B", "C_接近合格": "C"}.get(row_tier, row_tier)
+            if target is None or row_tier == target or row_short == tier.upper():
                 c = r.get("code", "")
                 if c:
                     codes.append(c)
@@ -665,7 +683,7 @@ a{{color:#2563eb}}
         """为指定股票生成深度研报。
 
         Args:
-            market: cn (当前仅 A 股支持深度研报)。
+            market: cn/hk/us。
             code: 股票代码。
         """
         cfg = MARKET_CONFIG[market]
@@ -677,7 +695,8 @@ a{{color:#2563eb}}
             }, status=400)
             return
 
-        if not cfg["code_pattern"].match(code.strip()):
+        clean_code = code.strip().upper() if market == "us" else code.strip()
+        if not cfg["code_pattern"].match(clean_code):
             self.send_json({
                 "error": f"无效股票代码格式 (期望: {cfg['code_desc']})",
                 "market": market, "code": code,
@@ -695,9 +714,11 @@ a{{color:#2563eb}}
         args = [
             sys.executable,
             os.path.join(WORKDIR, cfg["deep_script"]),
-            "--code", code.strip(),
+            "--code", clean_code,
         ]
-        if market == "cn" and _deep_json_exists(code.strip()):
+        if market != "cn":
+            args.extend(["--market", market])
+        if _deep_json_exists(clean_code, market):
             args.append("--ai-only")
 
         try:
@@ -707,20 +728,20 @@ a{{color:#2563eb}}
             )
         except subprocess.TimeoutExpired:
             self.send_json({
-                "error": f"{code} 研报生成超时(>180s)",
-                "market": market, "code": code,
+                "error": f"{clean_code} 研报生成超时(>180s)",
+                "market": market, "code": clean_code,
             }, status=504)
             return
 
         data = {
             "done": result.returncode == 0,
             "market": market,
-            "code": code,
+            "code": clean_code,
             "output_tail": result.stdout[-500:] if result.stdout else "",
             "warnings": [],
         }
         if result.returncode != 0:
-            data["error"] = f"{code} 研报生成失败 (exit code={result.returncode})"
+            data["error"] = f"{clean_code} 研报生成失败 (exit code={result.returncode})"
             data["stderr_tail"] = result.stderr[-500:] if result.stderr else ""
             self.send_json(data, status=500)
             return
@@ -733,7 +754,7 @@ a{{color:#2563eb}}
         """对指定市场的 Tier X 全部标的运行 AI 定性分析（异步 + 进度追踪）。
 
         Args:
-            market: cn (当前仅 A 股支持)。
+            market: cn/hk/us。
             tier: A, B, C。
         """
         cfg = MARKET_CONFIG[market]
@@ -775,7 +796,7 @@ a{{color:#2563eb}}
             })
             return
 
-        before = _count_deep_existing()
+        before = _count_deep_existing(market)
 
         with _job_lock:
             _jobs[job_key] = {
@@ -791,10 +812,12 @@ a{{color:#2563eb}}
                     sys.executable,
                     os.path.join(WORKDIR, cfg["deep_script"]),
                     "--tier", tier,
-                    "--parallel", "20",
-                    "--ai-concurrency", "20",
                 ]
-                if _all_deep_json_exist(tier_codes):
+                if market == "cn":
+                    args.extend(["--parallel", "20", "--ai-concurrency", "20"])
+                else:
+                    args.extend(["--market", market, "--parallel", "6"])
+                if _all_deep_json_exist(tier_codes, market):
                     args.append("--ai-only")
                 result = subprocess.run(
                     args, capture_output=True, text=True,
@@ -849,7 +872,7 @@ a{{color:#2563eb}}
         cfg = MARKET_CONFIG[market]
         status_info = _market_status(market)
         ts = status_info.get("latest_ts")
-        deep_count = _count_deep_existing() if market == "cn" else 0
+        deep_count = _count_deep_existing(market)
 
         # ── 进度追踪 ──
         progress = None
@@ -906,8 +929,7 @@ a{{color:#2563eb}}
         if status_info.get("latest_invalid_ts"):
             data["latest_invalid_ts"] = status_info.get("latest_invalid_ts")
             data["latest_invalid_href"] = status_info.get("latest_invalid_href")
-        if market == "cn":
-            data["deep_count"] = deep_count
+        data["deep_count"] = deep_count
 
         self.send_json(data)
 

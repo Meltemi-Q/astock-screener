@@ -557,7 +557,8 @@ def _write_us_csv(records: list[dict], path: str):
         w = csv.writer(f, lineterminator="\n")
         w.writerow(cols)
         for i, r in enumerate(records, 1):
-            min_buy = int((r.get("price") or 0) * 100)
+            min_buy_value = r.get("min_buy")
+            min_buy = "" if min_buy_value is None else f"{min_buy_value:.2f}"
             tier_short = {"A_可买入": "A", "B_优质待跌": "B", "C_接近合格": "C"}.get(
                 r.get("tier", ""), "-"
             )
@@ -601,7 +602,7 @@ def _md_table_us(rows: list[dict]) -> str:
     lines = [head, sep]
     for i, r in enumerate(rows, 1):
         name_disp = r.get("name", "")
-        min_buy = int((r.get("price") or 0) * 100)
+        min_buy = _n(r.get("min_buy"), 2)
         lines.append(
             f"| {i} | {r.get('code','')} | {name_disp} | "
             f"{_n(r.get('price'),2)} | {min_buy} | {r.get('industry','')} | "
@@ -827,7 +828,7 @@ footer{padding:10px 20px;color:var(--muted);font-size:11px;border-top:1px solid 
 <script>
 var DATA=__DATA__, INDS=__INDS__, META=__META__;
 var COLS=[["rk","#","n"],["tier","档","s"],["code","代码","s"],["name","名称","s"],
-["px","现价","n"],["mb","一手","n"],["sc","评分","n"],["L","层","n"],["roe","ROE%","n"],["gm","毛利%","n"],
+["px","现价","n"],["mb","一股","n"],["sc","评分","n"],["L","层","n"],["roe","ROE%","n"],["gm","毛利%","n"],
 ["nm","净利%","n"],["yoy","同比%","n"],["cagr","CAGR%","n"],["pe","PE","n"],["peg","PEG","n"],
 ["er","预期年化%","n"],["disc","折让%","n"],["debt","负债%","n"],["cap","市值亿·USD","n"],["ind","行业","s"],["note","落选原因","s"]];
 var state={t:"all",q:"",ind:"",pass:false,sk:"sc",sd:-1};
@@ -936,7 +937,7 @@ function openDetail(code,push){
  document.getElementById("detailSub").innerHTML=tierBadge(r.tier)+'<span>评分 '+detailValue(r.sc)+'</span><span>第 '+detailValue(r.L)+' 层</span><span>'+esc(r.ind)+'</span>';
  var body='';
  body+='<section class="detail-card"><h3>交易与评级</h3><div class="detail-grid">'
-   +detailMetric("现价",r.px)+detailMetric("一手",r.mb)+detailMetric("评分",r.sc)+detailMetric("市值(亿 USD)",r.cap)+'</div></section>';
+   +detailMetric("现价",r.px)+detailMetric("一股",r.mb)+detailMetric("评分",r.sc)+detailMetric("市值(亿 USD)",r.cap)+'</div></section>';
  body+='<section class="detail-card"><h3>质量指标</h3><div class="detail-grid">'
    +detailMetric("ROE",r.roe,"%")+detailMetric("毛利率",r.gm,"%")+detailMetric("净利率",r.nm,"%")+detailMetric("负债率",r.debt,"%")+'</div></section>';
  body+='<section class="detail-card"><h3>成长与估值</h3><div class="detail-grid">'
@@ -959,8 +960,8 @@ function syncDetailFromHash(){
 function rowHTML(r){
  var cells=COLS.map(function(c){var k=c[0],v=r[k];
   if(k==="tier")return '<td>'+tierBadge(v)+'</td>';
-  if(k==="code")return '<td class="l"><button class="detail-link code" data-code="'+esc(r.code)+'">'+esc(v)+'</button></td>';
-  if(k==="name")return '<td class="l"><button class="detail-link name-link" data-code="'+esc(r.code)+'">'+esc(v)+'</button></td>';
+  if(k==="code")return '<td class="l"><a class="code" href="deep_dives/report.html?market=us&code='+esc(r.code)+'">'+esc(v)+'</a></td>';
+  if(k==="name")return '<td class="l"><a class="name-link" href="deep_dives/report.html?market=us&code='+esc(r.code)+'">'+esc(v)+'</a></td>';
   if(k==="ind")return '<td class="l">'+fmt(v)+'</td>';
   if(k==="note")return '<td class="note">'+fmt(v)+'</td>';
   if(k==="disc"){var cls=v>0?"pos":(v<0?"neg":"");return '<td class="'+cls+'">'+fmt(v)+'</td>'}
@@ -1015,7 +1016,7 @@ def _write_us_html(
             "code": r.get("code", ""),
             "name": r.get("name", ""),
             "px": rnd(r.get("price"), 2),
-            "mb": int((r.get("price") or 0) * 100),
+            "mb": r.get("min_buy"),
             "ind": r.get("industry", ""),
             "tier": tshort.get(r.get("tier", ""), ""),
             "sc": r.get("score"),

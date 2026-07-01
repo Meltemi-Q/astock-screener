@@ -72,11 +72,37 @@ function judge(v,thresholds,labels){
 function stockCodeFromLocation(){
   var params=new URLSearchParams(window.location.search);
   var code=params.get("code")||(window.location.hash||"").replace(/^#/,"");
-  return /^[0-9]{6}$/.test(code||"")?code:"";
+  var market=marketFromLocation();
+  if(market==="cn")return /^[0-9]{6}$/.test(code||"")?code:"";
+  if(market==="hk")return /^[0-9]{5}$/.test(code||"")?code:"";
+  if(market==="us")return /^[A-Za-z]{1,5}$/.test(code||"")?String(code).toUpperCase():"";
+  return "";
+}
+function marketFromLocation(){
+  var params=new URLSearchParams(window.location.search);
+  var market=(params.get("market")||"").toLowerCase();
+  if(market==="hk"||market==="us"||market==="cn")return market;
+  var code=params.get("code")||(window.location.hash||"").replace(/^#/,"");
+  if(/^[0-9]{5}$/.test(code||""))return "hk";
+  if(/^[A-Za-z]{1,5}$/.test(code||""))return "us";
+  return "cn";
+}
+function marketMeta(market){
+  return {
+    cn:{label:"A股",stable:"../astock_screen.html",currency:"CNY",dataPrefix:"",priceLabel:"现价(元)",minBuyLabel:"一手(元)",source:"东方财富公开接口"},
+    hk:{label:"港股",stable:"../hkstock_screen.html",currency:"HKD",dataPrefix:"hk_",priceLabel:"现价(HKD)",minBuyLabel:"一手(HKD)",source:"东方财富公开接口 + HKEX"},
+    us:{label:"美股",stable:"../usstock_screen.html",currency:"USD",dataPrefix:"us_",priceLabel:"现价(USD)",minBuyLabel:"一股(USD)",source:"Eastmoney 行情/K线 + SEC EDGAR"}
+  }[market||"cn"];
+}
+function payloadName(market,code){
+  return (marketMeta(market).dataPrefix||"")+code+".json";
 }
 function updateBackLinkFromStatus(){
+  var market=marketFromLocation();
   var link=$("backLink");
-  if(link)link.href="../astock_screen.html";
+  if(link)link.href=marketMeta(market).stable;
+  var index=$("indexLink");
+  if(index)index.style.display=market==="cn"?"":"none";
 }
 function showError(message){
   $("status").className="status error";
@@ -92,9 +118,10 @@ function showStatus(message, working){
 }
 
 function loadReport(){
+  var market=marketFromLocation();
   var code=stockCodeFromLocation();
   if(!code){showError("缺少股票代码，请从选股总表或研报索引进入。");return}
-  fetch("data/"+code+".json",{cache:"no-store"})
+  fetch("data/"+payloadName(market,code),{cache:"no-store"})
     .then(function(r){
       if(!r.ok)throw new Error("HTTP "+r.status);
       return r.json();
@@ -110,12 +137,13 @@ function loadReport(){
 }
 
 function generateMissingReport(code){
+  var market=marketFromLocation();
   if(window.location.protocol==="file:"){
-    showError("无法加载 data/"+code+".json。请通过 ./run.sh 启动本地 HTTP 服务后访问该页面。");
+    showError("无法加载 data/"+payloadName(market,code)+"。请通过 ./run.sh 启动本地 HTTP 服务后访问该页面。");
     return;
   }
   showStatus("本地还没有这只股票的深度研报，正在生成 "+code+" …",true);
-  fetch(API+"/api/deep?code="+code)
+  fetch(API+"/api/deep?market="+market+"&code="+code)
     .then(function(r){return r.json()})
     .then(function(d){
       if(d.done){
@@ -133,28 +161,29 @@ function generateMissingReport(code){
 function renderReport(data){
   var meta=data.meta||{}, quote=data.quote||{}, financials=data.financials||[];
   var name=meta.name||"", code=meta.code||"", ind=meta.industry||"";
+  var market=meta.market||marketFromLocation(), mm=marketMeta(market);
   document.title=name+"("+code+") 深度研报 | 五层选股";
   $("title").innerHTML=esc(name)+' <span style="font-size:16px;color:#64748b">'+esc(code)+"</span>";
-  $("subtitle").textContent=ind+" · "+financials.slice(-3).map(function(d){return d.year}).join("  |  ")+"年";
+  $("subtitle").textContent=mm.label+" · "+ind+" · "+financials.slice(-3).map(function(d){return d.year}).join("  |  ")+"年";
   $("status").hidden=true;
   $("content").hidden=false;
-  renderKpis(quote, financials);
+  renderKpis(quote, financials, mm);
   renderQuantSummary(financials);
   renderFinancialRows(financials);
   renderPeers(data);
   renderAnalysis(data);
-  $("footer").textContent="数据来源：东方财富公开接口 · AI分析由 DeepSeek 生成，仅供参考不构成投资建议 · 生成于 "+(meta.generated_at||"");
+  $("footer").textContent="数据来源："+mm.source+" · AI分析由 DeepSeek 生成，仅供参考不构成投资建议 · 生成于 "+(meta.generated_at||"");
   bindKlineButtons();
   drawKline();
   setupKlineInteraction();
   drawTrend(financials);
 }
 
-function renderKpis(quote, financials){
+function renderKpis(quote, financials, mm){
   var fy=financials.length?financials[financials.length-1]:{};
   var items=[
-    ["green",r(quote.price,2),"现价(元)"],
-    ["yellow",isNum(quote.min_buy)?quote.min_buy:"","一手(元)"],
+    ["green",r(quote.price,2),mm.priceLabel],
+    ["yellow",isNum(quote.min_buy)?r(quote.min_buy,mm.currency==="USD"?2:0):"",mm.minBuyLabel],
     ["blue",r(quote.pe_ttm,1),"PE(TTM)"],
     ["blue",r(quote.pb,1),"PB"],
     ["green",r(fy.roe,1)+"%","ROE"],
@@ -212,18 +241,20 @@ function renderFinancialRows(financials){
 
 function renderPeers(data){
   var meta=data.meta||{}, peers=data.peers||[];
+  var market=meta.market||marketFromLocation();
   $("peerTitle").textContent="同行对比（同行业 "+(meta.industry||"")+" 优质标的）";
   $("peerRows").innerHTML=peers.slice(0,8).map(function(p,i){
+    var peerMarket=p.market||market;
     var label={"A_可买入":"A","B_优质待跌":"B","C_接近合格":"C"}[p.tier]||"";
     var nameCell=p.has_deep
-      ? '<a href="report.html?code='+esc(p.code)+'" class="code">'+esc(p.code)+'</a> <a href="report.html?code='+esc(p.code)+'">'+esc(p.name)+'</a>'
-      : '<a href="#" class="code deep-gen" data-code="'+esc(p.code)+'">'+esc(p.code)+'</a> <a href="#" class="deep-gen" data-code="'+esc(p.code)+'">'+esc(p.name)+'</a> <span style="font-size:10px;color:#64748b">一键</span>';
+      ? '<a href="report.html?market='+esc(peerMarket)+'&code='+esc(p.code)+'" class="code">'+esc(p.code)+'</a> <a href="report.html?market='+esc(peerMarket)+'&code='+esc(p.code)+'">'+esc(p.name)+'</a>'
+      : '<a href="#" class="code deep-gen" data-market="'+esc(peerMarket)+'" data-code="'+esc(p.code)+'">'+esc(p.code)+'</a> <a href="#" class="deep-gen" data-market="'+esc(peerMarket)+'" data-code="'+esc(p.code)+'">'+esc(p.name)+'</a> <span style="font-size:10px;color:#64748b">一键</span>';
     return "<tr><td>"+(i+1)+"</td><td>"+nameCell+"</td><td>"+esc(r(p.pe,1))+"</td><td>"+esc(r(p.roe,1))+"%</td><td>"+esc(r(p.gm,1))+"%</td><td>"+esc(r(p.mktcap,0))+"亿</td><td>"+esc(label)+"</td></tr>";
   }).join("");
   document.querySelectorAll(".deep-gen").forEach(function(el){
     el.addEventListener("click",function(e){
       e.preventDefault();
-      generatePeerReport(el.getAttribute("data-code"),el);
+      generatePeerReport(el.getAttribute("data-market")||market,el.getAttribute("data-code"),el);
     });
   });
 }
@@ -259,10 +290,11 @@ function renderAnalysis(data){
 }
 
 function runAiAnalysis(code){
+  var market=marketFromLocation();
   var btn=$("aiAnalyzeBtn"), prog=$("aiProgress");
   if(!btn)return;
   btn.disabled=true;btn.textContent="分析中…";setInlineProgress(prog,"DeepSeek 分析中…");
-  fetch(API+"/api/deep?code="+code)
+  fetch(API+"/api/deep?market="+market+"&code="+code)
     .then(function(r){return r.json()})
     .then(function(d){
       if(d.done){setInlineProgress(prog,"完成，正在刷新…");setTimeout(function(){location.reload()},600)}
@@ -274,13 +306,13 @@ function runAiAnalysis(code){
     });
 }
 
-function generatePeerReport(code, el){
+function generatePeerReport(market, code, el){
   setLinkLoading(el,true,"生成中…");
   el.style.pointerEvents="none";
-  fetch(API+"/api/deep?code="+code)
+  fetch(API+"/api/deep?market="+market+"&code="+code)
     .then(function(r){return r.json()})
     .then(function(d){
-      if(d.done){location.href="report.html?code="+code}
+      if(d.done){location.href="report.html?market="+market+"&code="+code}
       else{setLinkLoading(el,false,code);el.style.pointerEvents="auto";alert("生成失败: "+(d.error||"未知"))}
     })
     .catch(function(){

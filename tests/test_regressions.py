@@ -154,15 +154,16 @@ class RegressionTests(unittest.TestCase):
                 self.assertIn("a.concat(b)", source)
                 self.assertIn("本期无 A/B 候选", source)
 
-    def test_market_rows_open_stock_detail_panel(self):
-        for rel in ("screeners/hk.py", "screeners/us.py"):
+    def test_hk_us_rows_link_to_shared_deep_dive_report(self):
+        cases = {
+            "screeners/hk.py": "deep_dives/report.html?market=hk&code=",
+            "screeners/us.py": "deep_dives/report.html?market=us&code=",
+        }
+        for rel, expected in cases.items():
             with self.subTest(file=rel):
                 source = (ROOT / rel).read_text(encoding="utf-8")
-                self.assertIn('id="detailPanel"', source)
-                self.assertIn("function openDetail", source)
-                self.assertIn('data-code="', source)
-                self.assertIn('location.hash="code="', source)
-                self.assertIn("window.addEventListener(\"hashchange\", syncDetailFromHash)", source)
+                self.assertIn(expected, source)
+                self.assertIn('href="deep_dives/report.html?market=', source)
 
     def test_server_stable_market_routes_use_http_redirect(self):
         source = (ROOT / "server.py").read_text(encoding="utf-8")
@@ -393,7 +394,22 @@ class RegressionTests(unittest.TestCase):
         source = (ROOT / "templates" / "deep_dive" / "assets" / "deep_dive.js").read_text(encoding="utf-8")
 
         self.assertIn("generateMissingReport(code)", source)
-        self.assertIn('fetch(API+"/api/deep?code="+code)', source)
+        self.assertIn('fetch(API+"/api/deep?market="+market+"&code="+code)', source)
+        self.assertIn("function marketFromLocation()", source)
+        self.assertIn("function payloadName(market,code)", source)
+
+    def test_global_deep_dive_generates_prefixed_market_payloads(self):
+        import global_deep_dive
+
+        self.assertEqual(global_deep_dive.payload_filename("hk", "01530"), "hk_01530.json")
+        self.assertEqual(global_deep_dive.payload_filename("us", "calm"), "us_CALM.json")
+
+    def test_global_deep_dive_uses_tencent_kline_for_hk_us(self):
+        source = (ROOT / "global_deep_dive.py").read_text(encoding="utf-8")
+
+        self.assertIn("web.ifzq.gtimg.cn/appstock/app/fqkline/get", source)
+        self.assertIn('f"us{code}.OQ"', source)
+        self.assertIn('f"hk{code}"', source)
 
     def test_industry_chart_reserves_bottom_space_for_rotated_labels(self):
         source = (ROOT / "astock_screener.py").read_text(encoding="utf-8")
