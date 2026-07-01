@@ -135,6 +135,25 @@ footer a{color:var(--link);text-decoration:none}
 </div>
 <div class="progress-wrap" id="progress-us"><div class="progress-bar"></div></div>
 </div>
+
+<!-- ├─ 可转债双低 ─┤ -->
+<div class="market-card" data-market="cbond" id="card-cbond">
+<div class="card-top">
+<span class="card-flag">🔁</span><span class="card-label">可转债双低</span>
+</div>
+<div class="card-exchange">沪深可转债 · Double-low Basket</div>
+<div class="card-status" id="status-cbond">
+<span class="status-dot loading"></span>
+<span class="status-text">加载中…</span>
+</div>
+<div class="card-stats" id="stats-cbond"></div>
+<div class="card-meta" id="meta-cbond"></div>
+<div class="card-actions">
+<a class="btn primary" href="cbond_double_low.html" id="link-cbond">📊 查看双低</a>
+<button class="btn secondary" data-cbond-refresh="1">⟳ 更新双低筛选</button>
+</div>
+<div class="progress-wrap" id="progress-cbond"><div class="progress-bar"></div></div>
+</div>
 </div>
 </main>
 
@@ -288,12 +307,55 @@ function loadAllMarkets(){
   .catch(function(e){
    setConnStatus(false,"● 离线 — 服务器未运行 ("+e.message+")");
    // Set all cards to loading-failed
-   for(var m in MARKET_META){
+  for(var m in MARKET_META){
     var dot=document.getElementById("status-"+m).querySelector(".status-dot");
     var txt=document.getElementById("status-"+m).querySelector(".status-text");
     dot.className="status-dot missing";
     txt.textContent="无法连接服务器";
    }
+  });
+ loadCbondStatus();
+}
+
+function updateCbondCard(data){
+ var statusEl=document.getElementById("status-cbond");
+ var statsEl=document.getElementById("stats-cbond");
+ var metaEl=document.getElementById("meta-cbond");
+ var linkEl=document.getElementById("link-cbond");
+ var dot=statusEl.querySelector(".status-dot");
+ var txt=statusEl.querySelector(".status-text");
+ if(!data||data.status!=="ready"){
+  dot.className="status-dot missing";
+  txt.textContent="尚未生成 — 点击下方按钮更新";
+  statsEl.innerHTML="";
+  metaEl.textContent=(data&&data.warnings&&data.warnings[0])||(data&&data.errors&&data.errors[0])||"暂无可转债双低结果";
+  if(linkEl)linkEl.classList.add("disabled-link");
+  return;
+ }
+ dot.className="status-dot ready";
+ var ts=data.latest_ts||"",y=ts.substring(0,4),m=ts.substring(4,6),d=ts.substring(6,8);
+ txt.textContent="已生成 · "+y+"-"+m+"-"+d;
+ statsEl.innerHTML=
+  '<div class="stat-pill"><div class="val signal">'+(data.buy_count||0)+'</div><div class="lbl">买入候选</div></div>'+
+  '<div class="stat-pill"><div class="val B">'+(data.watch_count||0)+'</div><div class="lbl">观察池</div></div>'+
+  '<div class="stat-pill"><div class="val" style="font-size:18px;font-weight:700">'+(data.row_count||0)+'</div><div class="lbl">全市场</div></div>';
+ metaEl.textContent="默认保守规则 · 买入候选 "+(data.buy_count||0)+" 只 · 观察 "+(data.watch_count||0)+" 只";
+ if(linkEl){
+  linkEl.setAttribute("href",data.latest_href||data.stable_href||"cbond_double_low.html");
+  linkEl.classList.remove("disabled-link");
+ }
+}
+
+function loadCbondStatus(){
+ fetch("/api/cbond/status")
+  .then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
+  .then(updateCbondCard)
+  .catch(function(e){
+   var dot=document.getElementById("status-cbond").querySelector(".status-dot");
+   var txt=document.getElementById("status-cbond").querySelector(".status-text");
+   dot.className="status-dot missing";
+   txt.textContent="无法连接服务器";
+   document.getElementById("meta-cbond").textContent=e.message;
   });
 }
 
@@ -345,7 +407,38 @@ document.querySelectorAll("[data-refresh]").forEach(function(btn){
   var market=btn.getAttribute("data-refresh");
   var mode=btn.getAttribute("data-mode")||"quotes";
   var progressEl=document.getElementById("progress-"+market);
-  handleRefresh(market,mode,btn,progressEl);
+ handleRefresh(market,mode,btn,progressEl);
+ });
+});
+
+document.querySelectorAll("[data-cbond-refresh]").forEach(function(btn){
+ btn.addEventListener("click",function(){
+  if(refreshBusy.cbond)return;
+  var progressEl=document.getElementById("progress-cbond");
+  refreshBusy.cbond=true;
+  btn.disabled=true;
+  btn.textContent="⏳ 更新中…";
+  if(progressEl)progressEl.classList.add("active","indeterminate");
+  fetch("/api/cbond/refresh",{method:"POST"})
+   .then(function(r){return r.json();})
+   .then(function(data){
+    if(data.done){
+     showToast("可转债双低筛选完成 ✓");
+     updateCbondCard(data);
+    }else if(data.cached){
+     showToast("可转债双低筛选冷却中，请稍后再试",true);
+    }else{
+     showToast("可转债双低筛选失败: "+(data.error||"未知错误"),true);
+    }
+   })
+   .catch(function(e){showToast("网络错误: "+e.message,true);})
+   .finally(function(){
+    refreshBusy.cbond=false;
+    btn.disabled=false;
+    btn.textContent="⟳ 更新双低筛选";
+    if(progressEl)progressEl.classList.remove("active","indeterminate");
+    loadCbondStatus();
+   });
  });
 });
 

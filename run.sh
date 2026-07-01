@@ -9,6 +9,7 @@
 #   ./run.sh --deep --no-llm 深度研报但不调用 AI（仅量化数据）
 #   ./run.sh --deep --ai-only 只对已有研报补 AI
 #   ./run.sh --code 600519   单独生成某只股票的深度研报
+#   ./run.sh --cbond         生成可转债双低策略筛选
 #   ./run.sh --serve-only    仅启动服务（不跑选股）
 #   ./run.sh --year 2024     使用 2024 年报
 set -euo pipefail
@@ -27,6 +28,7 @@ usage() {
   ./run.sh --deep --ai-only     只对已有研报补 AI，不重抓财务/K线
   ./run.sh --deep --parallel=20 --ai-concurrency=20
   ./run.sh --code 600519        单独生成某只股票的深度研报
+  ./run.sh --cbond              生成可转债双低策略筛选
   ./run.sh --serve-only         仅启动服务（不跑选股）
   ./run.sh --serve=8900         指定 HTTP 服务端口
   ./run.sh --no-serve           只跑选股，不启动服务
@@ -41,8 +43,10 @@ if [ -z "$PY" ]; then echo "❌ 未找到 python3"; exit 1; fi
 # ── 解析参数 ──
 SCREENER_ARGS=()
 DEEP_ARGS=()
+CBOND_ARGS=()
 DO_SCREENER=true
 DO_DEEP=false
+DO_CBOND=false
 DO_SERVE=true       # 默认启动服务（离线→在线）
 SERVE_PORT=8899
 REUSE_SERVER=false
@@ -67,7 +71,7 @@ for arg in "$@"; do
 
   case "$arg" in
     -h|--help)   usage; exit 0 ;;
-    --fresh)     SCREENER_ARGS+=("$arg") ;;
+    --fresh)     SCREENER_ARGS+=("$arg"); CBOND_ARGS+=("$arg") ;;
     --quotes-fresh) SCREENER_ARGS+=("$arg") ;;
     --deep)      DO_DEEP=true ;;
     --no-llm)    DEEP_ARGS+=("$arg") ;;
@@ -77,6 +81,7 @@ for arg in "$@"; do
     --ai-concurrency=*) DEEP_ARGS+=("--ai-concurrency" "${arg#*=}") ;;
     --prefetch-financials=*) DEEP_ARGS+=("--prefetch-financials" "${arg#*=}") ;;
     --code)      EXPECT_CODE="1" ;;
+    --cbond)     DO_CBOND=true; DO_SCREENER=false ;;
     --year)      EXPECT_YEAR="1"; SCREENER_ARGS+=("$arg") ;;
     --market)    EXPECT_MARKET="1" ;;
     --global)    MARKET="all"; USE_GLOBAL=true ;;
@@ -127,6 +132,20 @@ stop_existing_project_servers() {
     done < <(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)
   done
 }
+
+# ── Step 0: 可转债双低策略 ──
+if [ "$DO_CBOND" = true ]; then
+  echo "========================================="
+  echo "▶ 可转债双低策略筛选"
+  echo "========================================="
+  "$PY" cbond_double_low.py --jisilu-check ${CBOND_ARGS[@]+"${CBOND_ARGS[@]}"}
+  TS=$(date +%Y%m%d)
+  echo "─────────────────────────────────────────────"
+  [ -f "results/cbond_double_low.html" ] && echo "🌐 固定入口: $(pwd)/results/cbond_double_low.html"
+  [ -f "results/cbond_double_low_${TS}.html" ] && echo "🌐 总表: $(pwd)/results/cbond_double_low_${TS}.html"
+  [ -f "results/cbond_double_low_${TS}.md" ] && echo "📄 结论: $(pwd)/results/cbond_double_low_${TS}.md"
+  [ -f "results/cbond_double_low_${TS}.csv" ] && echo "📊 CSV:  $(pwd)/results/cbond_double_low_${TS}.csv"
+fi
 
 # ── Step 1: 五层选股 ──
 if [ "$DO_SCREENER" = true ]; then
@@ -253,6 +272,8 @@ if [ "$DO_SERVE" = true ]; then
   OPEN_PAGE="astock_screen.html"
   if [ "$USE_GLOBAL" = true ]; then
     OPEN_PAGE="screen.html"
+  elif [ "$DO_CBOND" = true ]; then
+    OPEN_PAGE="cbond_double_low.html"
   fi
 
   echo "  http://localhost:$SERVE_PORT/$OPEN_PAGE"
@@ -260,6 +281,8 @@ if [ "$DO_SERVE" = true ]; then
   # 用浏览器打开（通过 http:// 而非 file://，使所有按钮可用）
   if [ "$(uname)" = "Darwin" ]; then
     if [ "$USE_GLOBAL" = true ]; then
+      open "http://localhost:$SERVE_PORT/$OPEN_PAGE" 2>/dev/null || true
+    elif [ "$DO_CBOND" = true ]; then
       open "http://localhost:$SERVE_PORT/$OPEN_PAGE" 2>/dev/null || true
     else
       if [ -f "results/astock_screen.html" ] || [ -n "$(find results -maxdepth 1 -name 'astock_screen_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].html' -print -quit 2>/dev/null)" ]; then

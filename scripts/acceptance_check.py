@@ -108,6 +108,11 @@ def http_smoke(port: int) -> bool:
             if market not in status.get("markets", {}):
                 print(f"FAIL missing market in status: {market}")
                 return False
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/cbond/status", timeout=5) as resp:
+            cbond_status = json.loads(resp.read().decode("utf-8"))
+        if "status" not in cbond_status:
+            print("FAIL missing cbond status")
+            return False
 
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/screen.html", timeout=5) as resp:
             html = resp.read().decode("utf-8")
@@ -118,6 +123,9 @@ def http_smoke(port: int) -> bool:
             'id="progress-cn"',
             'id="progress-hk"',
             'id="progress-us"',
+            'id="progress-cbond"',
+            'data-cbond-refresh="1"',
+            "可转债双低",
             "更新五层筛选",
             "themeToggle",
         ]
@@ -163,6 +171,7 @@ def main() -> int:
                 "astock_screener.py",
                 "global_screener.py",
                 "global_deep_dive.py",
+                "cbond_double_low.py",
                 "server.py",
                 "stock_deep_dive.py",
                 "layer4_report.py",
@@ -182,6 +191,7 @@ def main() -> int:
                 "astock_screener.py",
                 "global_screener.py",
                 "global_deep_dive.py",
+                "cbond_double_low.py",
                 "server.py",
                 "stock_deep_dive.py",
                 "layer4_report.py",

@@ -53,6 +53,76 @@ class RegressionTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         self.assertIn("--no-kline", result.stdout)
 
+    def test_cbond_double_low_help_renders(self):
+        result = subprocess.run(
+            [sys.executable, "cbond_double_low.py", "--help"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            timeout=3,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertIn("--max-double-low", result.stdout)
+        self.assertIn("可转债双低策略", result.stdout)
+
+    def test_convertible_bond_quote_board_estimates_remaining_scale(self):
+        from data_sources.convertible_bonds import parse_quote_board_row
+
+        row = parse_quote_board_row({
+            "f12": "128142",
+            "f14": "新乳转债",
+            "f2": 115.51,
+            "f20": 829106523,
+        })
+
+        self.assertEqual(row["code"], "128142")
+        self.assertAlmostEqual(row["remaining_scale"], 7.18, places=2)
+
+    def test_cbond_strategy_classifies_buy_watch_and_reject(self):
+        import argparse
+        from datetime import date
+        import cbond_double_low
+
+        args = argparse.Namespace(
+            min_rating="AA-",
+            min_scale=2.0,
+            min_years=0.5,
+            max_price=130.0,
+            max_premium=30.0,
+            max_double_low=150.0,
+        )
+        today = date(2026, 7, 1)
+        records = [
+            {
+                "code": "113001", "name": "候选转债", "stock_name": "正常股份",
+                "price": 110.0, "premium_rt": 15.0, "double_low": 125.0,
+                "rating": "AA", "remaining_scale": 5.0, "remaining_years": 2.0,
+                "listing_date": "2024-01-01 00:00:00", "delist_date": None,
+                "has_quote_board": True,
+            },
+            {
+                "code": "113002", "name": "观察转债", "stock_name": "正常股份",
+                "price": 132.0, "premium_rt": 20.0, "double_low": 152.0,
+                "rating": "AA", "remaining_scale": 5.0, "remaining_years": 2.0,
+                "listing_date": "2024-01-01 00:00:00", "delist_date": None,
+                "has_quote_board": True,
+            },
+            {
+                "code": "113003", "name": "风险转债", "stock_name": "*ST风险",
+                "price": 90.0, "premium_rt": 10.0, "double_low": 100.0,
+                "rating": "A", "remaining_scale": 1.0, "remaining_years": 0.2,
+                "listing_date": "2024-01-01 00:00:00", "delist_date": None,
+                "has_quote_board": True,
+            },
+        ]
+
+        out = {r["code"]: r for r in cbond_double_low.classify_records(records, args, today)}
+        self.assertEqual(out["113001"]["status"], "买入候选")
+        self.assertEqual(out["113002"]["status"], "观察")
+        self.assertEqual(out["113003"]["status"], "剔除")
+        self.assertIn("评级低于", out["113003"]["risk_reasons"])
+
     def test_api_deep_reports_subprocess_failure(self):
         import server
 

@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 import sys
 import json
+import csv
 import subprocess
 import threading
 import time
@@ -94,6 +95,7 @@ _job_lock = threading.Lock()
 
 # 文件名正则
 DATE_HTML_RE = re.compile(r"^(astock_screen|hkstock_screen|usstock_screen)_\d{8}\.html$")
+CBOND_CSV_RE = re.compile(r"^cbond_double_low_(\d{8})\.csv$")
 
 
 # ── 辅助函数 ────────────────────────────────────────────
@@ -197,6 +199,87 @@ def _market_status(market: str) -> dict:
         "file_count": count,
         "status": "not_generated",
         "warnings": [f"{cfg['label']}暂无有效筛选结果，请先运行更新五层筛选"],
+    }
+
+
+def _latest_cbond_ts() -> str:
+    """返回最新可转债双低策略 CSV 日期戳。"""
+    if not os.path.isdir(RESULTS_DIR):
+        return ""
+    matches = []
+    for name in os.listdir(RESULTS_DIR):
+        m = CBOND_CSV_RE.match(name)
+        if m:
+            matches.append(m.group(1))
+    return sorted(matches)[-1] if matches else ""
+
+
+def _cbond_status() -> dict:
+    """返回可转债双低策略产物状态。"""
+    ts = _latest_cbond_ts()
+    if not ts:
+        return {
+            "status": "not_generated",
+            "latest_ts": None,
+            "latest_href": "",
+            "stable_href": "cbond_double_low.html",
+            "row_count": 0,
+            "buy_count": 0,
+            "watch_count": 0,
+            "reject_count": 0,
+            "warnings": ["暂无可转债双低筛选结果，请先运行 ./run.sh --cbond"],
+        }
+
+    csv_path = os.path.join(RESULTS_DIR, f"cbond_double_low_{ts}.csv")
+    html_path = os.path.join(RESULTS_DIR, f"cbond_double_low_{ts}.html")
+    row_count = buy_count = watch_count = reject_count = 0
+    try:
+        with open(csv_path, encoding="utf-8-sig") as f:
+            for row in csv.DictReader(f):
+                row_count += 1
+                status = row.get("status", "")
+                if status == "买入候选":
+                    buy_count += 1
+                elif status == "观察":
+                    watch_count += 1
+                elif status == "剔除":
+                    reject_count += 1
+    except Exception as e:
+        return {
+            "status": "invalid",
+            "latest_ts": ts,
+            "latest_href": "",
+            "stable_href": "cbond_double_low.html",
+            "row_count": 0,
+            "buy_count": 0,
+            "watch_count": 0,
+            "reject_count": 0,
+            "errors": [f"读取可转债 CSV 失败: {e}"],
+        }
+
+    if not os.path.exists(html_path):
+        return {
+            "status": "invalid",
+            "latest_ts": ts,
+            "latest_href": "",
+            "stable_href": "cbond_double_low.html",
+            "row_count": row_count,
+            "buy_count": buy_count,
+            "watch_count": watch_count,
+            "reject_count": reject_count,
+            "errors": [f"缺少 HTML 产物: cbond_double_low_{ts}.html"],
+        }
+
+    return {
+        "status": "ready",
+        "latest_ts": ts,
+        "latest_href": f"cbond_double_low_{ts}.html",
+        "stable_href": "cbond_double_low.html",
+        "row_count": row_count,
+        "buy_count": buy_count,
+        "watch_count": watch_count,
+        "reject_count": reject_count,
+        "warnings": [],
     }
 
 
@@ -525,7 +608,13 @@ a{{color:#2563eb}}
             qs = {k: v[0] for k, v in parse_qs(self.path.split("?")[1]).items()}
 
         try:
-            if path == "/api/refresh":
+            if path == "/api/cbond/status":
+                self._api_cbond_status()
+
+            elif path == "/api/cbond/refresh":
+                self._api_cbond_refresh()
+
+            elif path == "/api/refresh":
                 market = _get_market(qs.get("market", ""))
                 if not market:
                     self.send_json({"error": f"无效 market 参数: {qs.get('market')}，有效值: cn, hk, us"}, status=400)
@@ -676,6 +765,64 @@ a{{color:#2563eb}}
             status = 200
 
         self.send_json(data, status=status)
+
+    # ── API: /api/cbond/status + /api/cbond/refresh ───────
+
+    def _api_cbond_status(self):
+        """返回可转债双低策略状态。"""
+        self.send_json(_cbond_status())
+
+    def _api_cbond_refresh(self):
+        """刷新可转债双低筛选产物。"""
+        global _last_run
+        now = time.time()
+        last = _last_run.get("cbond", 0)
+        if now - last < 5:
+            self.send_json({
+                "done": False, "cached": True,
+                "msg": "冷却中，5秒后再试",
+            })
+            return
+        _last_run["cbond"] = now
+
+        args = [
+            sys.executable,
+            os.path.join(WORKDIR, "cbond_double_low.py"),
+            "--fresh",
+            "--jisilu-check",
+        ]
+        try:
+            result = subprocess.run(
+                args, capture_output=True, text=True,
+                timeout=180, cwd=WORKDIR,
+            )
+        except subprocess.TimeoutExpired:
+            self.send_json({"done": False, "error": "可转债双低筛选超时(>180s)"}, status=504)
+            return
+
+        status_info = _cbond_status()
+        data = {
+            "done": result.returncode == 0 and status_info.get("status") == "ready",
+            "latest_ts": status_info.get("latest_ts"),
+            "latest_href": status_info.get("latest_href", ""),
+            "stable_href": status_info.get("stable_href", "cbond_double_low.html"),
+            "row_count": status_info.get("row_count", 0),
+            "buy_count": status_info.get("buy_count", 0),
+            "watch_count": status_info.get("watch_count", 0),
+            "reject_count": status_info.get("reject_count", 0),
+            "output_tail": result.stdout[-500:] if result.stdout else "",
+        }
+        if result.returncode != 0:
+            data["error"] = f"可转债双低筛选失败 (exit code={result.returncode})"
+            data["stderr_tail"] = result.stderr[-500:] if result.stderr else ""
+            self.send_json(data, status=500)
+            return
+        if status_info.get("status") != "ready":
+            data["error"] = "可转债双低产物未通过检查"
+            data["errors"] = status_info.get("errors", [])
+            self.send_json(data, status=422)
+            return
+        self.send_json(data)
 
     # ── API: /api/deep ───────────────────────────────
 
