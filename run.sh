@@ -10,6 +10,7 @@
 #   ./run.sh --deep --ai-only 只对已有研报补 AI
 #   ./run.sh --code 600519   单独生成某只股票的深度研报
 #   ./run.sh --cbond         生成可转债双低策略筛选
+#   ./run.sh --cbond-deep    生成可转债双低筛选 + 候选详情/AI分析
 #   ./run.sh --serve-only    仅启动服务（不跑选股）
 #   ./run.sh --year 2024     使用 2024 年报
 set -euo pipefail
@@ -29,6 +30,7 @@ usage() {
   ./run.sh --deep --parallel=20 --ai-concurrency=20
   ./run.sh --code 600519        单独生成某只股票的深度研报
   ./run.sh --cbond              生成可转债双低策略筛选
+  ./run.sh --cbond-deep         生成可转债双低筛选 + 候选详情/AI分析
   ./run.sh --serve-only         仅启动服务（不跑选股）
   ./run.sh --serve=8900         指定 HTTP 服务端口
   ./run.sh --no-serve           只跑选股，不启动服务
@@ -44,9 +46,11 @@ if [ -z "$PY" ]; then echo "❌ 未找到 python3"; exit 1; fi
 SCREENER_ARGS=()
 DEEP_ARGS=()
 CBOND_ARGS=()
+CBOND_DEEP_ARGS=()
 DO_SCREENER=true
 DO_DEEP=false
 DO_CBOND=false
+DO_CBOND_DEEP=false
 DO_SERVE=true       # 默认启动服务（离线→在线）
 SERVE_PORT=8899
 REUSE_SERVER=false
@@ -71,17 +75,18 @@ for arg in "$@"; do
 
   case "$arg" in
     -h|--help)   usage; exit 0 ;;
-    --fresh)     SCREENER_ARGS+=("$arg"); CBOND_ARGS+=("$arg") ;;
+    --fresh)     SCREENER_ARGS+=("$arg"); CBOND_ARGS+=("$arg"); CBOND_DEEP_ARGS+=("$arg") ;;
     --quotes-fresh) SCREENER_ARGS+=("$arg") ;;
     --deep)      DO_DEEP=true ;;
-    --no-llm)    DEEP_ARGS+=("$arg") ;;
+    --no-llm)    DEEP_ARGS+=("$arg"); CBOND_DEEP_ARGS+=("$arg") ;;
     --ai-only)   DEEP_ARGS+=("$arg"); DO_DEEP=true; DO_SCREENER=false ;;
-    --no-kline)  DEEP_ARGS+=("$arg") ;;
-    --parallel=*) DEEP_ARGS+=("--parallel" "${arg#*=}") ;;
+    --no-kline)  DEEP_ARGS+=("$arg"); CBOND_DEEP_ARGS+=("$arg") ;;
+    --parallel=*) DEEP_ARGS+=("--parallel" "${arg#*=}"); CBOND_DEEP_ARGS+=("--parallel" "${arg#*=}") ;;
     --ai-concurrency=*) DEEP_ARGS+=("--ai-concurrency" "${arg#*=}") ;;
     --prefetch-financials=*) DEEP_ARGS+=("--prefetch-financials" "${arg#*=}") ;;
     --code)      EXPECT_CODE="1" ;;
     --cbond)     DO_CBOND=true; DO_SCREENER=false ;;
+    --cbond-deep) DO_CBOND=true; DO_CBOND_DEEP=true; DO_SCREENER=false ;;
     --year)      EXPECT_YEAR="1"; SCREENER_ARGS+=("$arg") ;;
     --market)    EXPECT_MARKET="1" ;;
     --global)    MARKET="all"; USE_GLOBAL=true ;;
@@ -145,6 +150,18 @@ if [ "$DO_CBOND" = true ]; then
   [ -f "results/cbond_double_low_${TS}.html" ] && echo "🌐 总表: $(pwd)/results/cbond_double_low_${TS}.html"
   [ -f "results/cbond_double_low_${TS}.md" ] && echo "📄 结论: $(pwd)/results/cbond_double_low_${TS}.md"
   [ -f "results/cbond_double_low_${TS}.csv" ] && echo "📊 CSV:  $(pwd)/results/cbond_double_low_${TS}.csv"
+fi
+
+# ── Step 0.5: 可转债深度分析 ──
+if [ "$DO_CBOND_DEEP" = true ]; then
+  echo ""
+  echo "========================================="
+  echo "▶ 可转债候选深度分析"
+  echo "========================================="
+  "$PY" cbond_deep_dive.py --from-screen --status 买入候选 ${CBOND_DEEP_ARGS[@]+"${CBOND_DEEP_ARGS[@]}"}
+  echo "─────────────────────────────────────────────"
+  [ -f "results/cbond_deep/index.html" ] && echo "🔬 可转债深度索引: $(pwd)/results/cbond_deep/index.html"
+  [ -f "results/cbond_deep/report.html" ] && echo "🔬 可转债详情页壳: $(pwd)/results/cbond_deep/report.html"
 fi
 
 # ── Step 1: 五层选股 ──
@@ -272,6 +289,8 @@ if [ "$DO_SERVE" = true ]; then
   OPEN_PAGE="astock_screen.html"
   if [ "$USE_GLOBAL" = true ]; then
     OPEN_PAGE="screen.html"
+  elif [ "$DO_CBOND_DEEP" = true ]; then
+    OPEN_PAGE="cbond_deep/index.html"
   elif [ "$DO_CBOND" = true ]; then
     OPEN_PAGE="cbond_double_low.html"
   fi

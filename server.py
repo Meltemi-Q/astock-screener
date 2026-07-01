@@ -8,6 +8,7 @@ Endpoints:
   /api/refresh?market=cn|hk|us&mode=quotes|full  刷新数据
   /api/layer4?market=cn|hk|us&tier=A|B|C        AI 定性分析
   /api/deep?market=cn|hk|us&code=XXXXXX         个股深度研报
+  /api/cbond/deep?code=XXXXXX                   可转债深度分析
 
 向后兼容: 不带 market 参数默认 market=cn (A 股)，保持与旧版 HTML 仪表盘兼容。
 """
@@ -30,6 +31,7 @@ from screeners.output_validation import latest_market_result
 WORKDIR = os.path.dirname(os.path.abspath(__file__))
 RESULTS_DIR = os.path.join(WORKDIR, "results")
 DEEP_DIR = os.path.join(RESULTS_DIR, "deep_dives")
+CBOND_DEEP_DIR = os.path.join(RESULTS_DIR, "cbond_deep")
 TEMPLATE_SCREEN = os.path.join(WORKDIR, "templates", "screen.html")
 DEFAULT_PORT = 8899
 
@@ -314,6 +316,11 @@ def _count_deep_existing(market: str = "cn") -> int:
 def _deep_json_exists(code: str, market: str = "cn") -> bool:
     """检查深度研报 JSON 数据文件是否存在。"""
     return os.path.exists(os.path.join(DEEP_DIR, "data", _deep_payload_filename(market, code)))
+
+
+def _cbond_deep_json_exists(code: str) -> bool:
+    """检查可转债深度分析 JSON 数据文件是否存在。"""
+    return os.path.exists(os.path.join(CBOND_DEEP_DIR, "data", f"{code}.json"))
 
 
 def _all_deep_json_exist(codes: list[str], market: str = "cn") -> bool:
@@ -614,6 +621,9 @@ a{{color:#2563eb}}
             elif path == "/api/cbond/refresh":
                 self._api_cbond_refresh()
 
+            elif path == "/api/cbond/deep":
+                self._api_cbond_deep(qs.get("code", ""))
+
             elif path == "/api/refresh":
                 market = _get_market(qs.get("market", ""))
                 if not market:
@@ -821,6 +831,52 @@ a{{color:#2563eb}}
             data["error"] = "可转债双低产物未通过检查"
             data["errors"] = status_info.get("errors", [])
             self.send_json(data, status=422)
+            return
+        self.send_json(data)
+
+    def _api_cbond_deep(self, code: str):
+        """生成或补充单只可转债深度分析。"""
+        clean_code = (code or "").strip()
+        if not clean_code:
+            self.send_json({"error": "缺少 code 参数"}, status=400)
+            return
+        if not re.match(r"^\d{6}$", clean_code):
+            self.send_json({
+                "error": "无效可转债代码格式 (期望: 6位数字代码)",
+                "code": code,
+            }, status=400)
+            return
+
+        args = [
+            sys.executable,
+            os.path.join(WORKDIR, "cbond_deep_dive.py"),
+            "--code", clean_code,
+        ]
+        if _cbond_deep_json_exists(clean_code):
+            args.append("--ai-only")
+
+        try:
+            result = subprocess.run(
+                args, capture_output=True, text=True,
+                timeout=240, cwd=WORKDIR,
+            )
+        except subprocess.TimeoutExpired:
+            self.send_json({
+                "error": f"{clean_code} 可转债深度分析超时(>240s)",
+                "code": clean_code,
+            }, status=504)
+            return
+
+        data = {
+            "done": result.returncode == 0,
+            "code": clean_code,
+            "href": f"cbond_deep/report.html?code={clean_code}",
+            "output_tail": result.stdout[-500:] if result.stdout else "",
+        }
+        if result.returncode != 0:
+            data["error"] = f"{clean_code} 可转债深度分析失败 (exit code={result.returncode})"
+            data["stderr_tail"] = result.stderr[-500:] if result.stderr else ""
+            self.send_json(data, status=500)
             return
         self.send_json(data)
 

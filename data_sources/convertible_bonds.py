@@ -19,11 +19,13 @@ import time
 from datetime import date, datetime
 from urllib import parse
 
-from .http import get_json
+from .http import get_json, get_text
 
 
 DATACENTER_URL = "https://datacenter-web.eastmoney.com/api/data/v1/get"
 QUOTE_BOARD_URL = "https://push2.eastmoney.com/api/qt/clist/get"
+KLINE_URL = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
+TENCENT_KLINE_URL = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
 JISILU_CB_URL = "https://www.jisilu.cn/data/cbnew/cb_list_new/"
 
 CB_QUOTE_COLUMNS = (
@@ -38,6 +40,8 @@ CB_QUOTE_COLUMNS = (
 )
 
 CB_QUOTE_FIELDS = "f2,f3,f12,f14,f15,f16,f17,f18,f20,f21,f22,f62"
+KLINE_FIELDS1 = "f1,f2,f3,f4,f5,f6"
+KLINE_FIELDS2 = "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61"
 
 HEADERS_EM = {
     "User-Agent": "Mozilla/5.0",
@@ -184,6 +188,89 @@ def parse_quote_board_row(row):
     }
 
 
+def cbond_market_id(code: str) -> str:
+    """Return Eastmoney secid market prefix for a convertible bond code."""
+    code = str(code or "").strip()
+    # Shanghai convertible bonds commonly start with 110/111/113/118.
+    return "1" if code.startswith(("110", "111", "113", "118")) else "0"
+
+
+def fetch_eastmoney_cb_kline(code, klt="101", limit=260, ttl_hours=0.5):
+    """Fetch convertible-bond K-line rows from Eastmoney push2his.
+
+    klt: 101=daily, 102=weekly, 103=monthly.
+    """
+    secid = f"{cbond_market_id(code)}.{str(code).strip()}"
+    params = {
+        "secid": secid,
+        "fields1": KLINE_FIELDS1,
+        "fields2": KLINE_FIELDS2,
+        "klt": str(klt),
+        "fqt": "1",
+        "beg": "19900101",
+        "end": "20500101",
+        "lmt": str(limit),
+    }
+    url = KLINE_URL + "?" + parse.urlencode(params)
+    data = get_json(url, ttl_hours=ttl_hours, headers=HEADERS_QUOTE)
+    rows = ((data.get("data") or {}).get("klines") or [])
+    parsed = []
+    for line in rows:
+        parts = str(line).split(",")
+        if len(parts) < 6:
+            continue
+        try:
+            parsed.append({
+                "date": parts[0],
+                "open": float(parts[1]),
+                "close": float(parts[2]),
+                "high": float(parts[3]),
+                "low": float(parts[4]),
+                "volume": float(parts[5]),
+                "amount": fnum(parts[6]) if len(parts) > 6 else None,
+                "amplitude": fnum(parts[7]) if len(parts) > 7 else None,
+                "change_pct": fnum(parts[8]) if len(parts) > 8 else None,
+                "change": fnum(parts[9]) if len(parts) > 9 else None,
+                "turnover": fnum(parts[10]) if len(parts) > 10 else None,
+            })
+        except (TypeError, ValueError):
+            continue
+    return parsed
+
+
+def fetch_tencent_cb_kline(code, period_key="day", limit=260, ttl_hours=0.5):
+    """Fetch convertible-bond K-lines from Tencent as a fallback."""
+    code = str(code).strip()
+    prefix = "sh" if cbond_market_id(code) == "1" else "sz"
+    params = {
+        "param": f"{prefix}{code},{period_key},,,{limit},qfq",
+    }
+    url = TENCENT_KLINE_URL + "?" + parse.urlencode(params)
+    raw = get_text(url, ttl_hours=ttl_hours, headers=HEADERS_QUOTE)
+    import json
+    data = json.loads(raw)
+    stock_key = f"{prefix}{code}"
+    period_data = (data.get("data") or {}).get(stock_key, {})
+    rows = period_data.get(f"qfq{period_key}") or period_data.get(period_key) or []
+    parsed = []
+    for parts in rows:
+        if len(parts) < 6:
+            continue
+        try:
+            parsed.append({
+                "date": parts[0],
+                "open": float(parts[1]),
+                "close": float(parts[2]),
+                "high": float(parts[3]),
+                "low": float(parts[4]),
+                "volume": float(parts[5]),
+                "amount": fnum(parts[6]) if len(parts) > 6 else None,
+            })
+        except (TypeError, ValueError):
+            continue
+    return parsed
+
+
 def fetch_jisilu_low_sample(ttl_hours=0.25):
     """Fetch Jisilu's anonymous low double-low sample for sanity checks."""
     url = JISILU_CB_URL + "?___jsl=LST___t=" + str(int(time.time() * 1000))
@@ -261,4 +348,3 @@ def normalize_rating(value):
     for suffix in ("STI", "（稳定）", "(稳定)"):
         s = s.replace(suffix, "")
     return s.strip()
-

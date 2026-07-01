@@ -30,6 +30,14 @@ results/*
 !results/cbond_double_low_20260701.html
 !results/cbond_double_low_20260701.csv
 !results/cbond_double_low_20260701.md
+!results/cbond_deep/
+results/cbond_deep/*
+!results/cbond_deep/index.html
+!results/cbond_deep/report.html
+!results/cbond_deep/assets/
+!results/cbond_deep/assets/**
+!results/cbond_deep/data/
+!results/cbond_deep/data/*.json
 !results/astock_layer4_final_20260627.html
 !results/deep_dives/
 results/deep_dives/*

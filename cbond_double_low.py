@@ -17,6 +17,7 @@ import csv
 import html
 import json
 import os
+import shutil
 from datetime import date, datetime
 
 from data_sources.convertible_bonds import (
@@ -29,6 +30,8 @@ from data_sources.convertible_bonds import (
 
 WORKDIR = os.path.dirname(os.path.abspath(__file__))
 RESULTS_DIR = os.path.join(WORKDIR, "results")
+CBOND_DEEP_DIR = os.path.join(RESULTS_DIR, "cbond_deep")
+CBOND_DEEP_TEMPLATE_DIR = os.path.join(WORKDIR, "templates", "cbond_deep")
 
 RATING_ORDER = {
     "AAA": 9,
@@ -98,6 +101,21 @@ def pct(value):
 def fmt_date(value):
     d = parse_ymd(value)
     return d.isoformat() if d else "-"
+
+
+def ensure_cbond_deep_shell():
+    """Copy the shared convertible-bond detail shell next to results."""
+    files = {
+        "report.html": os.path.join(CBOND_DEEP_TEMPLATE_DIR, "report.html"),
+        os.path.join("assets", "cbond_deep.css"): os.path.join(CBOND_DEEP_TEMPLATE_DIR, "assets", "cbond_deep.css"),
+        os.path.join("assets", "cbond_deep.js"): os.path.join(CBOND_DEEP_TEMPLATE_DIR, "assets", "cbond_deep.js"),
+    }
+    for rel, src in files.items():
+        if not os.path.exists(src):
+            continue
+        dst = os.path.join(CBOND_DEEP_DIR, rel)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.copyfile(src, dst)
 
 
 def is_future_date(value, today: date) -> bool:
@@ -222,7 +240,7 @@ def summarize(records):
 
 def write_csv(path, records):
     with open(path, "w", encoding="utf-8-sig", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=CSV_FIELDS, extrasaction="ignore")
+        w = csv.DictWriter(f, fieldnames=CSV_FIELDS, extrasaction="ignore", lineterminator="\n")
         w.writeheader()
         for r in records:
             w.writerow(r)
@@ -235,13 +253,12 @@ def rows_html(rows, limit=None):
         cls = {"买入候选": "buy", "观察": "watch", "剔除": "reject"}.get(r.get("status"), "")
         out.append(
             "<tr class=\"%s\">"
-            "<td>%s</td><td><a href=\"https://quote.eastmoney.com/bond/%s%s.html\" target=\"_blank\" rel=\"noopener\">%s</a></td>"
+            "<td>%s</td><td><a href=\"cbond_deep/report.html?code=%s\">%s</a></td>"
             "<td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
             "<td>%s</td><td>%s</td><td>%s</td><td class=\"reason\">%s</td>"
             "</tr>" % (
                 cls,
                 r.get("rank", ""),
-                "sh" if str(r.get("code", "")).startswith(("110", "111", "113", "118")) else "sz",
                 html.escape(str(r.get("code", ""))),
                 html.escape(str(r.get("code", ""))),
                 html.escape(str(r.get("name", ""))),
@@ -410,6 +427,7 @@ def write_stable_alias(path, target, title="可转债双低策略固定入口"):
 
 def run(args):
     os.makedirs(RESULTS_DIR, exist_ok=True)
+    ensure_cbond_deep_shell()
     today = date.today()
     generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
     ttl = 0 if args.fresh else args.cache_hours
@@ -491,4 +509,3 @@ def main(argv=None):
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

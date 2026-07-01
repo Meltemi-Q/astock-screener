@@ -66,6 +66,64 @@ class RegressionTests(unittest.TestCase):
         self.assertIn("--max-double-low", result.stdout)
         self.assertIn("可转债双低策略", result.stdout)
 
+    def test_cbond_deep_dive_help_renders(self):
+        result = subprocess.run(
+            [sys.executable, "cbond_deep_dive.py", "--help"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            timeout=5,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertIn("--from-screen", result.stdout)
+        self.assertIn("可转债深度分析", result.stdout)
+
+    def test_cbond_double_low_links_to_internal_deep_report(self):
+        source = (ROOT / "cbond_double_low.py").read_text(encoding="utf-8")
+
+        self.assertIn("cbond_deep/report.html?code=", source)
+        self.assertIn("ensure_cbond_deep_shell", source)
+
+    def test_cbond_deep_uses_convertible_bond_specific_analysis(self):
+        report_js = (ROOT / "templates" / "cbond_deep" / "assets" / "cbond_deep.js").read_text(encoding="utf-8")
+        script = (ROOT / "cbond_deep_dive.py").read_text(encoding="utf-8")
+
+        self.assertIn("双低性", report_js)
+        self.assertIn("下跌保护", report_js)
+        self.assertIn("强赎/回售", report_js)
+        self.assertIn("轮动纪律", script)
+        self.assertIn("可转债双低策略研究员", script)
+
+    def test_cbond_deep_scores_candidate_and_reject(self):
+        import cbond_deep_dive
+
+        financials = [{
+            "year": 2025,
+            "roe": 18.0,
+            "debt": 38.0,
+            "ocf_ratio": 1.3,
+            "netp_yoy": 25.0,
+        }]
+        candidate = {
+            "status": "买入候选",
+            "price": 112.0,
+            "premium_rt": 12.0,
+            "double_low": 124.0,
+            "rating": "AA+",
+            "remaining_scale": 20.0,
+            "remaining_years": 2.0,
+            "turnover": 80_000_000,
+        }
+        rejected = dict(candidate, status="剔除", rating="A", remaining_scale=0.5)
+
+        candidate_scores = cbond_deep_dive.compute_scores(candidate, financials)
+        rejected_scores = cbond_deep_dive.compute_scores(rejected, financials)
+
+        self.assertGreater(candidate_scores["total"], 70)
+        self.assertLessEqual(rejected_scores["total"], 45)
+        self.assertIn(cbond_deep_dive.action_label(candidate, candidate_scores), {"篮子候选", "小仓试跑"})
+
     def test_convertible_bond_quote_board_estimates_remaining_scale(self):
         from data_sources.convertible_bonds import parse_quote_board_row
 
@@ -143,6 +201,30 @@ class RegressionTests(unittest.TestCase):
         self.assertFalse(captured["data"]["done"])
         self.assertIn("error", captured["data"])
         self.assertGreaterEqual(captured["status"], 400)
+
+    def test_api_cbond_deep_invokes_cbond_deep_script(self):
+        import server
+
+        handler = server.ScreenerHandler.__new__(server.ScreenerHandler)
+        captured = {}
+
+        def send_json(data, status=200):
+            captured["data"] = data
+            captured["status"] = status
+
+        handler.send_json = send_json
+        ok = subprocess.CompletedProcess(
+            args=["cbond_deep_dive.py"], returncode=0, stdout="ok", stderr=""
+        )
+        with patch.object(server, "_cbond_deep_json_exists", return_value=False):
+            with patch.object(server.subprocess, "run", return_value=ok) as run:
+                handler._api_cbond_deep("113042")
+
+        args = run.call_args.args[0]
+        self.assertTrue(captured["data"]["done"])
+        self.assertIn("cbond_deep_dive.py", args[1])
+        self.assertIn("--code", args)
+        self.assertIn("113042", args)
 
     def test_generated_html_initializes_api_before_status_fetch(self):
         source = (ROOT / "astock_screener.py").read_text(encoding="utf-8")
