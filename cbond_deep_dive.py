@@ -146,6 +146,10 @@ def compute_scores(bond: dict, financials: list[dict]) -> dict:
     scale = to_float(bond.get("remaining_scale"))
     years = to_float(bond.get("remaining_years"))
     turnover = to_float(bond.get("turnover"))
+    maturity_yield = to_float(bond.get("maturity_yield_est"))
+    call_gap = to_float(bond.get("call_gap_pct"))
+    down_gap = to_float(bond.get("down_revision_gap_pct"))
+    has_resale = str(bond.get("has_conditional_resale")).lower() in ("1", "true", "yes", "y")
 
     double_low_s = score_inverse(double_low, 120, 160)
     price_s = score_inverse(price, 105, 135)
@@ -159,6 +163,16 @@ def compute_scores(bond: dict, financials: list[dict]) -> dict:
     cash_s = score_forward(to_float(fy.get("ocf_ratio")), 0.2, 1.2)
     growth_s = score_forward(to_float(fy.get("netp_yoy")), -20, 30)
     stock_quality_s = clamp(roe_s * 0.35 + debt_s * 0.2 + cash_s * 0.25 + growth_s * 0.2)
+    event_s = 70
+    if maturity_yield is not None:
+        event_s += clamp(maturity_yield, -20, 12) * 1.2
+    if call_gap is not None and call_gap <= 8:
+        event_s -= 18 if call_gap > 0 else 28
+    if down_gap is not None and down_gap <= -12:
+        event_s += 8
+    if not has_resale:
+        event_s -= 8
+    event_s = clamp(event_s)
     total = clamp(
         double_low_s * 0.24
         + price_s * 0.14
@@ -167,11 +181,14 @@ def compute_scores(bond: dict, financials: list[dict]) -> dict:
         + scale_s * 0.08
         + turnover_s * 0.06
         + years_s * 0.06
-        + stock_quality_s * 0.12
+        + stock_quality_s * 0.08
+        + event_s * 0.04
     )
-    if bond.get("status") == "剔除":
+    basic_status = bond.get("basic_status") or bond.get("status")
+    final_action = bond.get("final_action")
+    if basic_status == "剔除" or final_action == "排除":
         total = min(total, 45)
-    elif bond.get("status") == "观察":
+    elif basic_status == "观察" or final_action == "观察":
         total = min(total, 72)
     return {
         "total": round(total, 1),
@@ -182,15 +199,20 @@ def compute_scores(bond: dict, financials: list[dict]) -> dict:
         "scale_liquidity": round((scale_s * 0.6 + turnover_s * 0.4), 1),
         "maturity": round(years_s, 1),
         "stock_quality": round(stock_quality_s, 1),
+        "event_risk": round(event_s, 1),
     }
 
 
 def action_label(bond: dict, scores: dict) -> str:
-    if bond.get("status") == "剔除":
+    final_action = bond.get("final_action")
+    if final_action in ("排除", "观察", "小仓试跑"):
+        return final_action
+    basic_status = bond.get("basic_status") or bond.get("status")
+    if basic_status == "剔除":
         return "排除"
-    if scores.get("total", 0) >= 78 and bond.get("status") == "买入候选":
+    if scores.get("total", 0) >= 78 and basic_status in ("买入候选", "基础候选"):
         return "篮子候选"
-    if bond.get("status") == "买入候选":
+    if basic_status in ("买入候选", "基础候选"):
         return "小仓试跑"
     return "观察"
 
@@ -216,10 +238,13 @@ def fetch_bond_klines(code: str, no_kline: bool = False) -> dict:
 
 def normalize_bond_record(record: dict) -> dict:
     keys = [
-        "rank", "status", "code", "name", "stock_code", "stock_name", "price",
+        "rank", "status", "basic_status", "enhanced_status", "final_action",
+        "code", "name", "stock_code", "stock_name", "price",
         "premium_rt", "double_low", "rating", "remaining_scale", "remaining_years",
         "change_pct", "maturity_date", "convert_price", "convert_value",
         "stock_price", "pb", "turnover", "risk_reasons", "source",
+        "enhanced_reasons", "maturity_redeem_price", "maturity_yield_est",
+        "call_gap_pct", "put_gap_pct", "down_revision_gap_pct", "has_conditional_resale",
         "resale_trigger_price", "redeem_trigger_price", "is_redeem", "redeem_type",
         "execute_reason_sh", "execute_reason_hs", "notice_date_sh", "notice_date_hs",
         "execute_start_date_sh", "execute_start_date_hs", "execute_end_date", "record_date_sh",
@@ -229,8 +254,13 @@ def normalize_bond_record(record: dict) -> dict:
         "price", "premium_rt", "double_low", "remaining_scale", "remaining_years",
         "change_pct", "convert_price", "convert_value", "stock_price", "pb",
         "turnover", "resale_trigger_price", "redeem_trigger_price",
+        "maturity_redeem_price", "maturity_yield_est", "call_gap_pct", "put_gap_pct",
+        "down_revision_gap_pct",
     ):
         out[k] = to_float(out.get(k))
+    out["has_conditional_resale"] = str(out.get("has_conditional_resale")).lower() in (
+        "1", "true", "yes", "y", "有"
+    )
     return out
 
 
@@ -348,7 +378,15 @@ def deepseek_analyze_cbond(payload: dict) -> dict | None:
 - 转股价值: {bond.get('convert_value')}
 - 赎回触发价: {bond.get('redeem_trigger_price')}
 - 回售触发价: {bond.get('resale_trigger_price')}
-- 机械筛选状态: {bond.get('status')}；排雷/观察原因: {bond.get('risk_reasons') or '无'}
+- 到期赎回价: {bond.get('maturity_redeem_price')}
+- 到期收益估算: {bond.get('maturity_yield_est')}%/年
+- 距强赎触发价: {bond.get('call_gap_pct')}%
+- 距回售触发价: {bond.get('put_gap_pct')}%
+- 常见下修压力线距离: {bond.get('down_revision_gap_pct')}%
+- 是否有普通有条件回售: {bond.get('has_conditional_resale')}
+- 基础筛选状态: {bond.get('basic_status') or bond.get('status')}；增强风控: {bond.get('enhanced_status')}；最终动作: {bond.get('final_action')}
+- 排雷/观察原因: {bond.get('risk_reasons') or '无'}
+- 增强风控原因: {bond.get('enhanced_reasons') or '无'}
 
 正股与财务:
 - 正股现价: {quote.get('price')} | PE(TTM): {quote.get('pe_ttm')} | PB: {quote.get('pb')} | 市值: {quote.get('mktcap_yi')} 亿
@@ -360,9 +398,10 @@ def deepseek_analyze_cbond(payload: dict) -> dict | None:
 量化评分:
 - 总分: {scores.get('total')}/100
 - 双低性: {scores.get('double_low')} | 价格安全: {scores.get('price_safety')} | 溢价率: {scores.get('premium')}
-- 信用: {scores.get('credit')} | 规模流动性: {scores.get('scale_liquidity')} | 正股质量: {scores.get('stock_quality')}
+- 信用: {scores.get('credit')} | 规模流动性: {scores.get('scale_liquidity')} | 正股质量: {scores.get('stock_quality')} | 事件风控: {scores.get('event_risk')}
 
-请按双低策略的真实交易纪律分析：下跌保护、正股弹性、信用/强赎/退市风险、是否适合小仓试跑或篮子持有、何时止盈/轮动。
+请按可转债双低策略的真实交易纪律分析：下跌保护、正股弹性、信用/强赎/回售/下修/退市风险、是否适合小仓试跑或篮子持有、何时止盈/轮动。
+注意：下修或回售公告只是事件催化，不能一票买入；必须结合转债价格、到期赎回价、回售价格、正股质量、公司偿付能力和公告落地概率。
 不要说空话，不要给保证收益，不要建议重仓。
 
 严格输出 JSON，不要 Markdown，不要代码块：
@@ -449,12 +488,12 @@ def run_one(code: str, args, records: dict[str, dict] | None = None, spot_cache:
             fresh=args.fresh,
             spot_cache=spot_cache,
         )
-        if not args.fresh:
+        if not args.fresh and not args.refresh_ai:
             old_analysis = existing_analysis(code)
             if old_analysis:
                 payload["analysis"] = old_analysis
 
-    if not args.no_llm and DEEPSEEK_KEY and (args.ai_only or not payload.get("analysis")):
+    if not args.no_llm and DEEPSEEK_KEY and (args.ai_only or args.refresh_ai or not payload.get("analysis")):
         print(f"[{code}] DeepSeek 可转债分析中...", end=" ", flush=True)
         analysis = deepseek_analyze_cbond(payload)
         print("OK" if analysis else "失败")
@@ -471,7 +510,7 @@ def run_one(code: str, args, records: dict[str, dict] | None = None, spot_cache:
 
 def select_rows(rows: list[dict], status: str, limit: int) -> list[dict]:
     if status != "all":
-        rows = [r for r in rows if r.get("status") == status]
+        rows = [r for r in rows if r.get("status") == status or r.get("basic_status") == status]
     rows.sort(key=lambda r: (
         999999 if to_float(r.get("rank")) is None else to_float(r.get("rank")),
         999999 if to_float(r.get("double_low")) is None else to_float(r.get("double_low")),
@@ -486,19 +525,20 @@ def generate_index(rows: list[dict]):
         code = r.get("code", "")
         name = r.get("name", "")
         stock = r.get("stock_name", "")
-        status = r.get("status", "")
+        status = r.get("basic_status") or r.get("status", "")
+        final_action = r.get("final_action", "")
         body_rows.append(
             f'<tr><td>{r.get("rank","")}</td><td><a href="report.html?code={code}">{code}</a></td>'
             f'<td><a href="report.html?code={code}">{name}</a></td><td>{stock}</td>'
             f'<td>{r.get("price","")}</td><td>{r.get("premium_rt","")}%</td>'
-            f'<td>{r.get("double_low","")}</td><td>{r.get("rating","")}</td><td>{status}</td></tr>'
+            f'<td>{r.get("double_low","")}</td><td>{r.get("rating","")}</td><td>{status}</td><td>{final_action}</td></tr>'
         )
     html = f"""<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>可转债深度分析索引</title><link rel="stylesheet" href="assets/cbond_deep.css"></head>
 <body><div class="container"><header><nav class="report-nav"><a class="back" href="../cbond_double_low.html">← 可转债双低</a></nav>
 <h1>可转债深度分析</h1><div class="sub">点击转债进入详情，缺失数据时会通过本地/线上 API 自动生成。</div></header>
-<div class="section"><div class="table-wrap"><table><thead><tr><th>#</th><th>代码</th><th>转债</th><th>正股</th><th>现价</th><th>溢价率</th><th>双低值</th><th>评级</th><th>状态</th></tr></thead>
+<div class="section"><div class="table-wrap"><table><thead><tr><th>#</th><th>代码</th><th>转债</th><th>正股</th><th>现价</th><th>溢价率</th><th>双低值</th><th>评级</th><th>基础状态</th><th>最终动作</th></tr></thead>
 <tbody>{''.join(body_rows)}</tbody></table></div></div></div></body></html>"""
     path = os.path.join(OUT_DIR, "index.html")
     with open(path, "w", encoding="utf-8") as f:
@@ -510,11 +550,12 @@ def parse_args(argv=None):
     ap = argparse.ArgumentParser(description="可转债深度分析页生成器")
     ap.add_argument("--code", help="单只可转债代码")
     ap.add_argument("--from-screen", action="store_true", help="从最新双低筛选结果批量生成")
-    ap.add_argument("--status", default="买入候选", choices=["买入候选", "观察", "剔除", "all"], help="批量生成的筛选状态")
+    ap.add_argument("--status", default="基础候选", choices=["基础候选", "买入候选", "观察", "剔除", "all"], help="批量生成的筛选状态")
     ap.add_argument("--limit", type=int, default=30, help="批量上限，默认30")
     ap.add_argument("--fresh", action="store_true", help="重新抓取可转债公开数据")
     ap.add_argument("--no-llm", action="store_true", help="跳过 DeepSeek，只生成量化详情")
     ap.add_argument("--ai-only", action="store_true", help="只对已有详情 JSON 补 AI，不重抓数据")
+    ap.add_argument("--refresh-ai", action="store_true", help="重建详情并强制刷新 DeepSeek 分析")
     ap.add_argument("--no-kline", action="store_true", help="跳过转债/正股 K线")
     ap.add_argument("--parallel", type=int, default=4, help="批量生成并发数，默认4")
     return ap.parse_args(argv)

@@ -335,11 +335,15 @@ function updateCbondCard(data){
  dot.className="status-dot ready";
  var ts=data.latest_ts||"",y=ts.substring(0,4),m=ts.substring(4,6),d=ts.substring(6,8);
  txt.textContent="已生成 · "+y+"-"+m+"-"+d;
+ var basic=data.basic_count;
+ if(basic===undefined||basic===null)basic=data.buy_count||0;
+ var finalCount=data.final_count;
+ if(finalCount===undefined||finalCount===null)finalCount=data.buy_count||0;
  statsEl.innerHTML=
-  '<div class="stat-pill"><div class="val signal">'+(data.buy_count||0)+'</div><div class="lbl">买入候选</div></div>'+
-  '<div class="stat-pill"><div class="val B">'+(data.watch_count||0)+'</div><div class="lbl">观察池</div></div>'+
+  '<div class="stat-pill"><div class="val signal">'+basic+'</div><div class="lbl">基础候选</div></div>'+
+  '<div class="stat-pill"><div class="val B">'+finalCount+'</div><div class="lbl">小仓试跑</div></div>'+
   '<div class="stat-pill"><div class="val" style="font-size:18px;font-weight:700">'+(data.row_count||0)+'</div><div class="lbl">全市场</div></div>';
- metaEl.textContent="默认保守规则 · 买入候选 "+(data.buy_count||0)+" 只 · 观察 "+(data.watch_count||0)+" 只";
+ metaEl.textContent="基础双低 "+basic+" 只 · 增强风控后小仓试跑 "+finalCount+" 只";
  if(linkEl){
   linkEl.setAttribute("href",data.latest_href||data.stable_href||"cbond_double_low.html");
   linkEl.classList.remove("disabled-link");

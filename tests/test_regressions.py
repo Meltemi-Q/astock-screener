@@ -106,7 +106,7 @@ class RegressionTests(unittest.TestCase):
             "netp_yoy": 25.0,
         }]
         candidate = {
-            "status": "买入候选",
+            "status": "基础候选",
             "price": 112.0,
             "premium_rt": 12.0,
             "double_low": 124.0,
@@ -123,6 +123,7 @@ class RegressionTests(unittest.TestCase):
         self.assertGreater(candidate_scores["total"], 70)
         self.assertLessEqual(rejected_scores["total"], 45)
         self.assertIn(cbond_deep_dive.action_label(candidate, candidate_scores), {"篮子候选", "小仓试跑"})
+        self.assertIn("event_risk", candidate_scores)
 
     def test_convertible_bond_quote_board_estimates_remaining_scale(self):
         from data_sources.convertible_bonds import parse_quote_board_row
@@ -176,7 +177,9 @@ class RegressionTests(unittest.TestCase):
         ]
 
         out = {r["code"]: r for r in cbond_double_low.classify_records(records, args, today)}
-        self.assertEqual(out["113001"]["status"], "买入候选")
+        self.assertEqual(out["113001"]["status"], "基础候选")
+        self.assertIn(out["113001"]["final_action"], {"小仓试跑", "观察"})
+        self.assertIn("enhanced_status", out["113001"])
         self.assertEqual(out["113002"]["status"], "观察")
         self.assertEqual(out["113003"]["status"], "剔除")
         self.assertIn("评级低于", out["113003"]["risk_reasons"])

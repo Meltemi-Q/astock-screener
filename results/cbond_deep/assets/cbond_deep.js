@@ -41,7 +41,7 @@ function renderReport(data){
   var meta=data.meta||{}, bond=data.bond||{}, scores=data.scores||{}, quote=data.stock_quote||{}, fy=(data.financials||[]).slice(-1)[0]||{};
   document.title=(meta.name||"可转债")+"("+meta.code+") 深度分析";
   $("title").innerHTML=esc(meta.name||"")+" <span style=\"font-size:16px;color:#64748b\">"+esc(meta.code||"")+"</span>";
-  $("subtitle").textContent="正股 "+(meta.stock_name||"-")+"("+meta.stock_code+") · "+(meta.industry||"未分类")+" · "+(bond.status||"");
+  $("subtitle").textContent="正股 "+(meta.stock_name||"-")+"("+meta.stock_code+") · "+(meta.industry||"未分类")+" · "+(bond.final_action||bond.status||"");
   $("status").hidden=true;$("content").hidden=false;
   renderKpis(bond,quote,fy,data);
   renderDecision(data);
@@ -63,6 +63,7 @@ function renderKpis(bond,quote,fy,data){
     ["",yi(bond.remaining_scale),"剩余规模"],
     ["",r(bond.remaining_years,2)+"年","剩余年限"],
     ["blue",r(bond.convert_value,2),"转股价值"],
+    ["",pct(bond.maturity_yield_est),"到期收益估算"],
     ["",r(quote.pe_ttm,1),"正股PE(TTM)"],
     ["green",r(fy.roe,1)+"%","正股ROE"],
     ["green",r((data.scores||{}).total,1),"综合分"]
@@ -73,32 +74,42 @@ function renderKpis(bond,quote,fy,data){
 function renderDecision(data){
   var bond=data.bond||{}, scores=data.scores||{};
   var aiAction=data.analysis&&data.analysis.action;
-  var mainAction=aiAction?("AI建议: "+aiAction):(data.action||"观察");
-  var subAction=aiAction?("量化状态 "+(data.action||"-")+" · 机械状态 "+(bond.status||"-")):("机械状态 "+(bond.status||"-"));
+  var finalAction=bond.final_action||data.action||"观察";
+  var mainAction=aiAction?("AI建议: "+aiAction):finalAction;
+  var subAction="基础筛选 "+(bond.basic_status||bond.status||"-")+" · 增强风控 "+(bond.enhanced_status||"-")+" · 最终动作 "+finalAction;
   var thesis=(data.analysis&&data.analysis.bond_thesis)||defaultThesis(data);
   $("decisionBand").innerHTML='<div class="decision-main"><div class="decision-label">当前动作</div><div class="decision-action">'+esc(mainAction)+'</div><div class="decision-score">综合分 '+esc(r(scores.total,1))+'/100 · '+esc(subAction)+'</div></div>'
     +'<div class="decision-copy">'+esc(thesis)+'</div>';
 }
 function defaultThesis(data){
   var b=data.bond||{};
-  if(b.status==="买入候选")return "机械规则通过，适合放入小仓或候选篮子继续复核；候选不足 10 只时不建议一次性构建完整组合。";
+  if(b.final_action==="小仓试跑")return "基础双低和增强风控通过，可作为小仓试跑或候选篮子继续复核；候选不足 10 只时不建议一次性构建完整组合。";
+  if((b.basic_status||b.status)==="基础候选"||(b.basic_status||b.status)==="买入候选")return "基础双低通过，但增强风控仍提示风险；下修/回售只能作为事件催化，不等于直接买入。";
   if(b.status==="观察")return "未触发硬排除，但价格、溢价率或双低值不够理想，适合等待轮动机会。";
   return "触发排雷条件，暂不进入双低篮子。";
 }
 
 function renderScores(scores){
-  var names={total:"综合",double_low:"双低性",price_safety:"价格安全",premium:"溢价率",credit:"信用",scale_liquidity:"规模流动性",maturity:"期限",stock_quality:"正股质量"};
+  var names={total:"综合",double_low:"双低性",price_safety:"价格安全",premium:"溢价率",credit:"信用",scale_liquidity:"规模流动性",maturity:"期限",stock_quality:"正股质量",event_risk:"事件风控"};
   $("scoreGrid").innerHTML=Object.keys(names).map(function(k){return '<div class="score-item"><div class="score">'+esc(r(scores[k],1))+'</div><div class="name">'+esc(names[k])+'</div></div>'}).join("");
 }
 
 function renderRiskBox(bond,data){
   var lines=[
     ["排雷原因",bond.risk_reasons||"无"],
+    ["增强风控",bond.enhanced_reasons||"无"],
+    ["最终动作",bond.final_action||data.action||"-"],
     ["到期日",bond.maturity_date||"-"],
+    ["到期赎回价",r(bond.maturity_redeem_price,2)],
+    ["到期收益估算",pct(bond.maturity_yield_est)],
     ["赎回触发价",r(bond.redeem_trigger_price,2)],
+    ["距强赎触发价",pct(bond.call_gap_pct)],
     ["回售触发价",r(bond.resale_trigger_price,2)],
+    ["距回售触发价",pct(bond.put_gap_pct)],
+    ["普通有条件回售",bond.has_conditional_resale?"有":"无"],
+    ["常见下修压力线距离",pct(bond.down_revision_gap_pct)],
     ["转股价",r(bond.convert_price,2)],
-    ["建议纪律",data.action==="篮子候选"||data.action==="小仓试跑"?"单只不超过 5-8%，125-130 或强赎风险出现时主动止盈/轮动":"不强行买入，等待双低值和风险项改善"]
+    ["建议纪律",bond.final_action==="小仓试跑"||data.action==="篮子候选"||data.action==="小仓试跑"?"单只不超过 5-8%，125-130 或强赎风险出现时主动止盈/轮动":"不强行买入，等待双低值和风险项改善"]
   ];
   $("riskBox").innerHTML=lines.map(function(x){return '<div class="risk-line"><span>'+esc(x[0])+'</span><span>'+esc(x[1])+'</span></div>'}).join("");
 }

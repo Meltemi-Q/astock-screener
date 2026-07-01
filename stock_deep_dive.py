@@ -19,7 +19,7 @@
   python3 stock_deep_dive.py --no-llm           # 跳过 LLM，仅出量化页
 """
 
-import os, sys, json, time, csv, ssl, argparse, re, html as html_lib
+import os, sys, json, time, csv, ssl, argparse, re, hashlib, html as html_lib
 from urllib import request, parse, error
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
@@ -161,9 +161,31 @@ def http_get(url, retries=5):
     raise last
 
 
-def get_json(url):
-    raw = http_get(url)
-    return json.loads(raw)
+def get_json(url, ttl_hours=6):
+    """GET JSON with disk cache and stale fallback for datacenter APIs."""
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    fp = os.path.join(CACHE_DIR, hashlib.md5(url.encode("utf-8")).hexdigest() + ".json")
+    ttl = ttl_hours * 3600
+    if os.path.exists(fp) and (time.time() - os.path.getmtime(fp)) < ttl:
+        try:
+            with open(fp, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    try:
+        raw = http_get(url)
+        data = json.loads(raw)
+        try:
+            with open(fp, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False)
+        except Exception:
+            pass
+        return data
+    except Exception:
+        if os.path.exists(fp):
+            with open(fp, "r", encoding="utf-8") as f:
+                return json.load(f)
+        raise
 
 
 def fetch_datacenter(report_name, columns, filt, pagesize=500):
@@ -233,11 +255,17 @@ def fetch_stock_full(code, name=None, industry=None, csv_rows=None, no_kline=Fal
                 "RPT_DMSK_FN_CASHFLOW",
                 "SECURITY_CODE,NOTICE_DATE,REPORT_DATE,NETCASH_OPERATE,NETCASH_INVEST,NETCASH_FINANCE",
                 f'(SECURITY_CODE="{code}")', 100)
+        def _safe_result(fut, label):
+            try:
+                return fut.result()
+            except Exception as e:
+                print(f"{label}失败:{type(e).__name__}", end=" ", flush=True)
+                return []
         with ThreadPoolExecutor(max_workers=3) as ex:
             f_inc, f_bal, f_cf = ex.submit(_fetch_income), ex.submit(_fetch_balance), ex.submit(_fetch_cashflow)
-            income = f_inc.result()
-            balance = f_bal.result()
-            cashflow = f_cf.result()
+            income = _safe_result(f_inc, "利润表")
+            balance = _safe_result(f_bal, "资产负债表")
+            cashflow = _safe_result(f_cf, "现金流")
 
     # 5) 行情数据：批量抓取全市场行情（clist f12 过滤有 bug 不可靠），
     #    利用 astock_screener.fetch_spot_parallel() + 缓存，秒级取到正确数据。

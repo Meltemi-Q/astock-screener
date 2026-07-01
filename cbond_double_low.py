@@ -54,6 +54,9 @@ RATING_ORDER = {
 CSV_FIELDS = [
     "rank",
     "status",
+    "basic_status",
+    "enhanced_status",
+    "final_action",
     "code",
     "name",
     "stock_code",
@@ -72,6 +75,13 @@ CSV_FIELDS = [
     "pb",
     "turnover",
     "risk_reasons",
+    "enhanced_reasons",
+    "maturity_redeem_price",
+    "maturity_yield_est",
+    "call_gap_pct",
+    "put_gap_pct",
+    "down_revision_gap_pct",
+    "has_conditional_resale",
     "source",
 ]
 
@@ -101,6 +111,126 @@ def pct(value):
 def fmt_date(value):
     d = parse_ymd(value)
     return d.isoformat() if d else "-"
+
+
+def round_or_none(value, digits=2):
+    if value is None:
+        return None
+    try:
+        return round(float(value), digits)
+    except (TypeError, ValueError):
+        return None
+
+
+def metric_calcs(record) -> dict:
+    """Convertible-bond event/risk proxy metrics used by enhanced filters."""
+    price = fnum(record.get("price"))
+    years = fnum(record.get("remaining_years"))
+    stock_price = fnum(record.get("stock_price"))
+    convert_price = fnum(record.get("convert_price"))
+    redeem_trigger = fnum(record.get("redeem_trigger_price"))
+    resale_trigger = fnum(record.get("resale_trigger_price"))
+    maturity_redeem = fnum(record.get("maturity_redeem_price"))
+
+    maturity_yield = None
+    if price and years and years > 0:
+        maturity_base = maturity_redeem if maturity_redeem else 100.0
+        maturity_yield = (maturity_base - price) / price / years * 100
+
+    call_gap = None
+    if stock_price and stock_price > 0 and redeem_trigger:
+        call_gap = (redeem_trigger - stock_price) / stock_price * 100
+
+    put_gap = None
+    if stock_price and stock_price > 0 and resale_trigger:
+        put_gap = (stock_price - resale_trigger) / stock_price * 100
+
+    down_revision_gap = None
+    if stock_price and convert_price and convert_price > 0:
+        # A common下修触发区间 is around 85% of conversion price, but clauses vary.
+        down_revision_line = convert_price * 0.85
+        down_revision_gap = (stock_price - down_revision_line) / down_revision_line * 100
+
+    return {
+        "maturity_yield_est": round_or_none(maturity_yield),
+        "call_gap_pct": round_or_none(call_gap),
+        "put_gap_pct": round_or_none(put_gap),
+        "down_revision_gap_pct": round_or_none(down_revision_gap),
+    }
+
+
+def enhanced_reasons(record, args) -> list[str]:
+    """Second-layer convertible-specific review after the basic double-low pass."""
+    reasons = []
+    price = fnum(record.get("price"))
+    premium = fnum(record.get("premium_rt"))
+    years = fnum(record.get("remaining_years"))
+    maturity_redeem = fnum(record.get("maturity_redeem_price"))
+    metrics = metric_calcs(record)
+    ytm = metrics["maturity_yield_est"]
+    call_gap = metrics["call_gap_pct"]
+    put_gap = metrics["put_gap_pct"]
+    down_gap = metrics["down_revision_gap_pct"]
+    has_resale = str(record.get("has_conditional_resale")).lower() in ("1", "true", "yes", "y")
+
+    if ytm is not None:
+        if ytm < -8:
+            reasons.append(f"到期收益估算{ytm:.2f}%/年，临近到期价格拖累明显")
+        elif ytm < 0:
+            reasons.append(f"到期收益估算{ytm:.2f}%/年，为负")
+        elif ytm >= 4:
+            reasons.append(f"到期收益估算{ytm:.2f}%/年，有债性缓冲")
+
+    if price is not None and maturity_redeem is not None and years is not None:
+        if years <= 1.0 and price > maturity_redeem + 3:
+            reasons.append(f"剩余期限{years:.2f}年且价格高于到期赎回价{maturity_redeem:.2f}")
+
+    if call_gap is not None:
+        if call_gap <= 0:
+            reasons.append("正股已高于强赎触发价，需核对连续交易日与公告")
+        elif call_gap <= 8:
+            reasons.append(f"距强赎触发价约{call_gap:.2f}%，上涨空间可能被封顶")
+
+    if has_resale:
+        if put_gap is not None and put_gap <= 0:
+            reasons.append("正股已低于回售触发价，需核对是否进入可回售年度及公告")
+        elif put_gap is not None and put_gap <= 8 and years is not None and years <= 2.2:
+            reasons.append(f"接近回售触发线({put_gap:.2f}%)，可关注回售公告窗口")
+    else:
+        reasons.append("无普通有条件回售条款，不能按回售保护估值")
+
+    if down_gap is not None:
+        if down_gap <= -12:
+            reasons.append(f"低于常见下修观察线约{abs(down_gap):.2f}%，有下修压力但需股东大会/董事会落地")
+        elif down_gap <= 5:
+            reasons.append(f"接近常见下修观察线({down_gap:.2f}%)，仅作为事件催化")
+
+    if premium is not None and premium > 25:
+        reasons.append(f"溢价率{premium:.2f}%偏高，正股跟涨弹性不足")
+    if price is not None and price > 125:
+        reasons.append(f"价格{price:.2f}偏高，债底保护变弱")
+
+    return reasons
+
+
+def enhanced_status_for(record, basic_status: str) -> tuple[str, str, list[str]]:
+    """Return enhanced status, final action and reasons."""
+    if basic_status == "剔除":
+        reasons = [r for r in str(record.get("risk_reasons") or "").split("；") if r]
+        return "增强排除", "排除", reasons
+    if basic_status == "观察":
+        reasons = [r for r in str(record.get("risk_reasons") or "").split("；") if r]
+        return "增强观察", "观察", reasons
+
+    reasons = enhanced_reasons(record, None)
+    risk_text = "；".join(reasons)
+    severe = any(k in risk_text for k in ("强赎", "到期收益估算-", "高于到期赎回价", "价格"))
+    supportive = any(k in risk_text for k in ("有债性缓冲", "回售公告窗口", "下修压力"))
+    if severe:
+        return "增强观察", "观察", reasons
+    if supportive or not reasons:
+        return "增强通过", "小仓试跑", reasons
+    return "增强观察", "观察", reasons
 
 
 def ensure_cbond_deep_shell():
@@ -197,16 +327,22 @@ def classify_records(records, args, today: date):
         hard = risk_reasons(record, args, today)
         soft = soft_reasons(record, args) if not hard else []
         if hard:
-            status = "剔除"
+            basic_status = "剔除"
             reasons = hard
         elif soft:
-            status = "观察"
+            basic_status = "观察"
             reasons = soft
         else:
-            status = "买入候选"
+            basic_status = "基础候选"
             reasons = []
-        record["status"] = status
+        record.update(metric_calcs(record))
+        record["basic_status"] = basic_status
+        record["status"] = basic_status
         record["risk_reasons"] = "；".join(reasons)
+        enhanced_status, final_action, extra_reasons = enhanced_status_for(record, basic_status)
+        record["enhanced_status"] = enhanced_status
+        record["final_action"] = final_action
+        record["enhanced_reasons"] = "；".join(extra_reasons)
         usable.append(record)
 
     usable.sort(key=lambda r: (
@@ -221,17 +357,21 @@ def classify_records(records, args, today: date):
 
 def summarize(records):
     total = len(records)
-    buy = [r for r in records if r["status"] == "买入候选"]
+    buy = [r for r in records if r["status"] in ("基础候选", "买入候选")]
+    final = [r for r in records if r.get("final_action") == "小仓试跑"]
     watch = [r for r in records if r["status"] == "观察"]
     reject = [r for r in records if r["status"] == "剔除"]
     low_pool = [r for r in records if r.get("double_low") is not None][:30]
     return {
         "total": total,
         "buy_count": len(buy),
+        "basic_count": len(buy),
+        "final_count": len(final),
         "watch_count": len(watch),
         "reject_count": len(reject),
         "low_pool_count": len(low_pool),
         "buy": buy,
+        "final": final,
         "watch": watch,
         "reject": reject,
         "low_pool": low_pool,
@@ -250,12 +390,13 @@ def rows_html(rows, limit=None):
     rows = rows[:limit] if limit else rows
     out = []
     for r in rows:
-        cls = {"买入候选": "buy", "观察": "watch", "剔除": "reject"}.get(r.get("status"), "")
+        cls = {"基础候选": "buy", "买入候选": "buy", "观察": "watch", "剔除": "reject"}.get(r.get("status"), "")
+        reason = r.get("enhanced_reasons") or r.get("risk_reasons") or ""
         out.append(
             "<tr class=\"%s\">"
             "<td>%s</td><td><a href=\"cbond_deep/report.html?code=%s\">%s</a></td>"
             "<td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
-            "<td>%s</td><td>%s</td><td>%s</td><td class=\"reason\">%s</td>"
+            "<td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class=\"reason\">%s</td>"
             "</tr>" % (
                 cls,
                 r.get("rank", ""),
@@ -269,7 +410,9 @@ def rows_html(rows, limit=None):
                 html.escape(str(r.get("rating") or "-")),
                 money2(r.get("remaining_scale")),
                 money2(r.get("remaining_years")),
-                html.escape(str(r.get("risk_reasons") or "")),
+                html.escape(str(r.get("enhanced_status") or r.get("status") or "")),
+                html.escape(str(r.get("final_action") or "")),
+                html.escape(str(reason)),
             )
         )
     return "\n".join(out)
@@ -277,17 +420,16 @@ def rows_html(rows, limit=None):
 
 def write_html(path, records, summary, args, generated_at):
     buy = summary["buy"]
+    final = summary["final"]
     watch = summary["watch"]
     low_pool = summary["low_pool"]
-    conclusion = (
-        f"当前按默认保守规则筛出 {len(buy)} 只买入候选。"
-        if buy else
-        "当前默认保守规则下没有完整通过的买入候选，建议只观察，不强行建仓。"
-    )
-    if 0 < len(buy) < 10:
+    conclusion = f"基础双低规则筛出 {len(buy)} 只基础候选；增强风控后 {len(final)} 只进入小仓试跑。"
+    if not final:
+        conclusion += " 当前没有同时通过到期收益、强赎/回售/下修复核的最终候选，建议只观察，不强行建仓。"
+    elif len(final) < 10:
         conclusion += " 数量不足 10 只，暂不适合一次性做完整 15-30 只篮子。"
-    elif len(buy) >= 10:
-        conclusion += " 候选数量已足够构建分散篮子，仍建议单只不超过 5-8%。"
+    else:
+        conclusion += " 数量已足够构建分散篮子，仍建议单只不超过 5-8%。"
 
     payload = {
         "generated_at": generated_at,
@@ -311,7 +453,7 @@ main{{max-width:1280px;margin:0 auto;padding:22px 18px 40px}}.toolbar{{display:f
 .metric{{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;box-shadow:var(--shadow)}}.metric .v{{font-size:26px;font-weight:800;color:var(--heading)}}.metric .l{{font-size:12px;color:var(--muted);margin-top:4px}}
 .notice{{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:16px;line-height:1.8}}
 .notice strong{{color:var(--heading)}}section{{margin:18px 0 26px}}h2{{font-size:17px;margin:0 0 10px;color:var(--heading)}}.table-wrap{{overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:8px}}
-table{{width:100%;border-collapse:collapse;min-width:980px}}th,td{{padding:9px 10px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap}}th{{background:var(--soft);color:var(--muted);font-size:12px;position:sticky;top:0}}td:nth-child(2),td:nth-child(3),td:nth-child(4),td.reason{{text-align:left}}a{{color:var(--link)}}tr.buy td:first-child{{color:var(--green);font-weight:800}}tr.watch td:first-child{{color:var(--yellow);font-weight:800}}tr.reject{{color:var(--muted)}}.reason{{white-space:normal;min-width:220px}}footer{{padding:16px 28px;color:var(--muted);font-size:11px;border-top:1px solid var(--border);text-align:center}}
+table{{width:100%;border-collapse:collapse;min-width:1120px}}th,td{{padding:9px 10px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap}}th{{background:var(--soft);color:var(--muted);font-size:12px;position:sticky;top:0}}td:nth-child(2),td:nth-child(3),td:nth-child(4),td.reason{{text-align:left}}a{{color:var(--link)}}tr.buy td:first-child{{color:var(--green);font-weight:800}}tr.watch td:first-child{{color:var(--yellow);font-weight:800}}tr.reject{{color:var(--muted)}}.reason{{white-space:normal;min-width:260px}}footer{{padding:16px 28px;color:var(--muted);font-size:11px;border-top:1px solid var(--border);text-align:center}}
 @media(max-width:720px){{header{{padding:16px}}h1{{font-size:18px}}main{{padding:14px 10px}}.summary{{grid-template-columns:repeat(2,minmax(0,1fr))}}}}
 </style></head><body>
 <header>
@@ -328,29 +470,31 @@ table{{width:100%;border-collapse:collapse;min-width:980px}}th,td{{padding:9px 1
 <main>
 <div class="summary">
 <div class="metric"><div class="v">{summary['total']}</div><div class="l">全市场转债记录</div></div>
-<div class="metric"><div class="v">{summary['buy_count']}</div><div class="l">买入候选</div></div>
+<div class="metric"><div class="v">{summary['basic_count']}</div><div class="l">基础候选</div></div>
+<div class="metric"><div class="v">{summary['final_count']}</div><div class="l">小仓试跑</div></div>
 <div class="metric"><div class="v">{summary['watch_count']}</div><div class="l">观察池</div></div>
 <div class="metric"><div class="v">{summary['reject_count']}</div><div class="l">排雷剔除</div></div>
 </div>
 <div class="notice">
 <strong>当前结论：</strong>{html.escape(conclusion)}
-<br>默认规则：评级 ≥ {html.escape(args.min_rating)}，剩余规模 ≥ {args.min_scale:g} 亿，剩余期限 ≥ {args.min_years:g} 年，价格 ≤ {args.max_price:g}，溢价率 ≤ {args.max_premium:g}%，双低值 ≤ {args.max_double_low:g}，剔除 ST/退债/待上市/强赎执行风险。
+<br>基础规则：评级 ≥ {html.escape(args.min_rating)}，剩余规模 ≥ {args.min_scale:g} 亿，剩余期限 ≥ {args.min_years:g} 年，价格 ≤ {args.max_price:g}，溢价率 ≤ {args.max_premium:g}%，双低值 ≤ {args.max_double_low:g}，剔除 ST/退债/待上市/强赎执行风险。
+<br>增强规则：复核到期赎回价/到期收益估算、距强赎触发线、普通有条件回售、距回售线、常见下修压力线；有事件催化不等于直接买入。
 </div>
 <section>
-<h2>买入候选 Top {min(args.basket_size, len(buy))}</h2>
-<div class="table-wrap"><table><thead><tr><th>#</th><th>代码</th><th>转债</th><th>正股</th><th>现价</th><th>溢价率</th><th>双低值</th><th>评级</th><th>剩余规模(亿)</th><th>剩余年限</th><th>说明</th></tr></thead><tbody>
-{rows_html(buy, args.basket_size) or '<tr><td colspan="11" class="reason">暂无完整通过候选。</td></tr>'}
+<h2>基础候选 Top {min(args.basket_size, len(buy))}</h2>
+<div class="table-wrap"><table><thead><tr><th>#</th><th>代码</th><th>转债</th><th>正股</th><th>现价</th><th>溢价率</th><th>双低值</th><th>评级</th><th>剩余规模(亿)</th><th>剩余年限</th><th>增强风控</th><th>最终动作</th><th>说明</th></tr></thead><tbody>
+{rows_html(buy, args.basket_size) or '<tr><td colspan="13" class="reason">暂无基础候选。</td></tr>'}
 </tbody></table></div>
 </section>
 <section>
 <h2>观察池 Top 30</h2>
-<div class="table-wrap"><table><thead><tr><th>#</th><th>代码</th><th>转债</th><th>正股</th><th>现价</th><th>溢价率</th><th>双低值</th><th>评级</th><th>剩余规模(亿)</th><th>剩余年限</th><th>观察原因</th></tr></thead><tbody>
-{rows_html(watch, 30) or '<tr><td colspan="11" class="reason">暂无观察项。</td></tr>'}
+<div class="table-wrap"><table><thead><tr><th>#</th><th>代码</th><th>转债</th><th>正股</th><th>现价</th><th>溢价率</th><th>双低值</th><th>评级</th><th>剩余规模(亿)</th><th>剩余年限</th><th>增强风控</th><th>最终动作</th><th>观察原因</th></tr></thead><tbody>
+{rows_html(watch, 30) or '<tr><td colspan="13" class="reason">暂无观察项。</td></tr>'}
 </tbody></table></div>
 </section>
 <section>
 <h2>双低值最低 30 只及排雷结果</h2>
-<div class="table-wrap"><table><thead><tr><th>#</th><th>代码</th><th>转债</th><th>正股</th><th>现价</th><th>溢价率</th><th>双低值</th><th>评级</th><th>剩余规模(亿)</th><th>剩余年限</th><th>剔除/观察原因</th></tr></thead><tbody>
+<div class="table-wrap"><table><thead><tr><th>#</th><th>代码</th><th>转债</th><th>正股</th><th>现价</th><th>溢价率</th><th>双低值</th><th>评级</th><th>剩余规模(亿)</th><th>剩余年限</th><th>增强风控</th><th>最终动作</th><th>剔除/观察原因</th></tr></thead><tbody>
 {rows_html(low_pool, 30)}
 </tbody></table></div>
 </section>
@@ -368,22 +512,24 @@ function setTheme(t){{document.documentElement.setAttribute("data-theme",t);loca
 
 def write_md(path, summary, args, generated_at):
     buy = summary["buy"][:args.basket_size]
+    final = summary["final"][:args.basket_size]
     lines = [
         f"# 可转债双低策略筛选 ({generated_at})",
         "",
         "## 当前结论",
     ]
-    if buy:
-        lines.append(f"- 默认保守规则筛出 **{len(summary['buy'])}** 只买入候选。")
-        if len(summary["buy"]) < 10:
-            lines.append("- 候选不足 10 只，不建议一次性做完整 15-30 只篮子。")
+    if summary["buy"]:
+        lines.append(f"- 基础双低规则筛出 **{len(summary['buy'])}** 只基础候选。")
+        lines.append(f"- 增强风控后 **{len(summary['final'])}** 只进入小仓试跑。")
+        if len(summary["final"]) < 10:
+            lines.append("- 最终候选不足 10 只，不建议一次性做完整 15-30 只篮子。")
         else:
-            lines.append("- 候选数量可支持分散篮子，仍需单只限仓。")
+            lines.append("- 最终候选数量可支持分散篮子，仍需单只限仓。")
     else:
-        lines.append("- 默认保守规则下暂无完整通过候选，建议观察。")
+        lines.append("- 基础规则下暂无候选，建议观察。")
     lines += [
         "",
-        "## 默认规则",
+        "## 基础规则",
         f"- 评级 >= {args.min_rating}",
         f"- 剩余规模 >= {args.min_scale:g} 亿",
         f"- 剩余期限 >= {args.min_years:g} 年",
@@ -392,9 +538,29 @@ def write_md(path, summary, args, generated_at):
         f"- 双低值 <= {args.max_double_low:g}",
         "- 剔除 ST/退债/待上市/强赎执行风险",
         "",
-        "## 买入候选",
-        "|排名|代码|转债|正股|现价|溢价率|双低值|评级|剩余规模|剩余年限|",
-        "|---:|---|---|---|---:|---:|---:|---|---:|---:|",
+        "## 增强规则",
+        "- 复核到期赎回价/到期收益估算、距强赎触发线、普通有条件回售、距回售线、常见下修压力线",
+        "- 下修/回售公告是事件催化，不是一票买入条件",
+        "",
+        "## 小仓试跑",
+        "|排名|代码|转债|正股|现价|溢价率|双低值|评级|最终动作|说明|",
+        "|---:|---|---|---|---:|---:|---:|---|---|---|",
+    ]
+    if final:
+        for r in final:
+            lines.append(
+                f"|{r['rank']}|{r['code']}|{r['name']}|{r['stock_name']}|"
+                f"{money2(r.get('price'))}|{pct(r.get('premium_rt'))}|"
+                f"{money2(r.get('double_low'))}|{r.get('rating') or '-'}|"
+                f"{r.get('final_action') or '-'}|{r.get('enhanced_reasons') or '无'}|"
+            )
+    else:
+        lines.append("|-|-|暂无|-|-|-|-|-|-|-|")
+    lines += [
+        "",
+        "## 基础候选",
+        "|排名|代码|转债|正股|现价|溢价率|双低值|评级|增强风控|最终动作|说明|",
+        "|---:|---|---|---|---:|---:|---:|---|---|---|---|",
     ]
     if buy:
         for r in buy:
@@ -402,10 +568,11 @@ def write_md(path, summary, args, generated_at):
                 f"|{r['rank']}|{r['code']}|{r['name']}|{r['stock_name']}|"
                 f"{money2(r.get('price'))}|{pct(r.get('premium_rt'))}|"
                 f"{money2(r.get('double_low'))}|{r.get('rating') or '-'}|"
-                f"{money2(r.get('remaining_scale'))}|{money2(r.get('remaining_years'))}|"
+                f"{r.get('enhanced_status') or '-'}|{r.get('final_action') or '-'}|"
+                f"{r.get('enhanced_reasons') or '无'}|"
             )
     else:
-        lines.append("|-|-|暂无|-|-|-|-|-|-|-|")
+        lines.append("|-|-|暂无|-|-|-|-|-|-|-|-|")
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
 
@@ -462,19 +629,20 @@ def run(args):
     print("  可转债双低策略筛选")
     print("=" * 60)
     print(f"全市场记录: {summary['total']} 只")
-    print(f"买入候选:   {summary['buy_count']} 只")
+    print(f"基础候选:   {summary['basic_count']} 只")
+    print(f"小仓试跑:   {summary['final_count']} 只")
     print(f"观察池:     {summary['watch_count']} 只")
     print(f"排雷剔除:   {summary['reject_count']} 只")
     if args.jisilu_check:
         print(f"集思录抽样: {jsl_count} 条，低双低前60重合 {jsl_overlap} 条")
     print("")
-    print("Top 买入候选:")
+    print("Top 基础候选:")
     for r in summary["buy"][:args.basket_size]:
         print(
             f"  {r['rank']:>3}. {r['code']} {r['name']} "
             f"价{money2(r.get('price'))} 溢价{pct(r.get('premium_rt'))} "
             f"双低{money2(r.get('double_low'))} 评级{r.get('rating') or '-'} "
-            f"规模{money2(r.get('remaining_scale'))}亿"
+            f"规模{money2(r.get('remaining_scale'))}亿 -> {r.get('enhanced_status')} / {r.get('final_action')}"
         )
     if not summary["buy"]:
         print("  暂无")
@@ -493,10 +661,10 @@ def parse_args(argv=None):
     ap.add_argument("--min-rating", default="AA-", help="最低评级，默认 AA-")
     ap.add_argument("--min-scale", type=float, default=2.0, help="最低剩余规模(亿)，默认2")
     ap.add_argument("--min-years", type=float, default=0.5, help="最低剩余期限(年)，默认0.5")
-    ap.add_argument("--max-price", type=float, default=130.0, help="买入候选最高价格，默认130")
-    ap.add_argument("--max-premium", type=float, default=30.0, help="买入候选最高转股溢价率，默认30")
-    ap.add_argument("--max-double-low", type=float, default=150.0, help="买入候选最高双低值，默认150")
-    ap.add_argument("--basket-size", type=int, default=30, help="页面展示的买入篮子上限，默认30")
+    ap.add_argument("--max-price", type=float, default=130.0, help="基础候选最高价格，默认130")
+    ap.add_argument("--max-premium", type=float, default=30.0, help="基础候选最高转股溢价率，默认30")
+    ap.add_argument("--max-double-low", type=float, default=150.0, help="基础候选最高双低值，默认150")
+    ap.add_argument("--basket-size", type=int, default=30, help="页面展示的基础候选上限，默认30")
     ap.add_argument("--jisilu-check", action="store_true", help="用集思录匿名低双低样本做交叉校验")
     return ap.parse_args(argv)
 

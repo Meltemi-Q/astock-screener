@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import time
 from datetime import date, datetime
+import re
 from urllib import parse
 
 from .http import get_json, get_text
@@ -95,6 +96,36 @@ def years_until(value, today=None):
     return round((d - today).days / 365.25, 3)
 
 
+def parse_maturity_redeem_price(*texts):
+    """Extract the maturity redemption price per 100 par from clause text."""
+    joined = "\n".join(str(t or "") for t in texts if t)
+    if not joined:
+        return None
+    patterns = [
+        r"(?:到期赎回条款|到期赎回|期满后|到期后)[\s\S]{0,120}?(?:票面面值|债券面值|面值)的?(\d+(?:\.\d+)?)%",
+        r"到期赎回价(?:格)?(?:为|:|：)?\s*(\d+(?:\.\d+)?)\s*元",
+        r"期满后[\s\S]{0,80}?(\d+(?:\.\d+)?)\s*元",
+    ]
+    for pattern in patterns:
+        m = re.search(pattern, joined)
+        if m:
+            try:
+                return float(m.group(1))
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
+def has_conditional_resale_clause(text):
+    """Return True for a normal holder put clause, excluding only change-of-use puts."""
+    s = str(text or "")
+    if not s:
+        return False
+    if "有条件回售" in s:
+        return True
+    return "低于当期转股" in s and ("回售" in s or "持有人有权" in s)
+
+
 def fetch_eastmoney_cb_terms(page_size=200, ttl_hours=2, quote_type="0"):
     """Fetch full convertible-bond terms and quote columns from Eastmoney."""
     rows = []
@@ -148,7 +179,7 @@ def fetch_eastmoney_cb_quote_board(page_size=100, ttl_hours=0.5):
                 "fields": CB_QUOTE_FIELDS,
             }
             url = QUOTE_BOARD_URL + "?" + parse.urlencode(params)
-            data = get_json(url, ttl_hours=ttl_hours, headers=HEADERS_QUOTE)
+            data = get_json(url, ttl_hours=ttl_hours, headers=HEADERS_QUOTE, timeout=8, retries=2)
             result = data.get("data") or {}
             total = int(result.get("total") or 0)
             diff = result.get("diff") or []
@@ -273,8 +304,8 @@ def fetch_tencent_cb_kline(code, period_key="day", limit=260, ttl_hours=0.5):
 
 def fetch_jisilu_low_sample(ttl_hours=0.25):
     """Fetch Jisilu's anonymous low double-low sample for sanity checks."""
-    url = JISILU_CB_URL + "?___jsl=LST___t=" + str(int(time.time() * 1000))
-    data = get_json(url, ttl_hours=ttl_hours, headers=HEADERS_JISILU)
+    url = JISILU_CB_URL + "?___jsl=LST"
+    data = get_json(url, ttl_hours=ttl_hours, headers=HEADERS_JISILU, timeout=8, retries=2)
     return [(r.get("cell") or {}) for r in (data.get("rows") or [])]
 
 
@@ -300,6 +331,8 @@ def build_convertible_bond_universe(ttl_hours=2, quote_ttl_hours=0.5, today=None
         original_scale = fnum(row.get("ACTUAL_ISSUE_SCALE"))
         if remaining_scale is None:
             remaining_scale = original_scale
+        redeem_clause = row.get("REDEEM_CLAUSE") or ""
+        resale_clause = row.get("RESALE_CLAUSE") or ""
         records.append({
             "code": code,
             "name": str(row.get("SECURITY_NAME_ABBR") or q.get("name") or "").strip(),
@@ -323,6 +356,11 @@ def build_convertible_bond_universe(ttl_hours=2, quote_ttl_hours=0.5, today=None
             "pb": fnum(row.get("PBV_RATIO")),
             "resale_trigger_price": fnum(row.get("RESALE_TRIG_PRICE")),
             "redeem_trigger_price": fnum(row.get("REDEEM_TRIG_PRICE")),
+            "maturity_redeem_price": parse_maturity_redeem_price(
+                redeem_clause,
+                row.get("INTEREST_RATE_EXPLAIN"),
+            ),
+            "has_conditional_resale": has_conditional_resale_clause(resale_clause),
             "is_redeem": row.get("IS_REDEEM"),
             "redeem_type": row.get("REDEEM_TYPE"),
             "execute_reason_sh": row.get("EXECUTE_REASON_SH"),

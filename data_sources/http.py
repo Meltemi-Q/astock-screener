@@ -62,7 +62,7 @@ def _cache_uid(url):
     return hashlib.md5(url.encode("utf-8")).hexdigest()
 
 
-def get_json(url, ttl_hours=None, headers=None):
+def get_json(url, ttl_hours=None, headers=None, timeout=DEFAULT_TIMEOUT, retries=DEFAULT_RETRIES):
     """GET JSON with local file cache (keyed by URL md5).
 
     On cache miss the raw response is fetched, parsed as JSON, and written
@@ -85,7 +85,13 @@ def get_json(url, ttl_hours=None, headers=None):
                 return json.load(f)
         except Exception:
             pass
-    raw = _http_get(url, headers=headers)
+    try:
+        raw = _http_get(url, headers=headers, timeout=timeout, retries=retries)
+    except Exception:
+        if os.path.exists(fp):
+            with open(fp, "r", encoding="utf-8") as f:
+                return json.load(f)
+        raise
     d = json.loads(raw)
     try:
         with open(fp, "w", encoding="utf-8") as f:
@@ -95,7 +101,7 @@ def get_json(url, ttl_hours=None, headers=None):
     return d
 
 
-def get_text(url, ttl_hours=None, headers=None):
+def get_text(url, ttl_hours=None, headers=None, timeout=DEFAULT_TIMEOUT, retries=DEFAULT_RETRIES):
     """GET plain text with local file cache (same pattern as get_json).
 
     Args:
@@ -115,7 +121,13 @@ def get_text(url, ttl_hours=None, headers=None):
                 return f.read()
         except Exception:
             pass
-    raw = _http_get(url, headers=headers)
+    try:
+        raw = _http_get(url, headers=headers, timeout=timeout, retries=retries)
+    except Exception:
+        if os.path.exists(fp):
+            with open(fp, "r", encoding="utf-8") as f:
+                return f.read()
+        raise
     try:
         with open(fp, "w", encoding="utf-8") as f:
             f.write(raw)

@@ -227,6 +227,8 @@ def _cbond_status() -> dict:
             "stable_href": "cbond_double_low.html",
             "row_count": 0,
             "buy_count": 0,
+            "basic_count": 0,
+            "final_count": 0,
             "watch_count": 0,
             "reject_count": 0,
             "warnings": ["暂无可转债双低筛选结果，请先运行 ./run.sh --cbond"],
@@ -234,18 +236,24 @@ def _cbond_status() -> dict:
 
     csv_path = os.path.join(RESULTS_DIR, f"cbond_double_low_{ts}.csv")
     html_path = os.path.join(RESULTS_DIR, f"cbond_double_low_{ts}.html")
-    row_count = buy_count = watch_count = reject_count = 0
+    row_count = basic_count = final_count = watch_count = reject_count = 0
     try:
         with open(csv_path, encoding="utf-8-sig") as f:
             for row in csv.DictReader(f):
                 row_count += 1
                 status = row.get("status", "")
-                if status == "买入候选":
-                    buy_count += 1
+                basic_status = row.get("basic_status") or status
+                final_action = row.get("final_action", "")
+                if status in ("买入候选", "基础候选") or basic_status in ("买入候选", "基础候选"):
+                    basic_count += 1
                 elif status == "观察":
                     watch_count += 1
                 elif status == "剔除":
                     reject_count += 1
+                if final_action == "小仓试跑":
+                    final_count += 1
+        if row_count and final_count == 0 and basic_count and "final_action" not in (row or {}):
+            final_count = basic_count
     except Exception as e:
         return {
             "status": "invalid",
@@ -254,6 +262,8 @@ def _cbond_status() -> dict:
             "stable_href": "cbond_double_low.html",
             "row_count": 0,
             "buy_count": 0,
+            "basic_count": 0,
+            "final_count": 0,
             "watch_count": 0,
             "reject_count": 0,
             "errors": [f"读取可转债 CSV 失败: {e}"],
@@ -266,7 +276,9 @@ def _cbond_status() -> dict:
             "latest_href": "",
             "stable_href": "cbond_double_low.html",
             "row_count": row_count,
-            "buy_count": buy_count,
+            "buy_count": final_count,
+            "basic_count": basic_count,
+            "final_count": final_count,
             "watch_count": watch_count,
             "reject_count": reject_count,
             "errors": [f"缺少 HTML 产物: cbond_double_low_{ts}.html"],
@@ -278,7 +290,9 @@ def _cbond_status() -> dict:
         "latest_href": f"cbond_double_low_{ts}.html",
         "stable_href": "cbond_double_low.html",
         "row_count": row_count,
-        "buy_count": buy_count,
+        "buy_count": final_count,
+        "basic_count": basic_count,
+        "final_count": final_count,
         "watch_count": watch_count,
         "reject_count": reject_count,
         "warnings": [],
@@ -818,6 +832,8 @@ a{{color:#2563eb}}
             "stable_href": status_info.get("stable_href", "cbond_double_low.html"),
             "row_count": status_info.get("row_count", 0),
             "buy_count": status_info.get("buy_count", 0),
+            "basic_count": status_info.get("basic_count", 0),
+            "final_count": status_info.get("final_count", 0),
             "watch_count": status_info.get("watch_count", 0),
             "reject_count": status_info.get("reject_count", 0),
             "output_tail": result.stdout[-500:] if result.stdout else "",
